@@ -45,7 +45,7 @@
     "deployment": "Docker Compose on one NVIDIA DGX Spark; generator reached through a published OpenAI-compatible host endpoint",
     "budget": "One DGX Spark and locally hosted open components; no paid service is required for the prototype",
     "licenses": [
-      "Application code remains unlicensed until the owner chooses publication terms",
+      "Application code: MIT",
       "SciFact claims and evidence annotations: CC BY 4.0",
       "SciFact abstracts from S2ORC: ODC-By 1.0",
       "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",

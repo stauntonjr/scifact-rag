@@ -67,8 +67,8 @@ See `docs/adr/0013-scifact-rag-composition-and-runtime.md` and
   The adapter now passes the checkpoint's supported `enable_thinking=false` chat-template option;
   an adapter regression test covers that request contract.
 - No GitHub repository, Issue, Project item, image publication, or deployment has been created.
-- The copied template `LICENSE` says MIT while intake deliberately keeps publication licensing
-  provisional. Reconcile that owner decision before any remote publication.
+- The owner selected MIT for the application. `LICENSE`, package metadata, intake, project
+  contract, charter, and README are reconciled; dataset, model, and pgvector rights remain separate.
 
 ## Measured template friction
 

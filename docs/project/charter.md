@@ -46,7 +46,7 @@ Success measures:
 - Data classification: public benchmark data and locally generated evaluation artifacts
 - Deployment: Docker Compose on one NVIDIA DGX Spark; generator reached through a published OpenAI-compatible host endpoint
 - Budget: One DGX Spark and locally hosted open components; no paid service is required for the prototype
-- Licensing: Application code remains unlicensed until the owner chooses publication terms, SciFact claims and evidence annotations: CC BY 4.0, SciFact abstracts from S2ORC: ODC-By 1.0, MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0, pgvector: PostgreSQL license
+- Licensing: Application code: MIT, SciFact claims and evidence annotations: CC BY 4.0, SciFact abstracts from S2ORC: ODC-By 1.0, MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0, pgvector: PostgreSQL license
 
 ## Engineering and release contract
 

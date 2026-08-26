@@ -63,8 +63,8 @@ DATABASE_URL=postgresql+psycopg://scifact:scifact-local@127.0.0.1:5432/scifact \
 - SciFact claims/evidence annotations: CC BY 4.0.
 - SciFact/S2ORC abstracts: ODC-By 1.0.
 - MiniLM and the selected NVIDIA Qwen NVFP4 checkpoint: Apache-2.0.
-- Application publication license remains an owner decision; the inherited template `LICENSE`
-  file is provisional until that decision is reconciled.
+- Application code is licensed under MIT. Dataset, model, and pgvector artifacts retain the
+  separate licenses listed above.
 
 See [the architecture ADR](docs/adr/0013-scifact-rag-composition-and-runtime.md) and
 [the dependency and license review](docs/research/scifact-rag-existing-solutions.md).

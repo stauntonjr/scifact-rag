@@ -97,15 +97,15 @@
     },
     "constraints.licenses": {
       "value": [
-        "Application code remains unlicensed until the owner chooses publication terms",
+        "Application code: MIT",
         "SciFact claims and evidence annotations: CC BY 4.0",
         "SciFact abstracts from S2ORC: ODC-By 1.0",
         "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",
         "pgvector: PostgreSQL license"
       ],
-      "status": "provisional",
-      "source": "Primary-source license review on 2026-08-25; application publication license remains an owner decision",
-      "recorded_at": "2026-08-26T01:26:57Z"
+      "status": "confirmed",
+      "source": "Owner selected MIT on 2026-08-25; repository LICENSE contains the MIT text",
+      "recorded_at": "2026-08-26T02:28:25Z"
     },
     "engineering.versioning.strategy": {
       "value": "semver",
