@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 
 from scifact_rag.application import RagApplication
-from scifact_rag.domain import EvidenceDocument, SearchHit
+from scifact_rag.domain import EvidenceChunk, EvidenceDocument, SearchHit
 
 
 class FakeCorpus:
@@ -22,6 +22,9 @@ class FakeCorpus:
 
 
 class FakeEmbedder:
+    def document_chunks(self, text: str) -> list[str]:
+        return [text]
+
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         return [[float(len(text))] for text in texts]
 
@@ -30,16 +33,21 @@ class FakeStore:
     def __init__(self, hits: Sequence[SearchHit] = ()) -> None:
         self.initialized = False
         self.batches: list[list[EvidenceDocument]] = []
+        self.chunk_batches: list[list[EvidenceChunk]] = []
         self.hits = list(hits)
 
     def initialize(self) -> None:
         self.initialized = True
 
     def upsert(
-        self, documents: Sequence[EvidenceDocument], embeddings: Sequence[Sequence[float]]
+        self,
+        documents: Sequence[EvidenceDocument],
+        chunks: Sequence[EvidenceChunk],
+        embeddings: Sequence[Sequence[float]],
     ) -> None:
-        assert len(documents) == len(embeddings)
+        assert len(chunks) == len(embeddings)
         self.batches.append(list(documents))
+        self.chunk_batches.append(list(chunks))
 
     def search(self, embedding: Sequence[float], limit: int) -> list[SearchHit]:
         return self.hits[:limit]
@@ -64,6 +72,10 @@ def test_ingest_batches_every_document() -> None:
     assert store.initialized
     assert result.documents == 3
     assert [[document.doc_id for document in batch] for batch in store.batches] == [
+        ["1", "2"],
+        ["3"],
+    ]
+    assert [[chunk.doc_id for chunk in batch] for batch in store.chunk_batches] == [
         ["1", "2"],
         ["3"],
     ]

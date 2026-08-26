@@ -11,6 +11,13 @@ class EvidenceDocument:
 
 
 @dataclass(frozen=True, slots=True)
+class EvidenceChunk:
+    doc_id: str
+    ordinal: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class SearchHit:
     doc_id: str
     title: str

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol
 
-from .domain import EvidenceDocument, SearchHit
+from .domain import EvidenceChunk, EvidenceDocument, SearchHit
 
 
 class CorpusSource(Protocol):
@@ -15,6 +15,8 @@ class CorpusSource(Protocol):
 
 
 class Embedder(Protocol):
+    def document_chunks(self, text: str) -> list[str]: ...
+
     def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
 
 
@@ -22,7 +24,10 @@ class EvidenceStore(Protocol):
     def initialize(self) -> None: ...
 
     def upsert(
-        self, documents: Sequence[EvidenceDocument], embeddings: Sequence[Sequence[float]]
+        self,
+        documents: Sequence[EvidenceDocument],
+        chunks: Sequence[EvidenceChunk],
+        embeddings: Sequence[Sequence[float]],
     ) -> None: ...
 
     def search(self, embedding: Sequence[float], limit: int) -> list[SearchHit]: ...

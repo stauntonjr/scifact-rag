@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "benchmark": "BEIR SciFact test qrels",
+  "cutoff": 10,
+  "selection": "Twelve baseline misses rescued by the bounded 126-token, 32-token-overlap experiment.",
+  "retention_rule": "Retain while the public qrels and MiniLM retrieval boundary remain active; the full 300-query benchmark remains authoritative.",
+  "query_ids": [
+    "5",
+    "48",
+    "72",
+    "127",
+    "198",
+    "213",
+    "295",
+    "312",
+    "324",
+    "415",
+    "528",
+    "549"
+  ]
+}

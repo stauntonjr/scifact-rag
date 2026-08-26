@@ -3,7 +3,14 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from .domain import Answer, EvidenceDocument, IngestResult, RetrievalMetrics, SearchHit
+from .domain import (
+    Answer,
+    EvidenceChunk,
+    EvidenceDocument,
+    IngestResult,
+    RetrievalMetrics,
+    SearchHit,
+)
 from .metrics import evaluate_rankings
 from .ports import AnswerGenerator, CorpusSource, Embedder, EvidenceStore
 
@@ -45,10 +52,17 @@ class RagApplication:
         return IngestResult(documents=total)
 
     def _upsert_batch(self, documents: Sequence[EvidenceDocument]) -> None:
-        embeddings = self._embedder.embed([_embedding_text(document) for document in documents])
-        if len(embeddings) != len(documents):
+        chunks = [
+            EvidenceChunk(document.doc_id, ordinal, text)
+            for document in documents
+            for ordinal, text in enumerate(
+                self._embedder.document_chunks(_embedding_text(document))
+            )
+        ]
+        embeddings = self._embedder.embed([chunk.text for chunk in chunks])
+        if len(embeddings) != len(chunks):
             raise ValueError("embedder returned the wrong number of vectors")
-        self._store.upsert(documents, embeddings)
+        self._store.upsert(documents, chunks, embeddings)
 
     def search(self, query: str, *, limit: int = 5) -> list[SearchHit]:
         if not query.strip():

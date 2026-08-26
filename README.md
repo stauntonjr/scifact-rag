@@ -5,6 +5,10 @@ It uses PostgreSQL with pgvector for retrieval, `paraphrase-MiniLM-L6-v2` for 38
 embeddings, and `nvidia/Qwen3.6-35B-A3B-NVFP4` through an OpenAI-compatible endpoint hosted on one
 DGX Spark.
 
+Retrieval uses overlapping 126-token MiniLM windows with 32 tokens of overlap and aggregates the
+best window score back to one document result. This preserves document IDs for citations while
+allowing evidence beyond MiniLM's first 128 input tokens to affect ranking.
+
 The product boundary is CLI-first. Domain and application contracts are Python dataclasses; one
 visible composition root wires replaceable corpus, embedding, storage, and generation adapters.
 HTTP, MCP, web UI, model tool-calling, and Pi effectiveness evaluation are intentionally inactive.
@@ -47,6 +51,10 @@ by this application.
   converted to `insufficient evidence` rather than returned as an ungrounded answer.
 - `evaluate` reports mean nDCG, MAP, recall, precision, and reciprocal rank at the selected cutoff
   over the public BEIR SciFact qrels.
+
+The current 300-query result at cutoff 10 is nDCG 0.601929, MAP 0.556945, recall 0.727944,
+precision 0.081000, and MRR 0.568218. The original one-vector baseline was nDCG 0.526066 and recall
+0.661722.
 
 ## Development checks
 

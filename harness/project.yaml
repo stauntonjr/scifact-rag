@@ -21,6 +21,7 @@
     "success_metrics": [
       "All 5,183 SciFact corpus documents can be ingested reproducibly",
       "The CLI reports nDCG, MAP, recall, precision, and MRR from public qrels",
+      "Retrieval exceeds the original nDCG@10 baseline of 0.526066 without reducing recall@10 below 0.661722",
       "An end-to-end ask command returns a grounded cited answer or insufficient evidence"
     ],
     "in_scope": [

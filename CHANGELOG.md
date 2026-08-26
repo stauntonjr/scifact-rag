@@ -6,6 +6,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Improved SciFact retrieval from nDCG@10 0.526066 and recall@10 0.661722 to 0.601929 and
+  0.727944 by ranking documents over bounded overlapping MiniLM token windows. Document-level
+  search results and citation IDs remain unchanged.
+- Activated the product-validation challenge capability with 12 real baseline misses rescued by
+  the accepted retrieval strategy; the full 300-query BEIR evaluation remains authoritative.
 - Stopped new-project intake from copying the template-maintenance root `tests/` suite into derived
   applications. The raw template unittest stage now runs only in template mode; generated
   repositories retain the portable executable harness checks and run application tests through

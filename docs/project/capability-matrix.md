@@ -37,10 +37,13 @@ The agent must not create an independent replacement merely because a capability
 deliberate replacement requires the human owner to approve supersession and update the catalog so
 only one capability owns each responsibility.
 
-## First greenfield use
+## SciFact activation state
 
-The planned `scifact-rag` proof should activate only `application-composition-root` and
-`cli-interface` initially. The HTTP, MCP, web, durable-memory, product-challenge, architecture-
-analysis, complexity-review, and role-parallelism entries remain inactive until their documented
-triggers are demonstrated. Point-in-time provenance and the semantic evidence ledger should be
-considered after the initial retrieval and answer artifacts exist, not pre-built speculatively.
+`scifact-rag` initially activated `application-composition-root` and `cli-interface`. After the
+public qrels exposed stable retrieval failures, the human owner approved
+`product-validation-challenges`. Its implementation is limited to 12 rescued queries and one
+focused integration oracle; the full 300-query benchmark remains authoritative.
+
+HTTP, MCP, web, durable memory, architecture analysis, complexity review, and role parallelism
+remain inactive. The increase to 3.72 chunk vectors per document is below the accepted four-vector
+budget and does not yet justify activating a separate complexity-analysis capability.

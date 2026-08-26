@@ -104,7 +104,7 @@
         "known-bad-corpus",
         "validation-harness"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Turn observed product failures and known-bad examples into a small deterministic challenge corpus once product outputs exist.",
       "source_projects": [
         {
@@ -137,6 +137,22 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner in the 2026-08-26 retrieval-effectiveness decision",
+        "runtime_dependencies": [
+          "BEIR SciFact qrels",
+          "sentence-transformers",
+          "PostgreSQL/pgvector"
+        ],
+        "ci_checks": [
+          "uv run pytest -m integration",
+          "docker compose run --rm app evaluate --cutoff 10"
+        ],
+        "implementation_paths": [
+          "tests/fixtures/retrieval_challenges.json",
+          "tests/test_retrieval_effectiveness_integration.py"
+        ]
       }
     },
     {

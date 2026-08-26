@@ -20,11 +20,13 @@ UI, but only CLI is active now.
 - Docker Compose owns PostgreSQL and the application image.
 - SparkRun/vLLM remains an external OpenAI-compatible host service; this project never manages its
   lifecycle implicitly.
-- Embeddings use `sentence-transformers/paraphrase-MiniLM-L6-v2` with `vector(384)`.
+- Embeddings use `sentence-transformers/paraphrase-MiniLM-L6-v2` with `vector(384)`. Documents are
+  represented by overlapping 126-token windows with 32-token overlap; the best window score is
+  aggregated back to one document result.
 - Generation uses `nvidia/Qwen3.6-35B-A3B-NVFP4` without tool calls.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
-- Only `application-composition-root` and `cli-interface` are active in
-  `harness/capabilities.json`.
+- `application-composition-root`, `cli-interface`, and the bounded
+  `product-validation-challenges` corpus are active in `harness/capabilities.json`.
 
 See `docs/adr/0013-scifact-rag-composition-and-runtime.md` and
 `docs/research/scifact-rag-existing-solutions.md`.
@@ -52,9 +54,12 @@ See `docs/adr/0013-scifact-rag-composition-and-runtime.md` and
   installation, Compose parsing, the application image build, containerized CLI help, and the
   pgvector round trip pass. The first integration invocation raced initial database startup; the
   unchanged test passed after Compose reported healthy.
-- The official checksum-verified corpus contains 5,183 documents. All were ingested. Evaluation
-  over 300 BEIR test queries at cutoff 10 reports nDCG 0.526066, MAP 0.477665, recall 0.661722,
-  precision 0.073000, and MRR 0.495447.
+- The official checksum-verified corpus contains 5,183 documents and 19,283 token windows. All were
+  ingested. Actual pgvector evaluation over 300 BEIR test queries at cutoff 10 reports nDCG
+  0.601929, MAP 0.556945, recall 0.727944, precision 0.081000, and MRR 0.568218. The original
+  one-vector baseline was nDCG 0.526066 and recall 0.661722.
+- Twelve public-qrels baseline misses rescued by windowing form the active product challenge set;
+  all twelve pass through the Compose application and updated database.
 - The application image is 10.69 GB because the standard sentence-transformers/PyTorch resolution
   includes the CUDA runtime even though Compose does not grant the application GPU access. Record
   this as an optimization candidate after the end-to-end prototype, not a precondition.
