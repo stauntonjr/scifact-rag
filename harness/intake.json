@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0",
+  "mode": "new",
+  "captured_at": "2026-08-26T01:26:57Z",
+  "answers": {
+    "project.name": {
+      "value": "SciFact RAG",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "project.summary": {
+      "value": "A CLI-first grounded retrieval-augmented generation prototype over the public SciFact corpus using PostgreSQL with pgvector, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "project.repository": {
+      "value": "stauntonjr/scifact-rag",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "project.profile": {
+      "value": "python-data",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "intent.users": {
+      "value": [
+        "Developer or researcher evaluating a small inspectable RAG system"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "intent.outcomes": {
+      "value": [
+        "Ingest the SciFact corpus, retrieve relevant evidence, and generate an answer with document citations or an explicit insufficient-evidence result",
+        "Measure retrieval against the public BEIR SciFact qrels using standard metrics"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "intent.success_metrics": {
+      "value": [
+        "All 5,183 SciFact corpus documents can be ingested reproducibly",
+        "The CLI reports nDCG, MAP, recall, precision, and MRR from public qrels",
+        "An end-to-end ask command returns a grounded cited answer or insufficient evidence"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "intent.in_scope": {
+      "value": [
+        "Typer CLI commands for ingest, search, ask, and retrieval evaluation",
+        "Python dataclass domain and application contracts",
+        "One explicit composition root with PostgreSQL/pgvector, MiniLM, SciFact, and OpenAI-compatible generation adapters",
+        "Docker Compose operation on one DGX Spark"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "intent.out_of_scope": {
+      "value": [
+        "HTTP API, MCP adapter, or web UI",
+        "Pi or weaker-model effectiveness comparisons",
+        "A bespoke adoption-effectiveness evaluation framework",
+        "Tool-calling by the generation model",
+        "Production deployment or multi-node operation"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "constraints.data_classification": {
+      "value": "public benchmark data and locally generated evaluation artifacts",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "constraints.deployment": {
+      "value": "Docker Compose on one NVIDIA DGX Spark; generator reached through a published OpenAI-compatible host endpoint",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "constraints.budget": {
+      "value": "One DGX Spark and locally hosted open components; no paid service is required for the prototype",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "constraints.licenses": {
+      "value": [
+        "Application code remains unlicensed until the owner chooses publication terms",
+        "SciFact claims and evidence annotations: CC BY 4.0",
+        "SciFact abstracts from S2ORC: ODC-By 1.0",
+        "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",
+        "pgvector: PostgreSQL license"
+      ],
+      "status": "provisional",
+      "source": "Primary-source license review on 2026-08-25; application publication license remains an owner decision",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "engineering.versioning.strategy": {
+      "value": "semver",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "engineering.versioning.current": {
+      "value": "0.1.0",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "engineering.versioning.public_contract": {
+      "value": [
+        "CLI commands and JSON result schemas",
+        "Docker Compose environment-variable contract"
+      ],
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "engineering.versioning.source": {
+      "value": "harness/project.yaml:engineering.versioning.current",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    },
+    "autonomy.level": {
+      "value": "supervised",
+      "status": "confirmed",
+      "source": "/tmp/scifact-rag-intake.json",
+      "recorded_at": "2026-08-26T01:26:57Z"
+    }
+  },
+  "contradictions": [],
+  "missing_essential_fields": [],
+  "context_readiness": "sufficient"
+}

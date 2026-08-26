@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0",
+  "harness_version": "0.5.0",
+  "template_mode": false,
+  "project": {
+    "name": "SciFact RAG",
+    "summary": "A CLI-first grounded retrieval-augmented generation prototype over the public SciFact corpus using PostgreSQL with pgvector, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+    "lifecycle": "new",
+    "profile": "python-data",
+    "status": "active",
+    "repository": "stauntonjr/scifact-rag"
+  },
+  "intent": {
+    "users": [
+      "Developer or researcher evaluating a small inspectable RAG system"
+    ],
+    "outcomes": [
+      "Ingest the SciFact corpus, retrieve relevant evidence, and generate an answer with document citations or an explicit insufficient-evidence result",
+      "Measure retrieval against the public BEIR SciFact qrels using standard metrics"
+    ],
+    "success_metrics": [
+      "All 5,183 SciFact corpus documents can be ingested reproducibly",
+      "The CLI reports nDCG, MAP, recall, precision, and MRR from public qrels",
+      "An end-to-end ask command returns a grounded cited answer or insufficient evidence"
+    ],
+    "in_scope": [
+      "Typer CLI commands for ingest, search, ask, and retrieval evaluation",
+      "Python dataclass domain and application contracts",
+      "One explicit composition root with PostgreSQL/pgvector, MiniLM, SciFact, and OpenAI-compatible generation adapters",
+      "Docker Compose operation on one DGX Spark"
+    ],
+    "out_of_scope": [
+      "HTTP API, MCP adapter, or web UI",
+      "Pi or weaker-model effectiveness comparisons",
+      "A bespoke adoption-effectiveness evaluation framework",
+      "Tool-calling by the generation model",
+      "Production deployment or multi-node operation"
+    ]
+  },
+  "constraints": {
+    "security": [
+      "No secrets in the repository"
+    ],
+    "data_classification": "public benchmark data and locally generated evaluation artifacts",
+    "deployment": "Docker Compose on one NVIDIA DGX Spark; generator reached through a published OpenAI-compatible host endpoint",
+    "budget": "One DGX Spark and locally hosted open components; no paid service is required for the prototype",
+    "licenses": [
+      "Application code remains unlicensed until the owner chooses publication terms",
+      "SciFact claims and evidence annotations: CC BY 4.0",
+      "SciFact abstracts from S2ORC: ODC-By 1.0",
+      "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",
+      "pgvector: PostgreSQL license"
+    ]
+  },
+  "engineering": {
+    "languages": [
+      "Python"
+    ],
+    "build_commands": [
+      "uv build"
+    ],
+    "test_commands": [
+      "uv run pytest"
+    ],
+    "command_contract": {
+      "primary_check": "make smoke",
+      "bootstrap": "uv sync --locked",
+      "format_check": "uvx --from ruff==0.12.10 ruff format --check .",
+      "lint": "uvx --from ruff==0.12.10 ruff check .",
+      "typecheck": "uvx --from pyright==1.1.403 pyright",
+      "unit": "uv run --with pytest==8.4.1 --with pytest-cov==6.2.1 --with hypothesis==6.138.13 python -m pytest --cov=. --cov-branch --cov-report=term-missing -m 'not integration'",
+      "integration": "uv run --with pytest==8.4.1 python -m pytest -m integration",
+      "package_smoke": "not-applicable: configure when a Python product artifact exists"
+    },
+    "quality": {
+      "dependency_lock": "uv.lock",
+      "coverage_policy": "branch-coverage-baseline-required-before-release",
+      "required_checks": [
+        "format_check",
+        "lint",
+        "typecheck",
+        "unit"
+      ],
+      "property_testing": "hypothesis"
+    },
+    "versioning": {
+      "strategy": "semver",
+      "current": "0.1.0",
+      "public_contract": [
+        "CLI commands and JSON result schemas",
+        "Docker Compose environment-variable contract"
+      ],
+      "source": "harness/project.yaml:engineering.versioning.current",
+      "tag_prefix": "v",
+      "pre_1_0_policy": "breaking-changes-bump-minor",
+      "release_notes": "CHANGELOG.md"
+    },
+    "architecture_changes_require_adr": true,
+    "public_interface_acceptance_required": true
+  },
+  "autonomy": {
+    "level": "supervised",
+    "network_writes": "explicit-human-approval",
+    "destructive_actions": "explicit-human-approval",
+    "release": "human-only",
+    "policy_changes": "human-review"
+  },
+  "sources_of_truth": [
+    {
+      "rank": 1,
+      "source": "accepted ADRs",
+      "scope": "durable architecture decisions"
+    },
+    {
+      "rank": 2,
+      "source": "code and schemas",
+      "scope": "implemented behavior"
+    },
+    {
+      "rank": 3,
+      "source": "tests and check evidence",
+      "scope": "verified behavior"
+    },
+    {
+      "rank": 4,
+      "source": "GitHub Issues",
+      "scope": "accepted work and acceptance criteria"
+    },
+    {
+      "rank": 5,
+      "source": "GitHub Project",
+      "scope": "operational planning view"
+    },
+    {
+      "rank": 6,
+      "source": "handoff and reports",
+      "scope": "orientation and derived status"
+    }
+  ],
+  "github": {
+    "issues_are_canonical_work_items": true,
+    "project_enabled": true,
+    "planning_contract": ".github/planning.json",
+    "security": {
+      "dependency_updates": "dependabot",
+      "dependency_review": "required",
+      "code_scanning": "codeql",
+      "secret_scanning": "required",
+      "push_protection": "required",
+      "workflow_permissions": "least-privilege",
+      "action_pinning": "full-commit-sha"
+    }
+  },
+  "open_questions": [],
+  "decisions": []
+}
