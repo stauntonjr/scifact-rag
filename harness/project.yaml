@@ -65,12 +65,12 @@
     "command_contract": {
       "primary_check": "make smoke",
       "bootstrap": "uv sync --locked",
-      "format_check": "uvx --from ruff==0.12.10 ruff format --check .",
-      "lint": "uvx --from ruff==0.12.10 ruff check .",
-      "typecheck": "uvx --from pyright==1.1.403 pyright",
-      "unit": "uv run --with pytest==8.4.1 --with pytest-cov==6.2.1 --with hypothesis==6.138.13 python -m pytest --cov=. --cov-branch --cov-report=term-missing -m 'not integration'",
-      "integration": "uv run --with pytest==8.4.1 python -m pytest -m integration",
-      "package_smoke": "not-applicable: configure when a Python product artifact exists"
+      "format_check": "uv run ruff format --check src tests",
+      "lint": "uv run ruff check src tests",
+      "typecheck": "uv run pyright",
+      "unit": "uv run pytest --cov=scifact_rag --cov-branch --cov-report=term-missing -m 'not integration'",
+      "integration": "uv run pytest -m integration",
+      "package_smoke": "python3 tools/python_package_smoke.py"
     },
     "quality": {
       "dependency_lock": "uv.lock",

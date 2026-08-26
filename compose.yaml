@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_DB: scifact
+      POSTGRES_USER: scifact
+      POSTGRES_PASSWORD: scifact-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scifact -d scifact"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/001-vector.sql:ro
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://scifact:scifact-local@postgres:5432/scifact
+      EMBEDDING_MODEL: sentence-transformers/paraphrase-MiniLM-L6-v2
+      GENERATOR_BASE_URL: ${GENERATOR_BASE_URL:-http://host.docker.internal:8000/v1}
+      GENERATOR_MODEL: ${GENERATOR_MODEL:-nvidia/Qwen3.6-35B-A3B-NVFP4}
+      HF_HOME: /models/huggingface
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+      - huggingface-cache:/models/huggingface
+
+volumes:
+  postgres-data:
+  huggingface-cache:

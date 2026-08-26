@@ -1,17 +1,52 @@
-[project]
-name = "agentic-project-template"
-version = "0.4.1"
-description = "A reusable engineering harness for agent-developed projects"
-requires-python = ">=3.11"
-license = "MIT"
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
-[tool.ruff]
-line-length = 100
-target-version = "py311"
+[project]
+name = "scifact-rag"
+version = "0.1.0"
+description = "CLI-first grounded RAG prototype over the SciFact corpus"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28,<1",
+  "pgvector>=0.4,<1",
+  "psycopg[binary]>=3.2,<4",
+  "sentence-transformers>=5.1,<6",
+  "sqlalchemy>=2.0,<3",
+  "typer>=0.16,<1",
+]
+
+[project.scripts]
+scifact-rag = "scifact_rag.cli:main"
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.403",
+  "pytest>=8.4",
+  "pytest-cov>=6.2",
+  "ruff>=0.12.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scifact_rag"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: requires the Compose PostgreSQL service"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
 
 [tool.coverage.run]
 branch = true
 relative_files = true
+source = ["scifact_rag"]

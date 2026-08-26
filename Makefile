@@ -1,57 +1,27 @@
-.PHONY: check test compile actions-supply-chain project-check smoke planning-audit challenge-validate challenges recovery-check harness-version product-version harness-lock harness-eval-validate model-stress-check model-stress-runner-check pi-runtime-check plugin-check plugin-sync
+.PHONY: check format-check lint typecheck unit integration package-smoke compose-config smoke
 
 check:
 	python3 tools/harness_check.py
 
-test:
-	@python3 -c 'import json, subprocess, sys; project = json.load(open("harness/project.yaml", encoding="utf-8")); sys.exit(subprocess.call([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]) if project.get("template_mode") else 0)'
+format-check:
+	uv run ruff format --check src tests
 
-compile:
-	python3 -m compileall -q tools tests
+lint:
+	uv run ruff check src tests
 
-actions-supply-chain:
-	python3 tools/check_actions_supply_chain.py
+typecheck:
+	uv run pyright
 
-project-check:
-	python3 tools/run_quality.py
+unit:
+	uv run pytest -m 'not integration'
 
-smoke: check actions-supply-chain compile test project-check challenge-validate recovery-check model-stress-check model-stress-runner-check
+integration:
+	uv run pytest -m integration
 
-planning-audit:
-	python3 tools/github_planning.py audit --offline
+package-smoke:
+	python3 tools/python_package_smoke.py
 
-challenge-validate:
-	python3 tools/run_challenges.py
+compose-config:
+	docker compose config --quiet
 
-challenges:
-	python3 tools/run_challenges.py --run
-
-recovery-check:
-	python3 tools/recovery_scenarios.py
-
-harness-version:
-	python3 tools/harness_upgrade.py status
-
-product-version:
-	python3 tools/product_version.py
-
-harness-lock:
-	python3 tools/harness_upgrade.py lock --yes
-
-harness-eval-validate:
-	python3 tools/evaluate_harness.py
-
-model-stress-check:
-	python3 tools/model_stress.py check
-
-model-stress-runner-check:
-	python3 tools/model_stress_runner.py check
-
-pi-runtime-check:
-	python3 tools/pi_adapter_check.py
-
-plugin-check:
-	python3 tools/skill_plugin.py check
-
-plugin-sync:
-	python3 tools/skill_plugin.py sync --yes
+smoke: check format-check lint typecheck unit package-smoke compose-config

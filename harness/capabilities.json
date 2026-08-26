@@ -277,7 +277,7 @@
         "ports-and-adapters",
         "visible-wiring"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Keep domain and application semantics independent of frameworks while one visible composition root wires ports to concrete adapters.",
       "source_projects": [
         {
@@ -311,6 +311,27 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner in the 2026-08-25 greenfield architecture decision",
+        "runtime_dependencies": [
+          "SQLAlchemy Core",
+          "psycopg",
+          "pgvector",
+          "sentence-transformers",
+          "httpx"
+        ],
+        "ci_checks": [
+          "make smoke",
+          "uv run pytest -m integration"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/domain.py",
+          "src/scifact_rag/ports.py",
+          "src/scifact_rag/application.py",
+          "src/scifact_rag/composition.py",
+          "src/scifact_rag/adapters/"
+        ]
       }
     },
     {
@@ -318,7 +339,7 @@
       "aliases": [
         "command-line-adapter"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Expose application use cases through a thin command-line adapter that shares typed inputs and results with later interfaces.",
       "source_projects": [
         {
@@ -348,6 +369,19 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner in the 2026-08-25 greenfield architecture decision",
+        "runtime_dependencies": [
+          "Typer"
+        ],
+        "ci_checks": [
+          "uv run scifact-rag --help",
+          "make smoke"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/cli.py"
+        ]
       }
     },
     {
