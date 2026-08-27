@@ -62,7 +62,7 @@ Follow the state order and gates in the loop contract.
 - Delegate only independent, bounded lanes. Use one write-capable owner per worktree.
 - Give every implementer an issue, branch, worktree, path scope, acceptance evidence, and stop condition.
 - Use a verifier who did not author the reviewed work.
-- Stop after three consecutive failures at the same boundary and escalate with preserved evidence.
+- Stop after five consecutive failures at the same boundary and escalate with preserved evidence.
 - Obtain required human approval before external side effects.
 - Treat a failed network or loopback probe inside a restricted runtime as indeterminate, not as
   proof that a credential, API, container, or host service is unavailable. Before classifying a
@@ -104,7 +104,7 @@ If objective, acceptance, or write scope changes, use `loop.py revise`; if imple
 without changing the contract, use `loop.py new-attempt`. A verifier finding is not itself a
 contract revision. Prior checks and approvals do not satisfy the new revision or attempt, and a
 contract revision invalidates prior criterion waivers. `new-attempt` persists each failed repair
-attempt and blocks after the third without creating attempt four.
+attempt and blocks after the fifth without creating attempt six.
 
 Inspect a preserved run without changing Git state:
 
@@ -112,7 +112,7 @@ Inspect a preserved run without changing Git state:
 python3 tools/loop.py recovery-status --run RUN_ID --integration-ref main
 ```
 
-After retry exhaustion, do not delete partial work or continue under a fourth attempt. Prepare a
+After retry exhaustion, do not delete partial work or continue under a sixth attempt. Prepare a
 structured handoff containing `schema_version`, `summary`, `failure_boundary`, `preserved_paths`,
 and `next_action`. Only a human-reviewed resume starts a new revision:
 

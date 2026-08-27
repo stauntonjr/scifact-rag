@@ -16,6 +16,7 @@ try:
     from .common import load_json, repository_root, write_json
     from .loop import (
         add_item,
+        configured_retry_limit,
         load_run,
         make_scope_contract,
         make_write_set,
@@ -30,6 +31,7 @@ except ImportError:  # Direct script execution.
     from common import load_json, repository_root, write_json
     from loop import (
         add_item,
+        configured_retry_limit,
         load_run,
         make_scope_contract,
         make_write_set,
@@ -181,14 +183,13 @@ def agent_crash(root: Path, source_root: Path) -> dict[str, Any]:
 
 
 def exhaust_retries(root: Path) -> dict[str, Any]:
-    new_attempt(root, "recovery-fixture", "failure one")
-    new_attempt(root, "recovery-fixture", "failure two")
-    try:
-        new_attempt(root, "recovery-fixture", "failure three")
-    except RuntimeError as exc:
-        error = str(exc)
-    else:  # pragma: no cover - a failure is the contract under test.
-        error = "retry ceiling did not stop"
+    error = "retry ceiling did not stop"
+    for failure in range(1, configured_retry_limit(root) + 1):
+        try:
+            new_attempt(root, "recovery-fixture", f"failure {failure}")
+        except RuntimeError as exc:
+            error = str(exc)
+            break
     _, record = load_run(root, "recovery-fixture")
     return {
         "record": record,
@@ -205,7 +206,10 @@ def retry_exhaustion(root: Path, source_root: Path) -> dict[str, Any]:
         "terminal_state": record["state"],
         "attempt_id": record["attempt_id"],
         "failure_count": len(record["attempt_history"]),
-        "ceiling_error": "retry ceiling reached after 3" in exhausted["error"],
+        "ceiling_error": (
+            f"retry ceiling reached after {record['retry_policy']['maximum_consecutive_failures']}"
+            in exhausted["error"]
+        ),
         "destructive_git_commands": [],
     }
 
@@ -221,7 +225,7 @@ def resumable_handoff(root: Path, source_root: Path) -> dict[str, Any]:
         handoff={
             "schema_version": "1.0",
             "summary": "Use a reviewed recovery approach",
-            "failure_boundary": "Three failures at one boundary",
+            "failure_boundary": "Configured failures at one boundary",
             "preserved_paths": ["partial.txt"],
             "next_action": "Re-enter understand before changing the candidate",
         },

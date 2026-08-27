@@ -379,3 +379,66 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   timing, tool-error, or oracle value, and both original and corrected hashes are reported.
 - Prevention: future cross-provider comparisons must distinguish configuration intent from an
   observed or source-verified provider request boundary.
+
+## SCIFACT-RAG-001: Compose run did not accept an ad hoc GPU flag
+
+- Date: 2026-08-26.
+- Workflow: run the first MS MARCO cross-encoder retrieval evaluation on the DGX Spark GPU.
+- Failed approach: documented and invoked `docker compose run --rm --gpus all app ...`, assuming
+  the standalone Docker GPU flag was available on this host's Compose `run` command.
+- Error signature: `unknown flag: --gpus` before any application or model process started.
+- Mutation check: the failed command created no container, changed no database row or repository
+  file, and invoked no model. A later CPU evaluation was deliberately interrupted after 417.39
+  seconds when the owner required a hosted GPU model; it produced no metrics and is diagnostic only.
+- Corrected path: define a separate digest-pinned Hugging Face TEI service with `gpus: all` in
+  `compose.yaml`, verify its health and `/rerank` API, and have the application call it over the
+  Compose network.
+- Verification: the disposable and durable TEI services loaded the exact model revision as
+  `FlashBert` on CUDA, enforced 512 tokens, and scored a relevant control above an irrelevant
+  control. The completed 300-query Compose run returned all metrics in 87.91 seconds.
+- Prevention: GPU device requests belong in this project's Compose service definition; documented
+  application commands no longer depend on an unsupported `docker compose run --gpus` option.
+
+## HARNESS-012: evidence-ordering repairs exhausted the engineering retry ceiling
+
+- Date: 2026-08-26.
+- Workflow: complete the independently reviewed MS MARCO reranker engineering loop.
+- Failed approach: recorded attempt-scoped release-impact evidence after the full gate, then did not
+  refresh it before a later attempt, consuming the three permitted repairs on harness evidence
+  freshness rather than product defects.
+- Error signature: completion validation reported stale release-impact evidence and, after repair,
+  multiple current-attempt full gates.
+- Mutation check: the exhausted repairs did not alter the reviewed reranker candidate; the human
+  resume rebuilt only its evidence chain.
+- Corrected path: record current-attempt release impact before the single final full gate, then bind
+  independent review and verdict to that exact candidate and evidence identity.
+- Verification: the resumed reranker run reported cleanly, and recovery fixture R005 now proves the
+  owner-authorized five-failure ceiling blocks at attempt five without creating attempt six.
+- Prevention: the engineering-loop ceiling is five for new runs, the second-failed-repair
+  proportionality review remains mandatory, and retry exhaustion still requires human-reviewed
+  structured recovery. Pi's separate unavailable-tool ceiling remains three.
+
+## SCIFACT-RAG-002: representation ingestion invalidated the BM25 index
+
+- Date: 2026-08-26.
+- Workflow: evaluate fixed BM25 fusion and incremental candidate pools for semantic packing
+  representations after ingesting a new full-corpus vector representation.
+- Failed approach: every representation batch unconditionally updated existing document tuples and
+  recomputed identical BM25 vectors, even though the corpus text had not changed. The first attempt
+  also launched three BM25 evaluations concurrently against the resulting index.
+- Error signature: VectorChord-BM25 raised `could not read blocks 1920..1920 ... read only 0 of
+  8192 bytes`, followed by `ResourceOwnerForget called for relcache reference after release
+  started`; a serialized retry reproduced the same stale tuple reference.
+- Mutation check: the failed evaluations were read-only and returned no accepted metrics. All 5,183
+  document rows remained readable. The local `documents_bm25_idx` was rebuilt once from the intact
+  heap, shrinking from 370,130,944 to 155,115,520 bytes; no table, volume, or corpus row was deleted.
+- Corrected path: the document upsert now executes its conflict update only for changed title/text
+  or a previously missing retained embedding. BM25 vectors update only when retokenization is
+  distinct from the stored vector. Representation rows remain independently replaceable.
+- Verification: the isolated PostgreSQL test preserves document `ctid` and `xmin` across an
+  additional representation upsert and then retrieves through BM25. A full 5,183-document no-op
+  ingestion preserved the exact tuple-identity digest and BM25 index size, followed by a successful
+  live BM25 search without reindexing.
+- Prevention: unchanged representation ingestion must be tuple-idempotent at the document layer;
+  the focused integration test is the durable guard. Full BM25 evaluations against this local
+  extension are serialized rather than launched concurrently.

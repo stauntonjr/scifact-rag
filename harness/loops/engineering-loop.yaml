@@ -5,7 +5,7 @@
   "start_state": "intake",
   "terminal_states": ["reported", "blocked", "abandoned"],
   "retry_policy": {
-    "maximum_consecutive_failures": 3,
+    "maximum_consecutive_failures": 5,
     "on_exhaustion": "stop-and-escalate",
     "preserve_partial_work": true,
     "resume_requires": "human-reviewed-structured-handoff",

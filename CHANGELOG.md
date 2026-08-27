@@ -6,6 +6,91 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added an opt-in fixed-pool ColBERT ablation that applies the existing robust-normalized
+  title/max-content scorer to the unchanged six-generator interval pool. On the fixed 649-query
+  development split, candidate recall and oracle nDCG are identical to the whole-document control,
+  but nDCG changes from 0.759619 to 0.655268 (-0.104351) and recall from 0.869055 to 0.795095.
+  Applying the same scorer to the prior four-generator pool changes nDCG by only +0.002063,
+  locating the measured regression in the complete multiview scoring bundle rather than pool
+  composition without identifying one component. No component sweep or default promotion
+  followed.
+- Added an opt-in dual-profile nominal-coreference DP strategy that derives raw-source 112/126
+  MiniLM candidate chunks and raw-source 510-token ColBERT scorer chunks from one analysis. The
+  primary pool is limited to BM25, title, rewritten nominal sentences, and raw MiniLM-DP vectors;
+  ColBERT separately scores title and every large content view, takes the per-document content max,
+  robust-normalizes both channels per query, and ranks their equal mean. Full ingestion stores
+  17,807 embedded MiniLM-DP rows and 5,573 non-embedded ColBERT-DP rows with zero tokenizer-limit or
+  raw-source violations. One fixed 649-query development run reaches candidate recall 0.955059 and
+  oracle nDCG 0.955886 but final nDCG 0.657331 and recall 0.795095, so the strategy remains opt-in
+  without a weight sweep or default promotion.
+- Separated title embeddings from every abstract-derived MiniLM representation and made fixed
+  equal RRF between the dedicated title and abstract-token channels the pre-1.0 default. Expanded
+  the global-interval pool to six generators and added one opt-in RankZephyr listwise scorer through
+  a pinned, memory-bounded vLLM service and pinned RankLLM HTTP coordinator. MS MARCO, ColBERT, and
+  RankZephyr remain independent scorers over the identical pool; no scorer fusion or parameter
+  sweep is introduced. A live RankZephyr throughput probe projected roughly 3.4 hours for 160
+  queries, so the owner deferred it from practical use and rejected its distilled-frontier-model
+  approach; its services are stopped while the opt-in integration remains.
+- Recorded one fixed exploratory comparison on all 300 already-inspected SciFact test queries. The
+  six-generator pool reaches candidate recall 0.950333 and oracle nDCG 0.951169. ColBERT reaches
+  nDCG 0.744417 and recall 0.852667, 0.003283 below AnswerAI's non-equivalent published full-corpus
+  nDCG 0.7477; MS MARCO reaches nDCG 0.688308 and recall 0.812222. The current dedicated-title plus
+  abstract-token equal-RRF default reaches only nDCG 0.548652 and recall 0.705167, making the
+  default policy a revisit item without automatically changing it from reused test evidence.
+- Added independent MS MARCO and ColBERT scoring over the five-generator coreference-interval
+  candidate pool. The expanded pool raises candidate recall to 0.925000; MS MARCO reaches
+  validation nDCG 0.701572 with recall 0.790625, while ColBERT retains nDCG 0.734958 and recall
+  0.800000. Neither changed the then-current default or added a fusion.
+- Added opt-in global equal-cost coreference-interval packing, three fixed BM25 packing fusions,
+  and three one-at-a-time additions to the existing candidate pool. The interval pack leads the
+  packers at validation nDCG 0.630108 and recall 0.762500; either coreference pack raises pooled
+  candidate recall to 0.925000 and oracle nDCG to 0.926414, but equal five-channel RRF regresses.
+  Representation ingestion is now document/BM25 tuple-idempotent, preventing unchanged vector
+  ingestion from invalidating the VectorChord-BM25 index.
+- Added opt-in MiniLM `sentence-pack` and `coref-aware-pack` representations with deterministic
+  sentence boundaries, original-offset coreference cohesion, bounded 126-token fallback, and one
+  frozen validation result per strategy; neither changes the default.
+- Added one opt-in hosted ColBERT late-interaction scorer over the unchanged four-generator pool.
+  The digest-pinned NVIDIA vLLM service loads an immutable Apache-2.0 AnswerAI checkpoint and
+  explicitly right-truncates at 512 tokens. Frozen validation nDCG improves to 0.734958, but recall
+  falls to 0.800000 below the guardrail, so no test run or default promotion occurred. The measured
+  MiniLM/abstract length mismatch and semantic chunking follow-on are documented separately.
+- Added a generic immutable candidate feature matrix, score-normalizer port, and setwise ranking
+  policy boundary. One opt-in four-channel robust normalized mean uses fixed median/MAD logistic
+  normalization with deterministic zero-MAD and constant-channel fallbacks. It improves pooled
+  validation nDCG from 0.683622 to 0.688954 at unchanged recall 0.806250, but remains below the
+  BM25/token-window leader, so no test confirmation or default promotion occurred.
+- Added feature-preserving candidate generation, complete corpus-global BM25/vector rescoring,
+  fixed four- and five-channel pooled RRF strategies, exact matching-passage provenance, and a
+  deterministic 649/160 train development/validation partition. The shared pool reaches validation
+  recall 0.906250 and oracle nDCG 0.907664, but neither fixed pooled ranker beats the validation
+  BM25/token-window leader, so no test confirmation or default promotion occurred. ADR-0020 aligns
+  future graph-projection ownership with Procurement Intelligence Lab without adding a dependency,
+  schema, service, graph implementation, or template runtime capability.
+- Added one pinned `ms-marco-MiniLM-L6-v2` cross-encoder experiment over the deduplicated top-50
+  candidate union from BM25, token windows, strict coreference, and nominal coreference. A
+  digest-pinned Hugging Face TEI service hosts the model on the DGX Spark GPU; the model revision,
+  512-token input boundary, candidate depth, and batching ceiling are fixed, while graph work and
+  default promotion remain deferred. The one 300-query run leads MRR at 0.658184 but ranks fourth
+  by nDCG at 0.686962 and lowers recall versus BM25, so it remains experimental.
+- Added four fixed BM25-plus-vector RRF strategies for token windows, strict coreference, nominal
+  coreference, and coreference-max. All reuse symmetric top-50, `k=60` fusion with no sweep or
+  weights. Nominal fusion leads nDCG@10 at 0.697360, token-window fusion leads recall@10 at
+  0.842667; that exploratory public-qrels evidence did not authorize promotion at that stage.
+- Migrated the PostgreSQL 17 Compose image to preserve pgvector 0.8.6 while adding
+  pg_tokenizer 0.1.1 and VectorChord-BM25 0.3.0. The independent raw title-plus-abstract BM25
+  strategy was the leaderboard leader at that intermediate stage with nDCG@10 0.681034 and
+  recall@10 0.821889, but it did not replace the then-current default; later BM25 fusion uses one frozen
+  protocol rather than tuning.
+- Added independently selectable PostgreSQL keyword and strict-dense-plus-keyword RRF retrieval
+  experiments without a new dependency or service. Keyword search rescues 13 strict-dense misses,
+  but keyword-only and symmetric RRF underperform strict dense overall, so both remain
+  experimental and did not replace the then-current default.
+- Added independently selectable token-window, strict coreference-sentence, broader
+  coreference-sentence, and max-fused retrieval strategies. Titles are a parallel representation,
+  strategy rows coexist in PostgreSQL, and token windows remained the default pending a separate
+  promotion decision. At that intermediate stage the strict strategy led the internal SciFact
+  leaderboard at nDCG@10 0.618163 and recall@10 0.779500.
 - Improved SciFact retrieval from nDCG@10 0.526066 and recall@10 0.661722 to 0.601929 and
   0.727944 by ranking documents over bounded overlapping MiniLM token windows. Document-level
   search results and citation IDs remain unchanged.
@@ -112,8 +197,8 @@ All notable changes to the harness are recorded here. The harness version and a 
 - Existing-repository adoption now copies only upstream-owned harness internals and records
   merge-required, workflow, test, license, changelog, and dependency-lock paths
   for explicit reconciliation instead of silently overwriting application policy.
-- Engineering-loop retries now persist the third consecutive failure as `blocked` without creating
-  attempt four. A retry-exhausted resume preserves partial work and starts a new evidence revision
+- Engineering-loop retries now persist the fifth consecutive failure as `blocked` without creating
+  attempt six. A retry-exhausted resume preserves partial work and starts a new evidence revision
   only from a structured `human:IDENTITY` handoff.
 - Plugin packaging now deterministically qualifies cross-skill references while retaining
   progressively disclosed `SKILL.md` and reference files. Repository policy and application state

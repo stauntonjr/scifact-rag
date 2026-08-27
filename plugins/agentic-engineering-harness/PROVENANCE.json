@@ -2,11 +2,11 @@
   "schema_version": "1.0",
   "plugin": {
     "name": "agentic-engineering-harness",
-    "version": "0.1.1+codex.20260825205827"
+    "version": "0.1.2+codex.20260826143341"
   },
   "manifest": {
     "path": "plugins/agentic-engineering-harness/.codex-plugin/plugin.json",
-    "sha256": "395e43ce6892de7b3eea3244cf7ee3949b7f70a71ee96a319115d8d5b78ed87c"
+    "sha256": "38d9158c0389ad42823a8abdc406e9093bb6f7a51635b4f77a5f86494cef36ac"
   },
   "source": {
     "repository": "https://github.com/stauntonjr/agentic-project-template",
@@ -31,8 +31,8 @@
   ],
   "files": {
     "execute-engineering-loop/SKILL.md": {
-      "source_sha256": "74c94e3540aeb745700f71d9f8d3cda501fddc414e98ea9450c974ea9d79be40",
-      "distribution_sha256": "0815e1748ea445e4017374da9a57a65d73f209e0ed0ede7bf1a1ed590806c9c9",
+      "source_sha256": "2872f8e50a5b8b60704adb79cab23a1d29e6f96738ab200c47f503d42f7c20cc",
+      "distribution_sha256": "d775028e61666cb503f9b326719db84ae73ebe78d630e4ebc6071161bb7c5eee",
       "transformation": "namespace-skill-references"
     },
     "execute-engineering-loop/agents/openai.yaml": {

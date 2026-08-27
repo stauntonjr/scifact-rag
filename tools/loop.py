@@ -74,7 +74,7 @@ RELEASE_IMPACTS = ("none", "patch", "minor", "major")
 FINAL_STATES = ("reported", "blocked", "abandoned")
 RUN_SCHEMA_VERSION = "1.4"
 RESUME_HANDOFF_SCHEMA_VERSION = "1.0"
-DEFAULT_MAXIMUM_CONSECUTIVE_FAILURES = 3
+DEFAULT_MAXIMUM_CONSECUTIVE_FAILURES = 5
 
 
 def git_text(root: Path, *args: str) -> str:

@@ -4,7 +4,7 @@
   "template_mode": false,
   "project": {
     "name": "SciFact RAG",
-    "summary": "A CLI-first grounded retrieval-augmented generation prototype over the public SciFact corpus using PostgreSQL with pgvector, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+    "summary": "A CLI-first grounded retrieval-augmented generation prototype over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
     "lifecycle": "new",
     "profile": "python-data",
     "status": "active",
@@ -27,7 +27,7 @@
     "in_scope": [
       "Typer CLI commands for ingest, search, ask, and retrieval evaluation",
       "Python dataclass domain and application contracts",
-      "One explicit composition root with PostgreSQL/pgvector, MiniLM, SciFact, and OpenAI-compatible generation adapters",
+      "One explicit composition root with PostgreSQL/pgvector/VectorChord-BM25, MiniLM, SciFact, and OpenAI-compatible generation adapters",
       "Docker Compose operation on one DGX Spark"
     ],
     "out_of_scope": [
@@ -50,7 +50,16 @@
       "SciFact claims and evidence annotations: CC BY 4.0",
       "SciFact abstracts from S2ORC: ODC-By 1.0",
       "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",
-      "pgvector: PostgreSQL license"
+      "MS MARCO MiniLM L6 cross-encoder checkpoint: Apache-2.0",
+      "AnswerAI ColBERT small checkpoint: Apache-2.0",
+      "RankLLM at pinned source revision: Apache-2.0",
+      "RankZephyr 7B V1 Full checkpoint: MIT",
+      "Hugging Face Text Embeddings Inference: Apache-2.0",
+      "vLLM: Apache-2.0; pinned NVIDIA vLLM container retains separate NVIDIA AI Product terms",
+      "FastCoref code and FCoref checkpoint: MIT",
+      "pgvector: PostgreSQL license",
+      "pg_tokenizer: Apache-2.0",
+      "VectorChord-BM25: AGPLv3 or Elastic License v2, separate from the MIT application"
     ]
   },
   "engineering": {

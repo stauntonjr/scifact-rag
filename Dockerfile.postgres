@@ -1,0 +1,18 @@
+ARG VCHORD_SUITE_IMAGE=tensorchord/vchord-suite:pg17-20260501@sha256:28a618d3ec820e3e7215b372b69ae9c5d22b5353d1046aa8fc7beb4f14613d74
+ARG PGVECTOR_IMAGE=pgvector/pgvector:0.8.6-pg17-bookworm@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
+
+FROM ${VCHORD_SUITE_IMAGE} AS extensions
+FROM ${PGVECTOR_IMAGE}
+
+COPY --from=extensions \
+    /usr/lib/postgresql/17/lib/pg_tokenizer.so \
+    /usr/lib/postgresql/17/lib/vchord_bm25.so \
+    /usr/lib/postgresql/17/lib/
+COPY --from=extensions \
+    /usr/share/postgresql/17/extension/pg_tokenizer* \
+    /usr/share/postgresql/17/extension/
+COPY --from=extensions \
+    /usr/share/postgresql/17/extension/vchord_bm25* \
+    /usr/share/postgresql/17/extension/
+
+CMD ["postgres", "-c", "shared_preload_libraries=vchord_bm25,vector,pg_tokenizer", "-c", "search_path=\"$user\", public, bm25_catalog, tokenizer_catalog"]

@@ -19,27 +19,128 @@ def test_pgvector_round_trip() -> None:
     store = PostgresEvidenceStore(database_url)
     store.initialize()
     suffix = uuid.uuid4().hex
-    first = EvidenceDocument(f"first-{suffix}", "first", "first document")
+    keyword_marker = f"marker{suffix}"
+    first = EvidenceDocument(f"first-{suffix}", "first", keyword_marker)
     second = EvidenceDocument(f"second-{suffix}", "second", "second document")
     seed = uuid.UUID(suffix).bytes
     first_vector = [float(seed[index % len(seed)] - 127.5) for index in range(384)]
     second_vector = [-value for value in first_vector]
 
     chunks = [
-        EvidenceChunk(first.doc_id, 0, "irrelevant first window"),
-        EvidenceChunk(first.doc_id, 1, "relevant second window"),
-        EvidenceChunk(second.doc_id, 0, "second document"),
+        EvidenceChunk(first.doc_id, 0, "irrelevant first window", "strict"),
+        EvidenceChunk(first.doc_id, 1, "relevant second window", "broad"),
+        EvidenceChunk(
+            first.doc_id,
+            0,
+            "raw scorer-only view",
+            "scorer-only",
+            embedding_required=False,
+        ),
+        EvidenceChunk(second.doc_id, 0, "second document", "strict"),
     ]
     try:
         store.upsert(
             [first, second],
             chunks,
-            [second_vector, first_vector, second_vector],
+            [second_vector, first_vector, None, first_vector],
         )
-        hits = store.search(first_vector, 1)
+        strict_hits = store.search_vector(first_vector, 1, ("strict",))
+        fused_hits = store.search_vector(first_vector, 1, ("strict", "broad"))
+        keyword_hits = store.search_keyword(keyword_marker, 2)
+        bm25_hits = store.search_bm25(keyword_marker, 10)
+        vector_candidates = store.retrieve_vector_candidates(
+            first_vector,
+            2,
+            ("strict", "broad"),
+        )
+        vector_scores = store.score_vector_candidates(
+            first_vector,
+            (first.doc_id, second.doc_id),
+            ("strict", "broad"),
+        )
+        bm25_scores = store.score_bm25_candidates(
+            keyword_marker,
+            (first.doc_id, second.doc_id),
+        )
+        scorer_views = store.load_chunks((first.doc_id,), ("scorer-only",))
+        scorer_only_vector_hits = store.search_vector(first_vector, 2, ("scorer-only",))
+        with store._engine.connect() as connection:
+            tuple_identity_before = {
+                str(row.doc_id): (str(row.ctid), str(row.xmin))
+                for row in connection.execute(
+                    text(
+                        "SELECT doc_id, ctid::text AS ctid, xmin::text AS xmin "
+                        "FROM documents WHERE doc_id IN (:first, :second)"
+                    ),
+                    {"first": first.doc_id, "second": second.doc_id},
+                )
+            }
+            extension_versions = dict(
+                list(
+                    connection.execute(
+                        text(
+                            "SELECT extname, extversion FROM pg_extension "
+                            "WHERE extname IN ('vector', 'pg_tokenizer', 'vchord_bm25')"
+                        )
+                    ).tuples()
+                )
+            )
 
-        assert hits[0].doc_id == first.doc_id
-        assert hits[0].score == pytest.approx(1.0)
+        store.upsert(
+            [first, second],
+            [
+                EvidenceChunk(first.doc_id, 0, "another first representation", "additional"),
+                EvidenceChunk(second.doc_id, 0, "another second representation", "additional"),
+            ],
+            [first_vector, second_vector],
+        )
+        with store._engine.connect() as connection:
+            tuple_identity_after = {
+                str(row.doc_id): (str(row.ctid), str(row.xmin))
+                for row in connection.execute(
+                    text(
+                        "SELECT doc_id, ctid::text AS ctid, xmin::text AS xmin "
+                        "FROM documents WHERE doc_id IN (:first, :second)"
+                    ),
+                    {"first": first.doc_id, "second": second.doc_id},
+                )
+            }
+        bm25_hits_after_representation_ingest = store.search_bm25(keyword_marker, 10)
+
+        assert strict_hits[0].doc_id == second.doc_id
+        assert fused_hits[0].doc_id == first.doc_id
+        assert fused_hits[0].score == pytest.approx(1.0)
+        assert keyword_hits[0].doc_id == first.doc_id
+        assert bm25_hits[0].doc_id == first.doc_id
+        assert bm25_hits[0].score > 0
+        assert vector_candidates[0].document.doc_id == first.doc_id
+        assert vector_candidates[0].representation == "broad"
+        assert vector_candidates[0].chunk_ordinal == 1
+        assert vector_candidates[0].matched_text == "relevant second window"
+        assert {score.doc_id for score in vector_scores} == {first.doc_id, second.doc_id}
+        first_score = next(score for score in vector_scores if score.doc_id == first.doc_id)
+        assert first_score.representation == "broad"
+        assert first_score.chunk_ordinal == 1
+        assert first_score.matched_text == "relevant second window"
+        assert {score.doc_id for score in bm25_scores} == {first.doc_id, second.doc_id}
+        assert next(score for score in bm25_scores if score.doc_id == first.doc_id).score > 0
+        assert scorer_views == [
+            EvidenceChunk(
+                first.doc_id,
+                0,
+                "raw scorer-only view",
+                "scorer-only",
+                embedding_required=False,
+            )
+        ]
+        assert scorer_only_vector_hits == []
+        assert tuple_identity_after == tuple_identity_before
+        assert bm25_hits_after_representation_ingest[0].doc_id == first.doc_id
+        assert extension_versions == {
+            "pg_tokenizer": "0.1.1",
+            "vchord_bm25": "0.3.0",
+            "vector": "0.8.6",
+        }
     finally:
         with store._engine.begin() as connection:
             connection.execute(

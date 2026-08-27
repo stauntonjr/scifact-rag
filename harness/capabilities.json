@@ -142,6 +142,7 @@
         "approved_by": "human owner in the 2026-08-26 retrieval-effectiveness decision",
         "runtime_dependencies": [
           "BEIR SciFact qrels",
+          "FastCoref/FCoref",
           "sentence-transformers",
           "PostgreSQL/pgvector"
         ],
@@ -151,7 +152,11 @@
         ],
         "implementation_paths": [
           "tests/fixtures/retrieval_challenges.json",
-          "tests/test_retrieval_effectiveness_integration.py"
+          "tests/test_retrieval_effectiveness_integration.py",
+          "src/scifact_rag/strategies.py",
+          "src/scifact_rag/adapters/coreference.py",
+          "src/scifact_rag/retrievers.py",
+          "docs/reports/scifact-retrieval-leaderboard.md"
         ]
       }
     },
@@ -334,6 +339,7 @@
           "SQLAlchemy Core",
           "psycopg",
           "pgvector",
+          "FastCoref/FCoref",
           "sentence-transformers",
           "httpx"
         ],
@@ -346,6 +352,7 @@
           "src/scifact_rag/ports.py",
           "src/scifact_rag/application.py",
           "src/scifact_rag/composition.py",
+          "src/scifact_rag/retrievers.py",
           "src/scifact_rag/adapters/"
         ]
       }
