@@ -57,6 +57,8 @@ class RetrievalStrategyName(StrEnum):
     POOLED_COREF_INTERVAL_RANKZEPHYR = "pooled-coref-interval-rankzephyr"
     POOLED_COREF_NOMINAL_DP_COLBERT = "pooled-coref-nominal-dp-colbert"
     POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT = "pooled-coref-interval-multiview-colbert"
+    POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT = "pooled-coref-interval-content-max-colbert"
+    POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT = "pooled-coref-interval-raw-mean-colbert"
 
 
 class CanonicalizationPolicy(StrEnum):
@@ -646,6 +648,8 @@ def pooled_incremental_vector_strategy(
         RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
         RetrievalStrategyName.POOLED_COREF_INTERVAL_RANKZEPHYR: RetrievalStrategyName.COREF_INTERVAL_PACK,
         RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
     }.get(strategy)
 
 

@@ -420,6 +420,28 @@ class RobustScoreNormalizer:
         )
 
 
+class IdentityScoreNormalizer:
+    """Expose finite raw scores to score-fusion policies without rescaling them."""
+
+    def normalize(self, matrix: CandidateFeatureMatrix) -> CandidateFeatureMatrix:
+        if not matrix.rows:
+            return matrix
+        _validated_feature_rows(matrix)
+        return CandidateFeatureMatrix(
+            matrix.channels,
+            tuple(
+                CandidateFeatureRow(
+                    row.document,
+                    tuple(
+                        replace(feature, normalized_score=feature.raw_score)
+                        for feature in row.features
+                    ),
+                )
+                for row in matrix.rows
+            ),
+        )
+
+
 class ReciprocalRankAggregator:
     def __init__(self, *, rank_constant: int = 60) -> None:
         if rank_constant < 1:

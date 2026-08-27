@@ -6,14 +6,21 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added two opt-in component ablations on the unchanged six-generator development pool. Raw
+  content-max-only ColBERT reaches nDCG 0.755459 and recall 0.870853, versus 0.759619 and 0.869055
+  for the whole-title-plus-abstract control. Taking the equal mean of raw title and content lowers
+  nDCG by -0.038623 to 0.716835; separately robust-normalizing those channels before the same equal
+  mean lowers it by a further -0.061568 to 0.655268. The fixed comparisons identify both raw 50/50
+  title fusion and especially separate robust normalization as measured losses on development,
+  without a weight sweep, validation/test run, or default promotion.
 - Added an opt-in fixed-pool ColBERT ablation that applies the existing robust-normalized
   title/max-content scorer to the unchanged six-generator interval pool. On the fixed 649-query
   development split, candidate recall and oracle nDCG are identical to the whole-document control,
   but nDCG changes from 0.759619 to 0.655268 (-0.104351) and recall from 0.869055 to 0.795095.
   Applying the same scorer to the prior four-generator pool changes nDCG by only +0.002063,
   locating the measured regression in the complete multiview scoring bundle rather than pool
-  composition without identifying one component. No component sweep or default promotion
-  followed.
+  composition. The later component ablations above separate content-only, raw equal-mean, and
+  robust-normalized equal-mean scoring. No component sweep or default promotion followed.
 - Added an opt-in dual-profile nominal-coreference DP strategy that derives raw-source 112/126
   MiniLM candidate chunks and raw-source 510-token ColBERT scorer chunks from one analysis. The
   primary pool is limited to BM25, title, rewritten nominal sentences, and raw MiniLM-DP vectors;

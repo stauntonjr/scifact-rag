@@ -18,6 +18,7 @@ from scifact_rag.domain import (
 from scifact_rag.ports import EvidenceStore
 from scifact_rag.retrievers import (
     EqualScoreFusionPolicy,
+    IdentityScoreNormalizer,
     PooledRankingRetriever,
     ReciprocalRankAggregator,
     ReciprocalRankFusionRetriever,
@@ -334,6 +335,30 @@ def test_robust_normalization_uses_mad_logistic_and_deterministic_fallbacks() ->
     assert distributed[1] == pytest.approx(1 - distributed[2])
     assert sparse == pytest.approx([1 / 3, 1 / 3, 1 / 3, 1.0])
     assert constant == [0.5, 0.5, 0.5, 0.5]
+
+
+def test_identity_normalizer_preserves_raw_scores_as_normalized_scores() -> None:
+    document = EvidenceDocument("one", "one", "one")
+    matrix = CandidateFeatureMatrix(
+        ("title", "content"),
+        (
+            CandidateFeatureRow(
+                document,
+                (
+                    RankingFeature("title", -2.5, 1, "title"),
+                    RankingFeature("content", 7.25, 1, "content"),
+                ),
+            ),
+        ),
+    )
+
+    normalized = IdentityScoreNormalizer().normalize(matrix)
+
+    assert [feature.normalized_score for feature in normalized.rows[0].features] == [
+        -2.5,
+        7.25,
+    ]
+    assert [feature.raw_score for feature in normalized.rows[0].features] == [-2.5, 7.25]
 
 
 def test_equal_score_fusion_averages_normalized_features_setwise() -> None:

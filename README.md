@@ -141,6 +141,12 @@ docker compose run --rm app diagnose-candidates --strategy pooled-coref-nominal-
 docker compose run --rm app diagnose-candidates \
   --strategy pooled-coref-interval-multiview-colbert \
   --split train-development --cutoff 10
+docker compose run --rm app diagnose-candidates \
+  --strategy pooled-coref-interval-content-max-colbert \
+  --split train-development --cutoff 10
+docker compose run --rm app diagnose-candidates \
+  --strategy pooled-coref-interval-raw-mean-colbert \
+  --split train-development --cutoff 10
 docker compose up -d reranker late-interaction rankzephyr-model rankllm
 docker compose run --rm app diagnose-candidates --strategy pooled-coref-interval-rankzephyr \
   --split train-validation --cutoff 10
@@ -178,9 +184,11 @@ mean. Retrieval scores and candidate-only sentence views do not enter the final 
 `pooled-coref-interval-multiview-colbert` applies that exact two-channel scorer, normalizer, and
 equal-mean policy to the existing six-generator interval pool. It is a fixed-pool ablation: the
 whole-document and multiview variants receive identical candidates, so their difference measures
-the complete scoring bundle rather than pool composition. It remains opt-in and does not isolate
-the individual effects of chunking, maximum aggregation, title separation, normalization, or
-fusion.
+the complete scoring bundle rather than pool composition. Two further fixed-pool strategies expose
+its component boundary. `pooled-coref-interval-content-max-colbert` ranks only the raw maximum
+content score. `pooled-coref-interval-raw-mean-colbert` takes the equal mean of raw title and
+maximum-content scores without rescaling them. All three remain opt-in and leave the default
+unchanged.
 
 Representation ingestion replaces only the selected representation rows. Existing document tuples
 and BM25 vectors are updated only when their underlying values change, so adding an unchanged
@@ -265,6 +273,15 @@ robust-normalized ColBERT title/max-content scoring reaches nDCG 0.657331, MAP 0
 0.795095, and MRR 0.620860. This is not directly comparable to the earlier validation/test rows:
 both split and scoring protocol differ. The large oracle gap is evidence to improve ranking rather
 than expand this candidate pool; no weight sweep or default promotion follows.
+
+The same fixed six-generator pool was then used for two component ablations. Content-max-only
+ranking reaches nDCG 0.755459, MAP 0.714034, recall 0.870853, and MRR 0.724220. Raw equal-mean
+title/content fusion reaches nDCG 0.716835, MAP 0.668757, recall 0.847997, and MRR 0.683461. The
+existing robust-normalized equal mean reaches nDCG 0.655268. Relative to content-only, adding raw
+50/50 title fusion changes nDCG by -0.038623; adding separate robust normalization changes it by a
+further -0.061568. The content-only comparison with whole-title-plus-abstract scoring still
+couples title omission, chunking, maximum aggregation, and avoided right truncation, so it is not
+a pure max-operator estimate. No weight sweep, validation/test run, or default promotion followed.
 
 Scoring the expanded interval pool independently did not convert its higher validation
 candidate ceiling into higher top-10 recall. MS MARCO reaches nDCG 0.701572 and recall 0.790625;

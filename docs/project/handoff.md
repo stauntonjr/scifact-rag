@@ -46,6 +46,10 @@ UI, but only CLI is active now.
 - `pooled-coref-interval-multiview-colbert` is a fixed-pool ablation: it applies the same multiview
   scorer, normalizer, and equal-mean policy to the existing six-generator interval pool. It reuses
   stored representations, adds no scoring algorithm or parameter, and remains opt-in.
+- `pooled-coref-interval-content-max-colbert` and
+  `pooled-coref-interval-raw-mean-colbert` are fixed-pool component ablations. The first ranks only
+  max content; the second takes the equal mean of unscaled title and max-content scores through the
+  generic identity normalizer. Both remain opt-in and leave existing strategies unchanged.
 - MS MARCO, ColBERT, and pinned RankZephyr/RankLLM scorers are independently selectable over the
   latest six-generator global coreference-interval pool: BM25, title, token windows, proper-noun
   coreference, nominal coreference, and interval packing. They do not combine scorer outputs or
@@ -205,10 +209,16 @@ exact ColBERT tokenizer revision, four-generator ownership, and title/max-conten
   changes nDCG by -0.104351 with identical candidate recall and oracle nDCG. Relative to the
   four-generator multiview result it changes nDCG by only -0.002063 with identical final recall.
   The regression therefore belongs to the complete title/max-content robust-fusion bundle, not
-  pool composition, but this run does not separate chunking, max aggregation, title separation,
-  normalization, or equal fusion. A stale-image CLI preflight made no model request; the rebuilt
-  application image then produced the only result-bearing run. No further ablation or promotion
-  followed.
+  pool composition. A stale-image CLI preflight made no model request; the rebuilt application
+  image then produced the only result-bearing run.
+- The completed component ablations hold that six-generator pool fixed. Content-max-only reaches
+  nDCG 0.755459, MAP 0.714034, recall 0.870853, and MRR 0.724220. Raw title/content equal mean
+  reaches nDCG 0.716835, MAP 0.668757, recall 0.847997, and MRR 0.683461. Adding raw title fusion
+  changes nDCG by -0.038623 from content-only; separately robust-normalizing those channels changes
+  it by a further -0.061568 to 0.655268. The content-only versus whole-document comparison still
+  couples title omission, chunking, max aggregation, and truncation, so it does not isolate max
+  alone. Exactly two development diagnostics ran; no weight sweep, validation/test run, promotion,
+  or further model evaluation followed.
 - The current BM25-plus-abstract-token RRF reaches test nDCG 0.669962 and recall 0.819222. The
   owner-selected dedicated-title plus abstract-token equal-RRF default reaches only nDCG 0.548652
   and recall 0.705167, so the default policy is a current revisit item. No automatic change was

@@ -472,8 +472,31 @@ def test_dual_dp_colbert_composition_uses_exact_four_generator_pool_and_two_view
     ]
 
 
-def test_interval_pool_multiview_colbert_reuses_six_generators_and_dual_dp_scorers(
+@pytest.mark.parametrize(
+    ("retrieval_strategy", "expected_scorers", "expected_normalizer"),
+    (
+        (
+            RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT,
+            ["colbert-title", "colbert-content"],
+            "RobustScoreNormalizer",
+        ),
+        (
+            RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT,
+            ["colbert-content"],
+            "IdentityScoreNormalizer",
+        ),
+        (
+            RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT,
+            ["colbert-title", "colbert-content"],
+            "IdentityScoreNormalizer",
+        ),
+    ),
+)
+def test_interval_pool_colbert_component_ablations_reuse_fixed_pool_and_scorers(
     monkeypatch: pytest.MonkeyPatch,
+    retrieval_strategy: RetrievalStrategyName,
+    expected_scorers: list[str],
+    expected_normalizer: str,
 ) -> None:
     budget_instances: list[tuple[str, int, str | None]] = []
 
@@ -528,7 +551,7 @@ def test_interval_pool_multiview_colbert_reuses_six_generators_and_dual_dp_score
 
     application = composition.build_application(
         settings,
-        retrieval_strategy=(RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT),
+        retrieval_strategy=retrieval_strategy,
     )
 
     assert application._strategy.representations == (
@@ -549,11 +572,8 @@ def test_interval_pool_multiview_colbert_reuses_six_generators_and_dual_dp_score
         "coref-nominal",
         "coref-interval-pack",
     ]
-    assert [scorer.name for scorer in retriever._scorers] == [
-        "colbert-title",
-        "colbert-content",
-    ]
-    assert retriever._normalizer.__class__.__name__ == "RobustScoreNormalizer"
+    assert [scorer.name for scorer in retriever._scorers] == expected_scorers
+    assert retriever._normalizer.__class__.__name__ == expected_normalizer
     assert retriever._aggregator.__class__.__name__ == "EqualScoreFusionPolicy"
     assert budget_instances == [
         ("minilm", 126, None),

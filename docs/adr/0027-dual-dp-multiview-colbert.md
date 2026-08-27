@@ -86,10 +86,23 @@ whole-document scoring. The oracle-to-final nDCG gap expands from 0.195671 to 0.
 Conversely, holding the multiview scorer fixed while changing from the six-generator pool to the
 four-generator DP pool changes nDCG by only +0.002063, MAP by +0.002899, recall by 0, and MRR by
 +0.002643. The scoring-bundle regression therefore persists when pool composition is fixed; the
-pool change did not cause it. This still does not identify whether robust normalization, equal
-title/content fusion, maximum chunk aggregation, title separation, or content chunking is the
-responsible component. No further component or weight sweep was run, and neither strategy is
-promoted as the default.
+pool change did not cause it.
+
+Two subsequent component ablations hold the six-generator pool and stored 510-token content views
+fixed. Ranking only the raw maximum content score reaches nDCG 0.755459, MAP 0.714034, recall
+0.870853, and MRR 0.724220. Taking the equal mean of raw title and maximum-content scores reaches
+nDCG 0.716835, MAP 0.668757, recall 0.847997, and MRR 0.683461. Applying separate robust
+normalization before that same equal mean reaches the prior nDCG 0.655268, MAP 0.604133, recall
+0.795095, and MRR 0.618217. Thus raw title fusion changes nDCG by -0.038623 from content-only, and
+separate robust normalization changes it by a further -0.061568 under this fixed development
+protocol.
+
+Content-only differs from the whole-document control by -0.004160 nDCG and +0.001798 recall, but
+that comparison still changes title inclusion, content chunking, maximum aggregation, and right
+truncation together. It therefore does not prove the maximum operator independently harmless. The
+two stepwise comparisons do isolate the measured effects of adding raw title fusion and then
+separate robust normalization. No weight, alternate aggregator, additional split, or default
+promotion was evaluated.
 
 The first execution of this control completed but its final JSON was lost to tool-output
 truncation and the ephemeral container was already removed. One identical recovery execution

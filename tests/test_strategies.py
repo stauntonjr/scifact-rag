@@ -554,6 +554,8 @@ def test_incremental_pool_strategies_add_only_one_packing_approach() -> None:
         RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
         RetrievalStrategyName.POOLED_COREF_INTERVAL_RANKZEPHYR: RetrievalStrategyName.COREF_INTERVAL_PACK,
         RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT: RetrievalStrategyName.COREF_INTERVAL_PACK,
     }
 
 
@@ -584,6 +586,14 @@ def test_colbert_is_an_independent_opt_in_pooled_strategy() -> None:
     assert (
         RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT.value
         == "pooled-coref-interval-multiview-colbert"
+    )
+    assert (
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT.value
+        == "pooled-coref-interval-content-max-colbert"
+    )
+    assert (
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT.value
+        == "pooled-coref-interval-raw-mean-colbert"
     )
     assert RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF.value == "title-token-window-rrf"
 

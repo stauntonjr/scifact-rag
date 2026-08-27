@@ -15,6 +15,7 @@ from .retrievers import (
     Bm25CandidateScorer,
     Bm25Retriever,
     EqualScoreFusionPolicy,
+    IdentityScoreNormalizer,
     KeywordRetriever,
     PooledRankingRetriever,
     ReciprocalRankAggregator,
@@ -123,6 +124,8 @@ def build_application(
     elif retrieval_strategy in (
         RetrievalStrategyName.POOLED_COREF_NOMINAL_DP_COLBERT,
         RetrievalStrategyName.POOLED_COREF_INTERVAL_MULTIVIEW_COLBERT,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT,
+        RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT,
     ):
         assert embedder is not None
         analyzer = FastCorefAnalyzer(
@@ -230,19 +233,31 @@ def build_application(
             resolved.late_interaction_base_url,
             resolved.late_interaction_model,
         )
+        content_scorer = StoredChunkMaxRerankerCandidateScorer(
+            "colbert-content",
+            store,
+            colbert,
+            COREF_NOMINAL_DP_COLBERT,
+        )
+        scorers = (
+            (content_scorer,)
+            if retrieval_strategy is RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT
+            else (TitleRerankerCandidateScorer("colbert-title", colbert), content_scorer)
+        )
+        normalizer = (
+            IdentityScoreNormalizer()
+            if retrieval_strategy
+            in (
+                RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT,
+                RetrievalStrategyName.POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT,
+            )
+            else RobustScoreNormalizer()
+        )
         retriever = PooledRankingRetriever(
             generators,
-            (
-                TitleRerankerCandidateScorer("colbert-title", colbert),
-                StoredChunkMaxRerankerCandidateScorer(
-                    "colbert-content",
-                    store,
-                    colbert,
-                    COREF_NOMINAL_DP_COLBERT,
-                ),
-            ),
+            scorers,
             EqualScoreFusionPolicy(),
-            normalizer=RobustScoreNormalizer(),
+            normalizer=normalizer,
         )
     elif retrieval_strategy in (
         RetrievalStrategyName.RERANK_MSMARCO,

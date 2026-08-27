@@ -174,13 +174,15 @@ metrics; per-query top-ten identities were not retained for this comparison.
 
 ## Fixed train-development ColBERT architecture comparison
 
-The raw dual-profile architecture, unchanged prior whole-document ColBERT strategy, and one
-fixed-pool scoring ablation were measured over the same 649 deterministic train-development
-queries. No run inspected validation or test qrels, varied a parameter, or promoted a default.
+The raw dual-profile architecture, unchanged prior whole-document ColBERT strategy, and three
+fixed-pool scoring ablations were measured over the same 649 deterministic train-development
+queries. No run inspected validation or test qrels, varied a weight, or promoted a default.
 
 | Strategy | Mean pool | Candidate recall | Oracle nDCG@10 | nDCG@10 | MAP@10 | Recall@10 | MRR@10 |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Six-generator pool, one whole-title-plus-abstract ColBERT score | 137.47 | 0.954289 | 0.955290 | **0.759619** | **0.719683** | **0.869055** | **0.730180** |
+| Six-generator pool, raw max-content ColBERT score only | 137.47 | 0.954289 | 0.955290 | 0.755459 | 0.714034 | **0.870853** | 0.724220 |
+| Six-generator pool, raw equal-mean ColBERT title/max-content | 137.47 | 0.954289 | 0.955290 | 0.716835 | 0.668757 | 0.847997 | 0.683461 |
 | Six-generator pool, robust equal-mean ColBERT title/max-content | 137.47 | 0.954289 | 0.955290 | 0.655268 | 0.604133 | 0.795095 | 0.618217 |
 | Four-generator pool, robust equal-mean ColBERT title/max-content | 126.56 | 0.955059 | 0.955886 | 0.657331 | 0.607033 | 0.795095 | 0.620860 |
 
@@ -201,10 +203,17 @@ Holding that scorer fixed and replacing the six-generator pool with the four-gen
 changes nDCG by +0.002063, MAP by +0.002899, recall by 0, and MRR by +0.002643. Pool composition
 therefore explains none of the observed regression on this split. The ablation still combines
 content chunking, maximum aggregation, title separation, robust normalization, and equal fusion;
-it does not identify one component or justify a sweep. The stale-image CLI preflight failed before
-any model request; rebuilding the application image preceded the single result-bearing run. The
-earlier whole-document control's disclosed output-recovery execution remains documented in its
-artifact. No strategy was promoted.
+the original fixed-pool result did not identify one component or justify a sweep.
+
+The two later stepwise ablations separate more of that bundle. Adding a raw title channel with an
+equal mean to content-max-only changes nDCG by -0.038623, recall by -0.022856, and MRR by -0.040759.
+Applying separate robust normalization to those same two channels before the same equal mean
+changes nDCG by a further -0.061568, recall by -0.052902, and MRR by -0.065244. Content-max-only is
+within -0.004160 nDCG and +0.001798 recall of whole-title-plus-abstract scoring, but that comparison
+still couples title omission, chunking, maximum aggregation, and avoided right truncation. It does
+not isolate max aggregation alone. The stale-image preflight from the earlier fixed-pool run and
+the whole-document control's disclosed output-recovery execution remain documented in their
+artifacts. No strategy was promoted.
 
 ## Failure requirements exposed by the leaderboard
 
