@@ -10,6 +10,11 @@ from .adapters.postgres import PostgresEvidenceStore
 from .adapters.reranker import RankLlmReranker, TeiReranker, VllmColbertReranker
 from .adapters.tokenization import HuggingFaceTokenBudget
 from .application import RagApplication
+from .generation import (
+    DpChunkContextAssembler,
+    GenerationContextStrategyName,
+    WholeDocumentContextAssembler,
+)
 from .retrievers import (
     Bm25CandidateGenerator,
     Bm25CandidateScorer,
@@ -102,6 +107,9 @@ def build_application(
     settings: Settings | None = None,
     *,
     retrieval_strategy: RetrievalStrategyName = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    generation_context_strategy: GenerationContextStrategyName = (
+        GenerationContextStrategyName.WHOLE_DOCUMENT
+    ),
 ) -> RagApplication:
     resolved = settings or Settings.from_environment()
     store = PostgresEvidenceStore(resolved.database_url)
@@ -435,6 +443,18 @@ def build_application(
             retriever = ReciprocalRankFusionRetriever((dense, Bm25Retriever(store)))
         else:
             retriever = dense
+    context_assembler = (
+        WholeDocumentContextAssembler()
+        if generation_context_strategy is GenerationContextStrategyName.WHOLE_DOCUMENT
+        else DpChunkContextAssembler(
+            store,
+            VllmColbertReranker(
+                resolved.late_interaction_base_url,
+                resolved.late_interaction_model,
+            ),
+            adaptive=(generation_context_strategy is GenerationContextStrategyName.ADAPTIVE),
+        )
+    )
     return RagApplication(
         store=store,
         embedder=embedder,
@@ -445,6 +465,7 @@ def build_application(
         ),
         strategy=strategy,
         retriever=retriever,
+        context_assembler=context_assembler,
     )
 
 

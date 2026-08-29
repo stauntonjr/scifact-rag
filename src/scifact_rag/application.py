@@ -12,6 +12,7 @@ from .domain import (
     RetrievalMetrics,
     SearchHit,
 )
+from .generation import WholeDocumentContextAssembler
 from .metrics import evaluate_rankings
 from .ports import (
     AnswerGenerator,
@@ -19,6 +20,7 @@ from .ports import (
     CorpusSource,
     Embedder,
     EvidenceStore,
+    GenerationContextAssembler,
     RepresentationStrategy,
     Retriever,
 )
@@ -36,12 +38,14 @@ class RagApplication:
         generator: AnswerGenerator,
         strategy: RepresentationStrategy,
         retriever: Retriever,
+        context_assembler: GenerationContextAssembler | None = None,
     ) -> None:
         self._store = store
         self._embedder = embedder
         self._generator = generator
         self._strategy = strategy
         self._retriever = retriever
+        self._context_assembler = context_assembler or WholeDocumentContextAssembler()
 
     def ingest(self, corpus: CorpusSource, *, batch_size: int = 64) -> IngestResult:
         if batch_size < 1:
@@ -88,11 +92,14 @@ class RagApplication:
         return self._retriever.search(query, limit)
 
     def ask(self, query: str, *, limit: int = 5) -> Answer:
-        evidence = tuple(self.search(query, limit=limit))
-        if not evidence:
+        retrieved = tuple(self.search(query, limit=limit))
+        if not retrieved:
             return Answer(query, _INSUFFICIENT, (), self._generator.model, ())
+        evidence = tuple(self._context_assembler.assemble(query, retrieved))
+        allowed = {hit.doc_id for hit in retrieved}
+        if not evidence or any(hit.doc_id not in allowed for hit in evidence):
+            raise ValueError("generation context must contain retrieved parent documents")
         generated = self._generator.generate(query, evidence).strip()
-        allowed = {hit.doc_id for hit in evidence}
         citations = tuple(dict.fromkeys(_CITATION.findall(generated)))
         if generated.lower() == _INSUFFICIENT:
             return Answer(query, _INSUFFICIENT, (), self._generator.model, evidence)

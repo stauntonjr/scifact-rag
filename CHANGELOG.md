@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added selectable generation-context assembly after retrieval. `whole-document` remains the
+  compatibility default; `top-dp-chunks` ColBERT-scores the stored raw 510-token DP views and sends
+  at most two per retrieved parent; `adaptive` preserves a whole abstract only when it is one exact
+  DP view and otherwise uses the same chunk policy. Parent document citations remain authoritative,
+  malformed or missing views fail explicitly, and no live generation-effectiveness claim or
+  default promotion is made.
 - Added two opt-in component ablations on the unchanged six-generator development pool. Raw
   content-max-only ColBERT reaches nDCG 0.755459 and recall 0.870853, versus 0.759619 and 0.869055
   for the whole-title-plus-abstract control. Taking the equal mean of raw title and content lowers

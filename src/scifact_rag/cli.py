@@ -9,6 +9,7 @@ import typer
 
 from .adapters.scifact import BeirSciFact, QrelsSplit
 from .composition import build_application
+from .generation import GenerationContextStrategyName
 from .strategies import RetrievalStrategyName
 
 app = typer.Typer(no_args_is_help=True, help="Grounded retrieval and generation over SciFact.")
@@ -69,9 +70,20 @@ def ask(
         RetrievalStrategyName,
         typer.Option(help="Retrieval strategy."),
     ] = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    context_strategy: Annotated[
+        GenerationContextStrategyName,
+        typer.Option(help="Generation context strategy."),
+    ] = GenerationContextStrategyName.WHOLE_DOCUMENT,
 ) -> None:
     """Generate a cited answer or an insufficient-evidence result."""
-    _emit(asdict(build_application(retrieval_strategy=strategy).ask(query, limit=limit)))
+    _emit(
+        asdict(
+            build_application(
+                retrieval_strategy=strategy,
+                generation_context_strategy=context_strategy,
+            ).ask(query, limit=limit)
+        )
+    )
 
 
 @app.command("evaluate")

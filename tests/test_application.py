@@ -17,6 +17,11 @@ from scifact_rag.domain import (
     RetrievalSignal,
     SearchHit,
 )
+from scifact_rag.generation import (
+    DpChunkContextAssembler,
+    GenerationContextStrategyName,
+    WholeDocumentContextAssembler,
+)
 from scifact_rag.retrievers import (
     PooledRankingRetriever,
     ReciprocalRankFusionRetriever,
@@ -177,9 +182,21 @@ class FakeGenerator:
 
     def __init__(self, text: str) -> None:
         self.text = text
+        self.calls: list[tuple[str, list[SearchHit]]] = []
 
     def generate(self, query: str, evidence: Sequence[SearchHit]) -> str:
+        self.calls.append((query, list(evidence)))
         return self.text
+
+
+class FakeContextAssembler:
+    def __init__(self, evidence: Sequence[SearchHit]) -> None:
+        self.evidence = list(evidence)
+        self.calls: list[tuple[str, list[SearchHit]]] = []
+
+    def assemble(self, query: str, evidence: Sequence[SearchHit]) -> list[SearchHit]:
+        self.calls.append((query, list(evidence)))
+        return self.evidence
 
 
 def test_ingest_batches_every_document() -> None:
@@ -299,6 +316,108 @@ def test_ask_without_evidence_does_not_call_generator() -> None:
 
     assert answer.text == "insufficient evidence"
     assert answer.evidence == ()
+
+
+def test_ask_generates_from_assembled_context_and_keeps_parent_citation_gate() -> None:
+    parent = SearchHit("42", "evidence", "whole abstract", 0.9)
+    chunk = SearchHit("42", "evidence", "selected chunk", 0.9)
+    generator = FakeGenerator("Supported answer [42]")
+    assembler = FakeContextAssembler([chunk])
+    application = RagApplication(
+        store=FakeStore([parent]),
+        embedder=FakeEmbedder(),
+        generator=generator,
+        strategy=FakeStrategy(),
+        retriever=FakeRetriever([parent]),
+        context_assembler=assembler,
+    )
+
+    answer = application.ask("question")
+
+    assert assembler.calls == [("question", [parent])]
+    assert generator.calls == [("question", [chunk])]
+    assert answer.evidence == (chunk,)
+    assert answer.citations == ("42",)
+
+
+def test_ask_rejects_context_from_an_unretrieved_parent_before_generation() -> None:
+    parent = SearchHit("42", "evidence", "whole abstract", 0.9)
+    generator = FakeGenerator("Unsupported [99]")
+    application = RagApplication(
+        store=FakeStore([parent]),
+        embedder=FakeEmbedder(),
+        generator=generator,
+        strategy=FakeStrategy(),
+        retriever=FakeRetriever([parent]),
+        context_assembler=FakeContextAssembler([SearchHit("99", "foreign", "foreign chunk", 1.0)]),
+    )
+
+    with pytest.raises(ValueError, match="retrieved parent"):
+        application.ask("question")
+
+    assert generator.calls == []
+
+
+@pytest.mark.parametrize(
+    ("context_strategy", "adaptive"),
+    (
+        (GenerationContextStrategyName.TOP_DP_CHUNKS, False),
+        (GenerationContextStrategyName.ADAPTIVE, True),
+    ),
+)
+def test_composition_wires_opt_in_dp_generation_context(
+    monkeypatch: pytest.MonkeyPatch,
+    context_strategy: GenerationContextStrategyName,
+    adaptive: bool,
+) -> None:
+    monkeypatch.setattr(composition, "PostgresEvidenceStore", lambda database_url: FakeStore())
+    monkeypatch.setattr(composition, "MiniLmEmbedder", lambda model: FakeEmbedder())
+    monkeypatch.setattr(composition, "VllmColbertReranker", lambda *args: object())
+    monkeypatch.setattr(
+        composition,
+        "OpenAiCompatibleGenerator",
+        lambda **kwargs: FakeGenerator(""),
+    )
+    settings = Settings(
+        database_url="postgresql://unused",
+        embedding_model="minilm",
+        generator_base_url="http://generator",
+        generator_model="generator",
+        generator_api_key=None,
+        coreference_model="coref",
+        coreference_device="cpu",
+        coreference_max_tokens=4000,
+        reranker_base_url="http://reranker",
+        late_interaction_base_url="http://colbert",
+        late_interaction_model="colbert",
+        rank_llm_base_url="http://rankllm",
+    )
+
+    application = composition.build_application(
+        settings,
+        generation_context_strategy=context_strategy,
+    )
+
+    assembler = cast(DpChunkContextAssembler, application._context_assembler)
+    assert assembler._adaptive is adaptive
+    assert assembler._chunks_per_document == 2
+    assert assembler._representation == "coref-nominal-dp-colbert"
+
+
+def test_composition_defaults_to_whole_document_generation_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(composition, "PostgresEvidenceStore", lambda database_url: FakeStore())
+    monkeypatch.setattr(composition, "MiniLmEmbedder", lambda model: FakeEmbedder())
+    monkeypatch.setattr(
+        composition,
+        "OpenAiCompatibleGenerator",
+        lambda **kwargs: FakeGenerator(""),
+    )
+
+    application = composition.build_application()
+
+    assert isinstance(application._context_assembler, WholeDocumentContextAssembler)
 
 
 def test_candidate_diagnostics_report_pool_oracle_channel_and_ranking_metrics() -> None:

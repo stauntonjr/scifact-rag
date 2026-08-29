@@ -66,6 +66,15 @@ The product boundary is CLI-first. Domain and application contracts are Python d
 visible composition root wires replaceable corpus, embedding, storage, and generation adapters.
 HTTP, MCP, web UI, model tool-calling, and Pi effectiveness evaluation are intentionally inactive.
 
+Generation context is separately selectable from retrieval. `whole-document` remains the
+compatibility default and sends each retrieved title and complete abstract. `top-dp-chunks` loads
+the existing raw 510-token `coref-nominal-dp-colbert` views, scores them with the hosted ColBERT
+service, and sends at most two chunks per retrieved parent. `adaptive` keeps a complete abstract
+when its DP representation is one exact matching view and otherwise uses the same top-two
+selection. Parent retrieval order is preserved; selected chunks are restored to source order
+within each parent, titles remain attached, and citations still name parent document IDs. These
+are implemented context policies, not measured generation-quality results.
+
 ## Run with Docker Compose
 
 The generator is external to this Compose project. It must be reachable from the host at
@@ -81,6 +90,19 @@ docker compose run --rm app ingest
 docker compose run --rm app search "What evidence links immune signaling to disease?"
 docker compose run --rm app ask "What evidence links immune signaling to disease?"
 docker compose run --rm app evaluate --cutoff 10
+```
+
+The two chunk-aware generation modes require the existing DP rows and the healthy ColBERT service.
+They do not change retrieval and can be paired with any retrieval strategy:
+
+```bash
+docker compose run --rm app ingest --strategy pooled-coref-nominal-dp-colbert
+docker compose run --rm app ask \
+  --context-strategy top-dp-chunks \
+  "What evidence links immune signaling to disease?"
+docker compose run --rm app ask \
+  --context-strategy adaptive \
+  "What evidence links immune signaling to disease?"
 ```
 
 To populate and compare the coreference strategies without replacing token-window rows:
@@ -238,7 +260,9 @@ by this application.
   reciprocal-rank-fusion score. Robust normalized fusion emits an equal mean in `[0, 1]`, not a
   calibrated probability.
 - `ask` accepts only citations matching retrieved document IDs. Missing or invalid citations are
-  converted to `insufficient evidence` rather than returned as an ungrounded answer.
+  converted to `insufficient evidence` rather than returned as an ungrounded answer. Its `evidence`
+  list is the actual whole-document or chunk context supplied to the generator; chunk modes may
+  return two entries with the same parent document ID.
 - `evaluate` reports mean nDCG, MAP, recall, precision, and reciprocal rank at the selected cutoff
   over the selected public BEIR SciFact qrels split.
 - `diagnose-candidates` reports per-generator and union candidate recall, mean pool size, oracle
