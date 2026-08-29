@@ -22,6 +22,8 @@ and the ColBERT token boundary is not a Qwen prompt-token guarantee.
 - Add a `GenerationContextAssembler` application port after document retrieval and before the
   existing `AnswerGenerator` port. Retrieval remains responsible for parent-document ranking;
   context assembly owns only the evidence text supplied to generation.
+- Depend on a narrow `StoredChunkSource` port for context loading rather than the full evidence
+  store contract; the PostgreSQL store satisfies both ports through its existing `load_chunks`.
 - Expose three `ask --context-strategy` values:
   - `whole-document` preserves the retrieved title and complete abstract unchanged and remains the
     compatibility default.

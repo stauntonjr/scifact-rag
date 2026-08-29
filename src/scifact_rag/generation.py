@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from enum import StrEnum
 
 from .domain import EvidenceChunk, SearchHit
-from .ports import EvidenceStore, Reranker
+from .ports import Reranker, StoredChunkSource
 from .strategies import COREF_NOMINAL_DP_COLBERT
 
 
@@ -25,7 +25,7 @@ class DpChunkContextAssembler:
 
     def __init__(
         self,
-        store: EvidenceStore,
+        store: StoredChunkSource,
         reranker: Reranker,
         *,
         adaptive: bool = False,

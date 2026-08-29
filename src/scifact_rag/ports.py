@@ -110,7 +110,15 @@ class Reranker(Protocol):
     def score(self, query: str, documents: Sequence[SearchHit]) -> list[float]: ...
 
 
-class EvidenceStore(Protocol):
+class StoredChunkSource(Protocol):
+    def load_chunks(
+        self,
+        document_ids: Sequence[str],
+        representations: Sequence[str],
+    ) -> list[EvidenceChunk]: ...
+
+
+class EvidenceStore(StoredChunkSource, Protocol):
     def initialize(self) -> None: ...
 
     def upsert(
@@ -119,12 +127,6 @@ class EvidenceStore(Protocol):
         chunks: Sequence[EvidenceChunk],
         embeddings: Sequence[Sequence[float] | None],
     ) -> None: ...
-
-    def load_chunks(
-        self,
-        document_ids: Sequence[str],
-        representations: Sequence[str],
-    ) -> list[EvidenceChunk]: ...
 
     def search_vector(
         self,
