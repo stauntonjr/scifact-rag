@@ -531,10 +531,7 @@ def test_cli_and_composition_use_the_selected_retrieval_default() -> None:
     )
 
     for command in (ingest, search, ask, evaluate_retrieval):
-        assert (
-            signature(command).parameters["strategy"].default
-            is DEFAULT_RETRIEVAL_STRATEGY
-        )
+        assert signature(command).parameters["strategy"].default is DEFAULT_RETRIEVAL_STRATEGY
 
     assert (
         signature(build_application).parameters["generation_context_strategy"].default

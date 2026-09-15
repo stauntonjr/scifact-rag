@@ -22,11 +22,7 @@ from scifact_rag.generation import (
     GenerationContextStrategyName,
     WholeDocumentContextAssembler,
 )
-from scifact_rag.retrievers import (
-    PooledRankingRetriever,
-    ReciprocalRankFusionRetriever,
-    VectorRetriever,
-)
+from scifact_rag.retrievers import PooledRankingRetriever
 from scifact_rag.strategies import DocumentOnlyStrategy, RetrievalStrategyName
 
 
@@ -395,6 +391,7 @@ def test_composition_wires_both_dp_names_to_the_adaptive_policy(
 
     application = composition.build_application(
         settings,
+        retrieval_strategy=RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
         generation_context_strategy=context_strategy,
     )
 
@@ -499,14 +496,6 @@ def test_interval_rankzephyr_composition_uses_six_generators_and_one_listwise_sc
         late_interaction_model="colbert",
         rank_llm_base_url="http://rankllm",
     )
-
-    default_application = composition.build_application(settings)
-    assert default_application._strategy.representations == ("title", "token-window")
-    default_retriever = cast(ReciprocalRankFusionRetriever, default_application._retriever)
-    assert [
-        cast(VectorRetriever, retriever)._representations
-        for retriever in default_retriever._retrievers
-    ] == [("title",), ("token-window",)]
 
     application = composition.build_application(
         settings,
