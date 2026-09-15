@@ -126,11 +126,13 @@ order. Parsing rejects missing, unknown, wrongly typed, unsafe, or noncanonical 
 `retrieval-eval-dry-run --manifest PATH` parses and emits canonical JSON without constructing an
 application, reading the corpus, opening PostgreSQL, or calling ColBERT.
 
-At execution, the CLI verifies the repository commit, three file/dataset digests, source split,
-fixed strategies, and cutoff before constructing retrievers. Required component names document at
-least the application image, PostgreSQL image, MiniLM checkpoint, ColBERT checkpoint and tokenizer,
-and PostgreSQL retrieval extensions. Identifiers and revisions are operator-recorded values; the
-runner does not infer mutable service versions after the run starts.
+At execution, the CLI verifies the three file/dataset digests, source split, fixed strategies, and
+cutoff before constructing retrievers. The application image deliberately excludes `.git`, so
+`repository_commit` is operator-recorded provenance rather than a runtime assertion. The required
+application-image component digest binds the executable container to that recorded source build.
+Other required component names document at least the PostgreSQL image, MiniLM checkpoint, ColBERT
+checkpoint and tokenizer, and PostgreSQL retrieval extensions. Identifiers and revisions are
+operator-recorded values; the runner does not infer mutable service versions after the run starts.
 
 ## Raw result contract
 
