@@ -11,6 +11,13 @@ from .adapters.openai_compatible import (
     OpenAiCompatibleGenerator,
 )
 from .adapters.postgres import PostgresEvidenceStore
+from .adapters.proposition_extraction import (
+    PROPOSITION_PROMPT_ID,
+    PROPOSITION_PROMPT_SHA256,
+    PROPOSITION_SCHEMA_SHA256,
+    PROPOSITION_SEED,
+    OpenAiCompatiblePropositionExtractor,
+)
 from .adapters.reranker import RankLlmReranker, TeiReranker, VllmColbertReranker
 from .adapters.scientific_inference import TransformersScientificInferenceClient
 from .adapters.tokenization import HuggingFacePairTokenBudget, HuggingFaceTokenBudget
@@ -21,6 +28,7 @@ from .generation import (
     WholeDocumentContextAssembler,
 )
 from .generation_evaluation import PairedGenerationEvaluator
+from .proposition_evaluation import PropositionEvaluationExecutor, PropositionSourceManifest
 from .retrievers import (
     Bm25CandidateGenerator,
     Bm25CandidateScorer,
@@ -598,6 +606,33 @@ def build_scientific_inference_executor(
         ScientificInferenceEvaluator(assembler, client),
         store,
     )
+
+
+def build_proposition_evaluator(
+    manifest: PropositionSourceManifest,
+    settings: Settings | None = None,
+) -> tuple[PropositionEvaluationExecutor, MiniLmEmbedder]:
+    resolved = settings or Settings.from_environment()
+    runtime = {
+        "extractor_model": resolved.generator_model,
+        "prompt_id": PROPOSITION_PROMPT_ID,
+        "prompt_sha256": PROPOSITION_PROMPT_SHA256,
+        "schema_sha256": PROPOSITION_SCHEMA_SHA256,
+        "seed": PROPOSITION_SEED,
+        "embedding_model": resolved.embedding_model,
+    }
+    mismatched = [name for name, value in runtime.items() if getattr(manifest, name) != value]
+    if mismatched:
+        raise ValueError(
+            "proposition runtime does not match the source manifest: "
+            + ", ".join(sorted(mismatched))
+        )
+    extractor = OpenAiCompatiblePropositionExtractor(
+        base_url=resolved.generator_base_url,
+        model=resolved.generator_model,
+        api_key=resolved.generator_api_key,
+    )
+    return PropositionEvaluationExecutor(extractor), MiniLmEmbedder(resolved.embedding_model)
 
 
 def _build_packing_strategy(

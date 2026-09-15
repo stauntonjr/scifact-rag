@@ -6,9 +6,11 @@ import math
 import os
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from enum import StrEnum
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Any
 
 from .domain import EvidenceDocument
 from .ports import Embedder, PropositionExtractor
@@ -29,11 +31,33 @@ from .proposition import (
     validate_propositions,
 )
 from .scientific_inference import canonical_payload_digest
+from .scientific_inference_evaluation import ScientificInferenceResult
 
 _SOURCE_MANIFEST_SCHEMA = "proposition-source-manifest/v1"
 _AUDIT_SCHEMA = "proposition-error-audit/v1"
 _EXTRACTION_SCHEMA = "proposition-extraction-result/v1"
 _LABELS = {"entailment", "contradiction", "neutral"}
+_REVIEW_SCHEMA = "proposition-audit-review/v1"
+_DISPOSITIONS = {
+    "likely_annotation_gap",
+    "related_insufficient",
+    "model_reasoning_error",
+    "evidence_selection_error",
+    "indeterminate",
+}
+_PHENOMENA = {
+    "synonymy",
+    "argument-direction",
+    "polarity",
+    "negation",
+    "population-qualifier",
+    "intervention-qualifier",
+    "comparator-qualifier",
+    "outcome-qualifier",
+    "association-versus-causation",
+    "species-evidence-boundary",
+    "cross-sentence-reasoning",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +150,15 @@ class PropositionSourceManifest:
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
+    @classmethod
+    def from_json(cls, serialized: str) -> PropositionSourceManifest:
+        raw = _json_object(serialized, "source manifest")
+        _require_fields(raw, cls, "source manifest")
+        if not isinstance(raw["sources"], list):
+            raise TypeError("source manifest sources must be an array")
+        sources = tuple(_parse_source(item) for item in raw["sources"])
+        return cls(**{**raw, "sources": sources})
+
 
 @dataclass(frozen=True, slots=True)
 class PropositionAuditRow:
@@ -151,11 +184,46 @@ class PropositionAuditRow:
             _validate_text(name, getattr(self, name))
         if self.gold_label not in _LABELS or self.predicted_label not in _LABELS:
             raise ValueError("audit labels are unsupported")
+        for name in ("evidence_margin", "polarity_margin", "colbert_score"):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int | float)
+                or not math.isfinite(value)
+            ):
+                raise ValueError(f"{name} must be finite")
+        if not isinstance(self.evidence, tuple) or any(
+            not isinstance(item, str) or not item.strip() for item in self.evidence
+        ):
+            raise ValueError("audit evidence must be a tuple of non-empty text")
         if self.margin_band not in range(6):
             raise ValueError("audit margin band must be between zero and five")
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
+
+
+@dataclass(frozen=True, slots=True)
+class PropositionAuditReview:
+    schema_version: str
+    candidate_id: str
+    reviewer: str
+    disposition: str
+    phenomena: tuple[str, ...]
+    rationale: str
+
+    def __post_init__(self) -> None:
+        if self.schema_version != _REVIEW_SCHEMA:
+            raise ValueError(f"schema_version must be {_REVIEW_SCHEMA}")
+        _validate_digest("candidate_id", self.candidate_id)
+        _validate_text("reviewer", self.reviewer)
+        _validate_text("rationale", self.rationale)
+        if self.disposition not in _DISPOSITIONS:
+            raise ValueError("audit disposition is unsupported")
+        if len(self.phenomena) != len(set(self.phenomena)) or any(
+            item not in _PHENOMENA for item in self.phenomena
+        ):
+            raise ValueError("audit phenomena are invalid")
 
 
 class ExtractionStatus(StrEnum):
@@ -696,6 +764,105 @@ def build_error_audit(
     return tuple(sorted(selected, key=lambda row: (row.stratum, row.candidate_id)))
 
 
+def phase3_candidate_records(
+    results: Sequence[ScientificInferenceResult],
+) -> tuple[Phase3CandidateRecord, ...]:
+    records: list[Phase3CandidateRecord] = []
+    for result in results:
+        if (
+            any(
+                value is None
+                for value in (
+                    result.predicted_label,
+                    result.evidence_margin,
+                    result.polarity_margin,
+                    result.colbert_score,
+                )
+            )
+            or result.error_stage is not None
+        ):
+            raise ValueError("Phase 3 result is not completely scored")
+        assert result.predicted_label is not None
+        assert result.evidence_margin is not None
+        assert result.polarity_margin is not None
+        assert result.colbert_score is not None
+        records.append(
+            Phase3CandidateRecord(
+                result.candidate_id,
+                result.query_id,
+                result.document_id,
+                result.claim,
+                result.document_sha256,
+                result.gold_label.value,
+                result.predicted_label.value,
+                result.evidence_margin,
+                result.polarity_margin,
+                result.colbert_score,
+                tuple(item.text for item in result.admitted),
+            )
+        )
+    ordered = tuple(sorted(records, key=lambda item: item.candidate_id))
+    _unique_candidates(ordered)
+    return ordered
+
+
+def read_audit(serialized: str) -> tuple[PropositionAuditRow, ...]:
+    rows: list[PropositionAuditRow] = []
+    for number, line in enumerate(serialized.splitlines(), 1):
+        try:
+            raw = _json_object(line, "audit row")
+            _require_fields(raw, PropositionAuditRow, "audit row")
+            raw["evidence"] = tuple(raw["evidence"])
+            rows.append(PropositionAuditRow(**raw))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"audit row {number} is invalid: {error}") from error
+    if len(rows) != 100 or len({row.candidate_id for row in rows}) != 100:
+        raise ValueError("audit must contain 100 unique rows")
+    return tuple(rows)
+
+
+def read_audit_reviews(
+    serialized: str,
+    audit: Sequence[PropositionAuditRow],
+) -> tuple[PropositionAuditReview, ...]:
+    reviews: list[PropositionAuditReview] = []
+    for number, line in enumerate(serialized.splitlines(), 1):
+        try:
+            raw = _json_object(line, "audit review")
+            _require_fields(raw, PropositionAuditReview, "audit review")
+            raw["phenomena"] = tuple(raw["phenomena"])
+            reviews.append(PropositionAuditReview(**raw))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"audit review row {number} is invalid: {error}") from error
+    expected = {row.candidate_id for row in audit}
+    observed = [review.candidate_id for review in reviews]
+    if len(observed) != len(set(observed)) or set(observed) != expected:
+        raise ValueError("audit review must contain exactly one row per frozen candidate")
+    return tuple(sorted(reviews, key=lambda item: item.candidate_id))
+
+
+def write_immutable(path: Path, content: str) -> None:
+    if path.exists():
+        if path.read_text(encoding="utf-8") == content:
+            return
+        raise FileExistsError(f"refusing to replace conflicting artifact: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+        ) as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+            staged = Path(output.name)
+        os.replace(staged, path)
+        staged = None
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
 def score_binary_separation(
     labels: Sequence[bool],
     scores: Sequence[float],
@@ -900,3 +1067,27 @@ def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
 def _sanitized_error(error: Exception) -> str:
     message = " ".join(str(error).split())
     return f"{type(error).__name__}: {message[:240]}"
+
+
+def _json_object(serialized: str, name: str) -> dict[str, Any]:
+    try:
+        value = json.loads(serialized)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{name} must be valid JSON") from error
+    if not isinstance(value, dict):
+        raise TypeError(f"{name} must be an object")
+    return value
+
+
+def _require_fields(value: Mapping[str, object], kind: type[Any], name: str) -> None:
+    if set(value) != {field.name for field in fields(kind)}:
+        raise ValueError(f"{name} fields do not match the schema")
+
+
+def _parse_source(value: object) -> PropositionSource:
+    if not isinstance(value, dict):
+        raise TypeError("source must be an object")
+    _require_fields(value, PropositionSource, "source")
+    return PropositionSource(
+        SourceKind(value["kind"]), value["source_id"], value["text"], value["sha256"]
+    )

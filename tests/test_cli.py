@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
 from inspect import signature
 from pathlib import Path
 
@@ -35,6 +36,13 @@ from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.generation_evaluation import (
     GenerationEvaluationExecutionSummary,
     GenerationEvaluationReport,
+)
+from scifact_rag.proposition import SourceKind, source_digest
+from scifact_rag.proposition_evaluation import (
+    Phase3CandidateRecord,
+    PropositionAuditRow,
+    PropositionSource,
+    PropositionSourceManifest,
 )
 from scifact_rag.retrieval_evaluation import (
     RETRIEVAL_DEFAULT_STRATEGIES,
@@ -203,6 +211,130 @@ def test_scientific_inference_runtime_must_match_the_manifest() -> None:
 
     with pytest.raises(ValueError, match="endpoint"):
         build_scientific_inference_executor(manifest, settings)
+
+
+def test_proposition_pair_cli_freezes_and_rederives_without_loading_models(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim = PropositionSource(
+        SourceKind.CLAIM,
+        "q-1",
+        "Aspirin lowers fever.",
+        source_digest("Aspirin lowers fever."),
+    )
+    document = PropositionSource(
+        SourceKind.DOCUMENT,
+        "d-1",
+        "Aspirin lowers fever.",
+        source_digest("Aspirin lowers fever."),
+    )
+    serialized_sources = json.dumps(
+        [asdict(claim), asdict(document)],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    manifest = PropositionSourceManifest(
+        "proposition-source-manifest/v1",
+        "pair-run",
+        "a" * 64,
+        "b" * 64,
+        hashlib.sha256(serialized_sources.encode()).hexdigest(),
+        "qwen-test",
+        "grounded-proposition-extraction-v1",
+        "c" * 64,
+        "d" * 64,
+        1729,
+        "minilm-test",
+        (claim, document),
+    )
+    audit_rows = tuple(
+        PropositionAuditRow(
+            "proposition-error-audit/v1",
+            f"{index:064x}",
+            "q-1",
+            "d-1",
+            claim.text,
+            "neutral",
+            "entailment",
+            float(index),
+            0.0,
+            0.0,
+            (document.text,),
+            "neutral-to-entailment",
+            index % 5 + 1,
+        )
+        for index in range(100)
+    )
+    audit = "".join(row.to_json() + "\n" for row in audit_rows)
+    record = Phase3CandidateRecord(
+        "f" * 64,
+        "q-1",
+        "d-1",
+        claim.text,
+        "e" * 64,
+        "neutral",
+        "entailment",
+        0.0,
+        0.0,
+        0.0,
+        (document.text,),
+    )
+
+    def fake_inputs(*args, **kwargs):
+        return manifest, (record,), audit
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("dry-run must not load Qwen or MiniLM")
+
+    monkeypatch.setattr(cli_module, "_proposition_inputs", fake_inputs)
+    monkeypatch.setattr(cli_module, "build_proposition_evaluator", fail_if_called)
+    placeholders: list[Path] = []
+    for name in ("phase3-manifest.json", "phase3-results.jsonl", "evaluation.jsonl"):
+        path = tmp_path / name
+        path.write_text("placeholder", encoding="utf-8")
+        placeholders.append(path)
+    output = tmp_path / "pair"
+    common = [
+        "--phase3-manifest",
+        str(placeholders[0]),
+        "--phase3-results",
+        str(placeholders[1]),
+        "--evaluation-set",
+        str(placeholders[2]),
+    ]
+    prepare = CliRunner().invoke(
+        app,
+        [
+            "prepare-proposition-pair-eval",
+            *common,
+            "--output-dir",
+            str(output),
+            "--run-id",
+            "pair-run",
+        ],
+    )
+    assert prepare.exit_code == 0
+    assert (output / "manifest.json").read_text() == manifest.to_json()
+    assert (output / "audit.jsonl").read_text() == audit
+
+    dry_run = CliRunner().invoke(
+        app,
+        [
+            "proposition-pair-eval-dry-run",
+            "--manifest",
+            str(output / "manifest.json"),
+            "--audit",
+            str(output / "audit.jsonl"),
+            *common,
+        ],
+    )
+    assert dry_run.exit_code == 0
+    assert json.loads(dry_run.stdout) == {
+        "run_id": "pair-run",
+        "sources": 2,
+        "audit_rows": 100,
+    }
 
 
 def test_generation_evaluation_dry_run_canonicalizes_a_complete_manifest(

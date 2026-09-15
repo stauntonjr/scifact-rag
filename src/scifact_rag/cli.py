@@ -12,14 +12,22 @@ from .adapters.openai_compatible import (
     SCIFACT_EVALUATION_PROMPT_SHA256,
     SCIFACT_EVALUATION_SEED,
 )
+from .adapters.proposition_extraction import (
+    PROPOSITION_PROMPT_ID,
+    PROPOSITION_PROMPT_SHA256,
+    PROPOSITION_SCHEMA_SHA256,
+    PROPOSITION_SEED,
+)
 from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
 from .application import RagApplication
 from .composition import (
+    Settings,
     build_application,
     build_generation_evaluator,
+    build_proposition_evaluator,
     build_scientific_inference_executor,
 )
-from .domain import SearchHit
+from .domain import EvidenceDocument, SearchHit
 from .evaluation import (
     GenerationEvaluationSet,
     GenerationRunManifest,
@@ -33,6 +41,20 @@ from .generation_evaluation import (
     generation_evaluation_expected_rows,
     read_generation_evaluation_records,
     write_generation_evaluation_report,
+)
+from .proposition import SourceKind
+from .proposition_evaluation import (
+    Phase3CandidateRecord,
+    PropositionExtractionJournal,
+    PropositionSourceManifest,
+    build_error_audit,
+    build_pair_records,
+    build_proposition_report,
+    build_source_manifest,
+    phase3_candidate_records,
+    read_audit,
+    read_audit_reviews,
+    write_immutable,
 )
 from .retrieval_evaluation import (
     RetrievalEvaluationExecutor,
@@ -513,6 +535,215 @@ def run_scientific_inference_eval(
     write_scientific_inference_failures(records, failures_path)
     response = asdict(summary)
     response.update({"report_path": str(report_path), "failures_path": str(failures_path)})
+    _emit(response)
+
+
+def _load_proposition_boundary(
+    phase3_manifest_path: Path,
+    phase3_results_path: Path,
+    evaluation_path: Path,
+    data_dir: Path,
+) -> tuple[
+    tuple[Phase3CandidateRecord, ...],
+    dict[str, EvidenceDocument],
+    str,
+    str,
+]:
+    phase3 = ScientificInferenceRunManifest.from_json(
+        phase3_manifest_path.read_text(encoding="utf-8")
+    )
+    evaluation = GenerationEvaluationSet.from_jsonl(evaluation_path.read_text(encoding="utf-8"))
+    if (
+        phase3.evaluation_manifest_sha256 != evaluation.sha256
+        or len(evaluation.cases) != 160
+        or {case.source_split for case in evaluation.cases} != {"train-validation"}
+    ):
+        raise ValueError("Phase 3 evaluation does not match the fixed 160-query boundary")
+    journal = ScientificInferenceJournal.open(phase3_results_path, phase3.run_id)
+    if journal.state.outcome_unknown:
+        raise ValueError("Phase 3 journal contains outcome-unknown attempts")
+    records = phase3_candidate_records(tuple(journal.state.results.values()))
+    decisive = sum(item.gold_label in {"entailment", "contradiction"} for item in records)
+    false_positives = sum(
+        item.gold_label == "neutral" and item.predicted_label in {"entailment", "contradiction"}
+        for item in records
+    )
+    if len(records) != 21_711 or decisive != 120 or false_positives != 4_316:
+        raise ValueError("Phase 3 results do not match the fixed candidate comparison")
+    corpus = BeirSciFact(data_dir / "scifact", QrelsSplit.TRAIN_VALIDATION)
+    documents = {document.doc_id: document for document in corpus.documents()}
+    return records, documents, evaluation.sha256, sha256_file(phase3_results_path)
+
+
+def _derive_proposition_manifest(
+    run_id: str,
+    records: tuple[Phase3CandidateRecord, ...],
+    documents: dict[str, EvidenceDocument],
+    evaluation_sha256: str,
+    phase3_sha256: str,
+) -> PropositionSourceManifest:
+    settings = Settings.from_environment()
+    return build_source_manifest(
+        run_id=run_id,
+        evaluation_sha256=evaluation_sha256,
+        phase3_sha256=phase3_sha256,
+        records=records,
+        documents=documents,
+        extractor_model=settings.generator_model,
+        prompt_id=PROPOSITION_PROMPT_ID,
+        prompt_sha256=PROPOSITION_PROMPT_SHA256,
+        schema_sha256=PROPOSITION_SCHEMA_SHA256,
+        seed=PROPOSITION_SEED,
+        embedding_model=settings.embedding_model,
+    )
+
+
+def _proposition_inputs(
+    phase3_manifest: Path,
+    phase3_results: Path,
+    evaluation_set: Path,
+    data_dir: Path,
+    run_id: str,
+) -> tuple[PropositionSourceManifest, tuple[Phase3CandidateRecord, ...], str]:
+    records, documents, evaluation_sha256, phase3_sha256 = _load_proposition_boundary(
+        phase3_manifest, phase3_results, evaluation_set, data_dir
+    )
+    manifest = _derive_proposition_manifest(
+        run_id, records, documents, evaluation_sha256, phase3_sha256
+    )
+    audit = build_error_audit(records)
+    return manifest, records, "".join(row.to_json() + "\n" for row in audit)
+
+
+@app.command("prepare-proposition-pair-eval")
+def prepare_proposition_pair_eval(
+    phase3_manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    phase3_results: Annotated[Path, typer.Option(exists=True, readable=True)],
+    evaluation_set: Annotated[Path, typer.Option(exists=True, readable=True)],
+    data_dir: Annotated[Path, typer.Option()] = Path("data"),
+    output_dir: Annotated[Path, typer.Option()] = Path("artifacts/proposition-pair-v1"),
+    run_id: Annotated[str, typer.Option()] = "proposition-pair-v1",
+) -> None:
+    """Freeze the fixed source manifest and 100-row audit before extraction."""
+    try:
+        manifest, _records, audit = _proposition_inputs(
+            phase3_manifest, phase3_results, evaluation_set, data_dir, run_id
+        )
+        write_immutable(output_dir / "manifest.json", manifest.to_json())
+        write_immutable(output_dir / "audit.jsonl", audit)
+    except (OSError, TypeError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    _emit(
+        {
+            "run_id": run_id,
+            "sources": len(manifest.sources),
+            "claims": sum(source.kind is SourceKind.CLAIM for source in manifest.sources),
+            "documents": sum(source.kind is SourceKind.DOCUMENT for source in manifest.sources),
+            "audit_rows": 100,
+            "output_dir": str(output_dir),
+        }
+    )
+
+
+@app.command("proposition-pair-eval-dry-run")
+def proposition_pair_eval_dry_run(
+    manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    audit: Annotated[Path, typer.Option(exists=True, readable=True)],
+    phase3_manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    phase3_results: Annotated[Path, typer.Option(exists=True, readable=True)],
+    evaluation_set: Annotated[Path, typer.Option(exists=True, readable=True)],
+    data_dir: Annotated[Path, typer.Option()] = Path("data"),
+) -> None:
+    """Re-derive the frozen boundary without loading Qwen or MiniLM."""
+    try:
+        frozen = PropositionSourceManifest.from_json(manifest.read_text(encoding="utf-8"))
+        expected, _records, expected_audit = _proposition_inputs(
+            phase3_manifest,
+            phase3_results,
+            evaluation_set,
+            data_dir,
+            frozen.run_id,
+        )
+        if frozen.to_json() != expected.to_json():
+            raise ValueError("source manifest does not match the re-derived boundary")
+        audit_text = audit.read_text(encoding="utf-8")
+        read_audit(audit_text)
+        if audit_text != expected_audit:
+            raise ValueError("audit does not match the re-derived boundary")
+    except (OSError, TypeError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    _emit({"run_id": frozen.run_id, "sources": len(frozen.sources), "audit_rows": 100})
+
+
+@app.command("run-proposition-pair-eval")
+def run_proposition_pair_eval(
+    manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    audit: Annotated[Path, typer.Option(exists=True, readable=True)],
+    phase3_manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    phase3_results: Annotated[Path, typer.Option(exists=True, readable=True)],
+    evaluation_set: Annotated[Path, typer.Option(exists=True, readable=True)],
+    data_dir: Annotated[Path, typer.Option()] = Path("data"),
+    audit_review: Annotated[Path | None, typer.Option(exists=True, readable=True)] = None,
+) -> None:
+    """Extract, resume, gate, and score the fixed proposition-pair diagnostic."""
+    try:
+        frozen = PropositionSourceManifest.from_json(manifest.read_text(encoding="utf-8"))
+        expected, records, expected_audit = _proposition_inputs(
+            phase3_manifest,
+            phase3_results,
+            evaluation_set,
+            data_dir,
+            frozen.run_id,
+        )
+        audit_text = audit.read_text(encoding="utf-8")
+        audit_rows = read_audit(audit_text)
+        if frozen.to_json() != expected.to_json() or audit_text != expected_audit:
+            raise ValueError("frozen proposition artifacts do not match their source boundary")
+        executor, embedder = build_proposition_evaluator(frozen)
+        output_dir = manifest.parent
+        extraction_path = output_dir / "extractions.jsonl"
+        extraction = executor.extract(frozen, extraction_path)
+        journal = PropositionExtractionJournal.open(extraction_path, frozen.run_id)
+        pairs, coverage = build_pair_records(
+            frozen,
+            records,
+            journal,
+            embedder,
+            decisive_document_ids={
+                item.document_id
+                for item in records
+                if item.gold_label in {"entailment", "contradiction"}
+            },
+            audit_document_ids={item.document_id for item in audit_rows},
+        )
+        write_immutable(
+            output_dir / "coverage.json",
+            json.dumps(asdict(coverage), indent=2, sort_keys=True) + "\n",
+        )
+        response = {**asdict(extraction), "coverage_passed": coverage.passed}
+        if coverage.passed:
+            pair_text = "".join(item.to_json() + "\n" for item in pairs)
+            pairs_path = output_dir / "pairs.jsonl"
+            write_immutable(pairs_path, pair_text)
+            response["scored_pairs"] = len(pairs)
+            if audit_review is None:
+                response["status"] = "awaiting-audit-review"
+            else:
+                read_audit_reviews(audit_review.read_text(encoding="utf-8"), audit_rows)
+                report = build_proposition_report(
+                    frozen.run_id,
+                    pairs,
+                    coverage,
+                    extraction_sha256=sha256_file(extraction_path),
+                    pairs_sha256=sha256_file(pairs_path),
+                    audit_complete=True,
+                )
+                write_immutable(output_dir / "report.json", report.to_json())
+                response.update({"status": "complete", "decision": report.decision})
+        else:
+            response["status"] = "stopped-extraction-coverage"
+    except (OSError, TypeError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
     _emit(response)
 
 
