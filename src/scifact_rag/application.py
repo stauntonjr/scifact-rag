@@ -29,6 +29,21 @@ _CITATION = re.compile(r"\[([^\[\]]+)\]")
 _INSUFFICIENT = "insufficient evidence"
 
 
+def finalize_generated_answer(
+    generated: str,
+    allowed_document_ids: set[str],
+) -> tuple[str, tuple[str, ...], bool]:
+    """Apply the product citation gate while retaining parsed citation evidence."""
+    stripped = generated.strip()
+    citations = tuple(dict.fromkeys(_CITATION.findall(stripped)))
+    if stripped.lower() == _INSUFFICIENT:
+        return _INSUFFICIENT, (), True
+    citation_valid = bool(citations) and all(
+        citation in allowed_document_ids for citation in citations
+    )
+    return (stripped if citation_valid else _INSUFFICIENT), citations, citation_valid
+
+
 class RagApplication:
     def __init__(
         self,
@@ -99,13 +114,15 @@ class RagApplication:
         allowed = {hit.doc_id for hit in retrieved}
         if not evidence or any(hit.doc_id not in allowed for hit in evidence):
             raise ValueError("generation context must contain retrieved parent documents")
-        generated = self._generator.generate(query, evidence).strip()
-        citations = tuple(dict.fromkeys(_CITATION.findall(generated)))
-        if generated.lower() == _INSUFFICIENT:
-            return Answer(query, _INSUFFICIENT, (), self._generator.model, evidence)
-        if not citations or any(citation not in allowed for citation in citations):
-            return Answer(query, _INSUFFICIENT, (), self._generator.model, evidence)
-        return Answer(query, generated, citations, self._generator.model, evidence)
+        generated = self._generator.generate(query, evidence)
+        answer_text, citations, citation_valid = finalize_generated_answer(generated, allowed)
+        return Answer(
+            query,
+            answer_text,
+            citations if citation_valid and answer_text != _INSUFFICIENT else (),
+            self._generator.model,
+            evidence,
+        )
 
     def evaluate(self, corpus: CorpusSource, *, cutoff: int = 10) -> RetrievalMetrics:
         queries = corpus.queries()
