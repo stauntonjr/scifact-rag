@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
+
+import pytest
 
 from scifact_rag.domain import SearchHit
-from scifact_rag.evaluation import GenerationEvaluationCase, GoldRationale, ScientificStance
+from scifact_rag.evaluation import (
+    GenerationEvaluationCase,
+    GenerationEvaluationSet,
+    GoldRationale,
+    ScientificStance,
+)
 from scifact_rag.generation import GenerationContextStrategyName
-from scifact_rag.generation_evaluation import PairedGenerationEvaluator
+from scifact_rag.generation_evaluation import (
+    GenerationEvaluationExecutor,
+    GenerationEvaluationRecord,
+    PairedGenerationEvaluator,
+)
 
 
 class RecordingRetriever:
@@ -187,3 +199,127 @@ def test_paired_evaluator_preserves_raw_invalid_citation_and_applies_product_fal
     assert result.answer_text == "insufficient evidence"
     assert result.citations == ("999",)
     assert result.citation_valid is False
+
+
+def test_paired_evaluator_runs_only_requested_policies_in_canonical_order() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assemblers = {
+        strategy: RecordingAssembler([parent]) for strategy in GenerationContextStrategyName
+    }
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers=assemblers,
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+
+    results = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=(
+            GenerationContextStrategyName.ADAPTIVE,
+            GenerationContextStrategyName.TOP_DP_CHUNKS,
+        ),
+    )
+
+    assert [result.context_strategy for result in results] == [
+        GenerationContextStrategyName.TOP_DP_CHUNKS,
+        GenerationContextStrategyName.ADAPTIVE,
+    ]
+    assert assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT].calls == []
+
+
+def test_generation_evaluation_record_round_trips_canonical_json() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+    result = evaluator.evaluate(_case(), retrieval_limit=1)[0]
+    record = GenerationEvaluationRecord(run_id="development-1", result=result)
+
+    serialized = record.to_json()
+
+    assert serialized.endswith("\n")
+    assert GenerationEvaluationRecord.from_json(serialized) == record
+
+
+def test_generation_evaluation_executor_resumes_only_missing_policy_rows(
+    tmp_path: Path,
+) -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    seed_assembler = RecordingAssembler([parent])
+    seed_evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: seed_assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+    seed = seed_evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=(GenerationContextStrategyName.WHOLE_DOCUMENT,),
+    )[0]
+    output = tmp_path / "results.jsonl"
+    output.write_text(
+        GenerationEvaluationRecord(run_id="development-1", result=seed).to_json(),
+        encoding="utf-8",
+    )
+    retriever = RecordingRetriever([parent])
+    assemblers = {
+        strategy: RecordingAssembler([parent]) for strategy in GenerationContextStrategyName
+    }
+    evaluator = PairedGenerationEvaluator(
+        retriever=retriever,
+        assemblers=assemblers,
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+
+    summary = GenerationEvaluationExecutor(evaluator).run(
+        run_id="development-1",
+        evaluation_set=GenerationEvaluationSet((_case(),)),
+        retrieval_limit=1,
+        output=output,
+    )
+
+    assert summary.expected_rows == 3
+    assert summary.preexisting_rows == 1
+    assert summary.written_rows == 2
+    assert summary.failed_rows == 0
+    assert retriever.calls == [("Drug A lowers marker B.", 1)]
+    assert assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT].calls == []
+    records = [
+        GenerationEvaluationRecord.from_json(line)
+        for line in output.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [(record.result.query_id, record.result.context_strategy) for record in records] == [
+        ("17", GenerationContextStrategyName.WHOLE_DOCUMENT),
+        ("17", GenerationContextStrategyName.TOP_DP_CHUNKS),
+        ("17", GenerationContextStrategyName.ADAPTIVE),
+    ]
+
+
+def test_generation_evaluation_executor_rejects_results_from_another_run(
+    tmp_path: Path,
+) -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+    result = evaluator.evaluate(_case(), retrieval_limit=1)[0]
+    output = tmp_path / "results.jsonl"
+    output.write_text(
+        GenerationEvaluationRecord(run_id="other-run", result=result).to_json(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="different run_id"):
+        GenerationEvaluationExecutor(evaluator).run(
+            run_id="development-1",
+            evaluation_set=GenerationEvaluationSet((_case(),)),
+            retrieval_limit=1,
+            output=output,
+        )

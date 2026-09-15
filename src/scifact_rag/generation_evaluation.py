@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
+import os
+import re
 import time
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
+from typing import Any
 
 from .application import finalize_generated_answer
 from .domain import SearchHit
-from .evaluation import GenerationEvaluationCase
+from .evaluation import GenerationEvaluationCase, GenerationEvaluationSet
 from .generation import GenerationContextStrategyName
 from .ports import AnswerGenerator, GenerationContextAssembler, Retriever
 
@@ -40,6 +45,71 @@ class GenerationEvaluationResult:
     error_message: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationRecord:
+    run_id: str
+    result: GenerationEvaluationResult
+    schema_version: str = "generation-evaluation-record/v1"
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", self.run_id):
+            raise ValueError("run_id must be a safe non-empty name")
+        if self.schema_version != "generation-evaluation-record/v1":
+            raise ValueError("schema_version must be generation-evaluation-record/v1")
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), sort_keys=True, separators=(",", ":")) + "\n"
+
+    @classmethod
+    def from_json(cls, serialized: str) -> GenerationEvaluationRecord:
+        try:
+            raw = json.loads(serialized)
+        except json.JSONDecodeError as exc:
+            raise ValueError("generation evaluation record must be valid JSON") from exc
+        if not isinstance(raw, dict) or set(raw) != {"schema_version", "run_id", "result"}:
+            raise ValueError("generation evaluation record fields do not match the schema")
+        raw_result = raw["result"]
+        expected_result_fields = {field.name for field in fields(GenerationEvaluationResult)}
+        if not isinstance(raw_result, dict) or set(raw_result) != expected_result_fields:
+            raise ValueError("generation evaluation result fields do not match the schema")
+        contexts = raw_result["supplied_contexts"]
+        expected_context_fields = {field.name for field in fields(SearchHit)}
+        if not isinstance(contexts, list) or any(
+            not isinstance(context, dict) or set(context) != expected_context_fields
+            for context in contexts
+        ):
+            raise ValueError("supplied context fields do not match the schema")
+        values: dict[str, Any] = dict(raw_result)
+        try:
+            values["context_strategy"] = GenerationContextStrategyName(
+                raw_result["context_strategy"]
+            )
+            values["supplied_contexts"] = tuple(SearchHit(**context) for context in contexts)
+            for field_name in (
+                "retrieved_parent_ids",
+                "retrieved_gold_parent_ids",
+                "supplied_parent_ids",
+                "citations",
+            ):
+                values[field_name] = tuple(raw_result[field_name])
+            result = GenerationEvaluationResult(**values)
+            return cls(
+                run_id=raw["run_id"],
+                result=result,
+                schema_version=raw["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"generation evaluation record values are invalid: {exc}") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationExecutionSummary:
+    expected_rows: int
+    preexisting_rows: int
+    written_rows: int
+    failed_rows: int
+
+
 class PairedGenerationEvaluator:
     def __init__(
         self,
@@ -59,9 +129,16 @@ class PairedGenerationEvaluator:
         case: GenerationEvaluationCase,
         *,
         retrieval_limit: int,
+        strategies: Sequence[GenerationContextStrategyName] = tuple(GenerationContextStrategyName),
     ) -> tuple[GenerationEvaluationResult, ...]:
         if retrieval_limit < 1:
             raise ValueError("retrieval_limit must be positive")
+        requested = set(strategies)
+        selected = tuple(
+            strategy for strategy in GenerationContextStrategyName if strategy in requested
+        )
+        if not selected:
+            return ()
         retrieval_started = self._clock()
         retrieved = tuple(self._retriever.search(case.claim, retrieval_limit))
         retrieval_latency_ms = (self._clock() - retrieval_started) * 1000.0
@@ -82,7 +159,7 @@ class PairedGenerationEvaluator:
                 retrieval_latency_ms,
                 retrieved_gold_ids,
             )
-            for strategy in GenerationContextStrategyName
+            for strategy in selected
         )
 
     def _evaluate_policy(
@@ -180,3 +257,81 @@ def _evidence_sentence_recall(
 
 def _normalize_text(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).split()).casefold()
+
+
+class GenerationEvaluationExecutor:
+    def __init__(self, evaluator: PairedGenerationEvaluator) -> None:
+        self._evaluator = evaluator
+
+    def run(
+        self,
+        *,
+        run_id: str,
+        evaluation_set: GenerationEvaluationSet,
+        retrieval_limit: int,
+        output: Path,
+    ) -> GenerationEvaluationExecutionSummary:
+        records = _read_records(output)
+        existing: dict[tuple[str, GenerationContextStrategyName], GenerationEvaluationRecord] = {}
+        evaluation_query_ids = {case.query_id for case in evaluation_set.cases}
+        for record in records:
+            if record.run_id != run_id:
+                raise ValueError("results file contains a different run_id")
+            key = (record.result.query_id, record.result.context_strategy)
+            if key in existing:
+                raise ValueError("results file contains a duplicate query and policy row")
+            if record.result.query_id not in evaluation_query_ids:
+                raise ValueError("results file contains a query outside the evaluation set")
+            existing[key] = record
+
+        written: list[GenerationEvaluationRecord] = []
+        for case in evaluation_set.cases:
+            missing = tuple(
+                strategy
+                for strategy in GenerationContextStrategyName
+                if (case.query_id, strategy) not in existing
+            )
+            if not missing:
+                continue
+            results = self._evaluator.evaluate(
+                case,
+                retrieval_limit=retrieval_limit,
+                strategies=missing,
+            )
+            if tuple(result.context_strategy for result in results) != missing or any(
+                result.query_id != case.query_id for result in results
+            ):
+                raise ValueError("evaluator returned rows outside the requested query and policies")
+            for result in results:
+                record = GenerationEvaluationRecord(run_id=run_id, result=result)
+                _append_record(output, record)
+                existing[(result.query_id, result.context_strategy)] = record
+                written.append(record)
+
+        all_records = tuple(existing.values())
+        return GenerationEvaluationExecutionSummary(
+            expected_rows=len(evaluation_set.cases) * len(GenerationContextStrategyName),
+            preexisting_rows=len(records),
+            written_rows=len(written),
+            failed_rows=sum(record.result.error_type is not None for record in all_records),
+        )
+
+
+def _read_records(path: Path) -> tuple[GenerationEvaluationRecord, ...]:
+    if not path.exists():
+        return ()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(f"could not read generation evaluation results: {exc}") from exc
+    if any(not line.strip() for line in lines):
+        raise ValueError("generation evaluation results must not contain blank rows")
+    return tuple(GenerationEvaluationRecord.from_json(line) for line in lines)
+
+
+def _append_record(path: Path, record: GenerationEvaluationRecord) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(record.to_json())
+        stream.flush()
+        os.fsync(stream.fileno())
