@@ -2,6 +2,10 @@
 
 ## Current objective
 
+The governing delivery sequence is `docs/project/roadmap.md`. The active gate is Phase 0 followed
+by the fixed generation-context comparison in Phase 1; inference, graph, adapters, and template
+evaluation remain downstream.
+
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
 ```text

@@ -65,6 +65,8 @@ strategies do not fuse rerankers or mix retrieval scores into their order.
 The product boundary is CLI-first. Domain and application contracts are Python dataclasses; one
 visible composition root wires replaceable corpus, embedding, storage, and generation adapters.
 HTTP, MCP, web UI, model tool-calling, and Pi effectiveness evaluation are intentionally inactive.
+The ordered delivery plan, phase gates, stop rules, and explicit deferrals are documented in
+[`docs/project/roadmap.md`](docs/project/roadmap.md).
 
 Generation context is separately selectable from retrieval. `whole-document` remains the
 compatibility default and sends each retrieved title and complete abstract. `top-dp-chunks` loads
