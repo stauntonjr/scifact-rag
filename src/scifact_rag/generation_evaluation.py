@@ -250,6 +250,7 @@ def write_generation_evaluation_report(
             staged.flush()
             os.fsync(staged.fileno())
             staged_path = Path(staged.name)
+        os.chmod(staged_path, 0o644)
         staged_path.replace(destination)
     finally:
         if staged_path is not None:

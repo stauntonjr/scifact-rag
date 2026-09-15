@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,7 @@ from scifact_rag.evaluation import (
     GeneratorSettings,
     GoldRationale,
     ScientificStance,
+    write_generation_evaluation_set,
 )
 
 
@@ -292,6 +294,16 @@ def test_generation_evaluation_set_round_trips_canonical_jsonl() -> None:
     restored = GenerationEvaluationSet.from_jsonl(original.to_jsonl())
 
     assert restored == original
+
+
+def test_generation_evaluation_set_writer_is_readable_outside_its_creator(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "input.jsonl"
+
+    write_generation_evaluation_set(GenerationEvaluationSet((_case(),)), destination)
+
+    assert destination.stat().st_mode & 0o777 == 0o644
 
 
 @pytest.mark.parametrize(

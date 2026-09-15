@@ -499,3 +499,4 @@ def test_generation_evaluation_report_writes_canonical_json_atomically(tmp_path:
     assert payload["schema_version"] == "generation-evaluation-report/v1"
     assert payload["run_id"] == "development-1"
     assert payload["complete"] is False
+    assert destination.stat().st_mode & 0o777 == 0o644

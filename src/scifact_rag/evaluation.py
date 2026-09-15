@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
@@ -248,6 +249,7 @@ def write_generation_evaluation_set(
             staged.write(evaluation_set.to_jsonl())
             staged.flush()
             staged_path = Path(staged.name)
+        os.chmod(staged_path, 0o644)
         staged_path.replace(destination)
     finally:
         if staged_path is not None:
