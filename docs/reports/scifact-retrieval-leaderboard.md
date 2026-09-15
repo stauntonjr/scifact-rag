@@ -77,6 +77,31 @@ strategy's 62 zero-hit queries. Symmetric RRF rescues 16 but loses 24 queries th
 so it also underperforms strict overall. A diagnostic top-10 union reaches recall 0.825333 over 20
 candidates; this is evidence for later candidate reranking, not a top-10 leaderboard entry.
 
+## Fixed Issue #6 retrieval-default comparison
+
+One frozen run compared the three roadmap candidates on the 160-query deterministic validation
+partition. That partition had already been inspected, so this is internal comparative evidence,
+not pristine validation. No strategy, parameter, model, depth, or data input changed after the
+results were opened.
+
+| Strategy | nDCG@10 | MAP@10 | Recall@10 | Precision@10 | MRR@10 | Median latency |
+|---|---:|---:|---:|---:|---:|---:|
+| DP content-max ColBERT over six-generator pool | **0.742493** | **0.716753** | **0.806250** | **0.092500** | **0.728472** | **638.94 ms** |
+| Whole-document ColBERT over six-generator pool | 0.734958 | 0.707396 | 0.800000 | 0.091875 | 0.722569 | 642.45 ms |
+| BM25 plus token-window RRF | 0.673519 | 0.630229 | 0.787500 | 0.090625 | 0.647436 | 78.70 ms |
+
+All 480 query-strategy rows completed with no failure or empty ranking. Relative to BM25,
+content-max ColBERT improves 39 queries, regresses 13, and ties 108; it gains eight relevant
+document IDs and loses five in the top ten. Its 0.068975 absolute nDCG gain comes with about 8.1
+times the median latency and a ColBERT GPU-service dependency. Content-max also dominates the
+whole-document ColBERT candidate on every reported effectiveness metric and is slightly faster.
+
+ADR-0029 therefore recommends `pooled-coref-interval-content-max-colbert` as the
+retrieval-effectiveness default and retains `bm25-token-window-rrf` as the fast/no-ColBERT
+alternative. This recommendation does not change the current runtime default. Exact provenance,
+artifact hashes, transition counts, and limitations are in
+`docs/reports/issue-6-retrieval-default-validation.md`.
+
 ## Current title-separated test comparison
 
 The owner authorized one fixed comparison on all 300 test queries after declining the runtime and
