@@ -15,7 +15,7 @@ from scifact_rag.adapters.openai_compatible import (
 )
 from scifact_rag.adapters.scifact import QrelsSplit
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
-from scifact_rag.composition import build_application
+from scifact_rag.composition import build_application, build_generation_evaluator
 from scifact_rag.evaluation import (
     ComponentRevision,
     EvaluationPurpose,
@@ -37,7 +37,7 @@ from scifact_rag.retrieval_evaluation import (
     canonical_qrels_sha256,
     sha256_file,
 )
-from scifact_rag.strategies import RetrievalStrategyName
+from scifact_rag.strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
 
 def test_cli_exposes_the_first_five_commands() -> None:
@@ -516,16 +516,24 @@ def test_build_generation_evaluation_manifest_writes_exact_official_evidence(
     assert rows[0]["rationales"][0]["sentences"] == ["Exact support."]
 
 
-def test_cli_and_composition_default_to_equal_title_token_window_rrf() -> None:
+def test_cli_and_composition_use_the_selected_retrieval_default() -> None:
+    assert (
+        DEFAULT_RETRIEVAL_STRATEGY
+        is RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT
+    )
     assert (
         signature(build_application).parameters["retrieval_strategy"].default
-        is RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF
+        is DEFAULT_RETRIEVAL_STRATEGY
+    )
+    assert (
+        signature(build_generation_evaluator).parameters["retrieval_strategy"].default
+        is DEFAULT_RETRIEVAL_STRATEGY
     )
 
     for command in (ingest, search, ask, evaluate_retrieval):
         assert (
             signature(command).parameters["strategy"].default
-            is RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF
+            is DEFAULT_RETRIEVAL_STRATEGY
         )
 
     assert (

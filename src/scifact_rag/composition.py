@@ -42,6 +42,7 @@ from .retrievers import (
 from .strategies import (
     COREF_NOMINAL_DP_COLBERT,
     COREF_NOMINAL_DP_MINILM,
+    DEFAULT_RETRIEVAL_STRATEGY,
     CanonicalizationPolicy,
     CompositeRepresentationStrategy,
     CoreferenceIntervalPackingStrategy,
@@ -111,7 +112,7 @@ class Settings:
 def build_application(
     settings: Settings | None = None,
     *,
-    retrieval_strategy: RetrievalStrategyName = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    retrieval_strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY,
     generation_context_strategy: GenerationContextStrategyName = (
         GenerationContextStrategyName.WHOLE_DOCUMENT
     ),
@@ -485,7 +486,7 @@ class _ApplicationRetriever:
 def build_generation_evaluator(
     settings: Settings | None = None,
     *,
-    retrieval_strategy: RetrievalStrategyName = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    retrieval_strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY,
 ) -> PairedGenerationEvaluator:
     resolved = settings or Settings.from_environment()
     retrieval_application = build_application(

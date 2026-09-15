@@ -61,6 +61,9 @@ class RetrievalStrategyName(StrEnum):
     POOLED_COREF_INTERVAL_RAW_MEAN_COLBERT = "pooled-coref-interval-raw-mean-colbert"
 
 
+DEFAULT_RETRIEVAL_STRATEGY = RetrievalStrategyName.POOLED_COREF_INTERVAL_CONTENT_MAX_COLBERT
+
+
 class CanonicalizationPolicy(StrEnum):
     PROPER_NOUN = "proper-noun"
     EXPLICIT_NOMINAL = "explicit-nominal"

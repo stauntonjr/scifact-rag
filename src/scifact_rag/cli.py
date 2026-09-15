@@ -39,7 +39,7 @@ from .retrieval_evaluation import (
     sha256_file,
     write_retrieval_evaluation_report,
 )
-from .strategies import RetrievalStrategyName
+from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
 app = typer.Typer(no_args_is_help=True, help="Grounded retrieval and generation over SciFact.")
 
@@ -64,7 +64,7 @@ def ingest(
     strategy: Annotated[
         RetrievalStrategyName,
         typer.Option(help="Retrieval strategy."),
-    ] = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    ] = DEFAULT_RETRIEVAL_STRATEGY,
 ) -> None:
     """Index or embed and upsert all SciFact documents."""
     corpus = BeirSciFact.ensure(data_dir)
@@ -80,7 +80,7 @@ def search(
     strategy: Annotated[
         RetrievalStrategyName,
         typer.Option(help="Retrieval strategy."),
-    ] = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    ] = DEFAULT_RETRIEVAL_STRATEGY,
 ) -> None:
     """Return ranked SciFact evidence documents."""
     _emit(
@@ -98,7 +98,7 @@ def ask(
     strategy: Annotated[
         RetrievalStrategyName,
         typer.Option(help="Retrieval strategy."),
-    ] = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    ] = DEFAULT_RETRIEVAL_STRATEGY,
     context_strategy: Annotated[
         GenerationContextStrategyName,
         typer.Option(help="Generation context strategy."),
@@ -402,7 +402,7 @@ def evaluate_retrieval(
     strategy: Annotated[
         RetrievalStrategyName,
         typer.Option(help="Retrieval strategy."),
-    ] = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+    ] = DEFAULT_RETRIEVAL_STRATEGY,
     split: Annotated[
         QrelsSplit,
         typer.Option(help="Qrels evaluation split."),
