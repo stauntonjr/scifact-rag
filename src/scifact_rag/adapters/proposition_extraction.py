@@ -71,6 +71,7 @@ Extract explicit scientific propositions only from the supplied source. Return v
 predicate, object, and qualifier spans with Python Unicode code-point [start,end) offsets. Preserve
 negation as polarity. Do not use outside knowledge, infer missing relations, normalize source text,
 or call tools. Return an empty propositions array when no complete relation is explicit."""
+PROPOSITION_PROMPT_SHA256 = hashlib.sha256(_SYSTEM_PROMPT.encode("utf-8")).hexdigest()
 _RESPONSE_KEYS = {"source_kind", "source_id", "source_sha256", "propositions"}
 _PROPOSITION_KEYS = {"sentence", "subject", "predicate", "object", "polarity", "qualifiers"}
 

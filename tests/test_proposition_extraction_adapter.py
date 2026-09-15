@@ -8,6 +8,7 @@ import pytest
 
 from scifact_rag.adapters.proposition_extraction import (
     PROPOSITION_PROMPT_ID,
+    PROPOSITION_PROMPT_SHA256,
     PROPOSITION_SCHEMA_SHA256,
     PROPOSITION_SEED,
     OpenAiCompatiblePropositionExtractor,
@@ -97,6 +98,7 @@ def test_qwen_extractor_sends_frozen_schema_and_returns_grounded_propositions(mo
     assert request["response_format"]["type"] == "json_schema"  # type: ignore[index]
     assert request["response_format"]["json_schema"]["strict"] is True  # type: ignore[index]
     assert PROPOSITION_PROMPT_ID in request["messages"][0]["content"]  # type: ignore[index]
+    assert len(PROPOSITION_PROMPT_SHA256) == 64
     assert PROPOSITION_SCHEMA_SHA256 in request["messages"][0]["content"]  # type: ignore[index]
     assert source.sha256 in request["messages"][1]["content"]  # type: ignore[index]
     assert timeout == 120.0

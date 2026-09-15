@@ -4,20 +4,27 @@ import hashlib
 import json
 import math
 import os
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
 from .domain import EvidenceDocument
+from .ports import Embedder, PropositionExtractor
 from .proposition import (
+    ExtractionCoverage,
+    ExtractionCoverageGate,
     GroundedProposition,
     GroundedSpan,
+    PropositionPairFeatures,
     PropositionPolarity,
     PropositionQualifier,
     QualifierRole,
     SourceKind,
+    evaluate_extraction_coverage,
     proposition_identity,
+    score_proposition_pairs,
     source_digest,
     validate_propositions,
 )
@@ -86,6 +93,12 @@ class PropositionSourceManifest:
     evaluation_sha256: str
     phase3_sha256: str
     source_set_sha256: str
+    extractor_model: str
+    prompt_id: str
+    prompt_sha256: str
+    schema_sha256: str
+    seed: int
+    embedding_model: str
     sources: tuple[PropositionSource, ...]
 
     def __post_init__(self) -> None:
@@ -95,6 +108,12 @@ class PropositionSourceManifest:
         _validate_digest("evaluation_sha256", self.evaluation_sha256)
         _validate_digest("phase3_sha256", self.phase3_sha256)
         _validate_digest("source_set_sha256", self.source_set_sha256)
+        for name in ("extractor_model", "prompt_id", "embedding_model"):
+            _validate_text(name, getattr(self, name))
+        _validate_digest("prompt_sha256", self.prompt_sha256)
+        _validate_digest("schema_sha256", self.schema_sha256)
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise TypeError("seed must be an integer")
         expected = tuple(sorted(self.sources, key=lambda item: (item.kind.value, item.source_id)))
         if not self.sources or self.sources != expected:
             raise ValueError("manifest sources must be non-empty and sorted")
@@ -123,6 +142,20 @@ class PropositionAuditRow:
     evidence: tuple[str, ...]
     stratum: str
     margin_band: int
+
+    def __post_init__(self) -> None:
+        if self.schema_version != _AUDIT_SCHEMA:
+            raise ValueError(f"schema_version must be {_AUDIT_SCHEMA}")
+        _validate_digest("candidate_id", self.candidate_id)
+        for name in ("query_id", "document_id", "claim", "stratum"):
+            _validate_text(name, getattr(self, name))
+        if self.gold_label not in _LABELS or self.predicted_label not in _LABELS:
+            raise ValueError("audit labels are unsupported")
+        if self.margin_band not in range(6):
+            raise ValueError("audit margin band must be between zero and five")
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
 
 
 class ExtractionStatus(StrEnum):
@@ -228,6 +261,286 @@ class BinarySeparationMetrics:
     prevalence: float
 
 
+@dataclass(frozen=True, slots=True)
+class PropositionExtractionSummary:
+    total_sources: int
+    preexisting_sources: int
+    extracted_sources: int
+    successful_sources: int
+    empty_sources: int
+    failed_sources: int
+
+
+@dataclass(frozen=True, slots=True)
+class PropositionPairRecord:
+    candidate_id: str
+    query_id: str
+    document_id: str
+    gold_label: str
+    predicted_label: str
+    evidence_margin: float
+    polarity_margin: float
+    colbert_score: float
+    features: PropositionPairFeatures
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
+
+
+@dataclass(frozen=True, slots=True)
+class PropositionEvaluationReport:
+    schema_version: str
+    run_id: str
+    decisive_candidates: int
+    false_positive_candidates: int
+    extraction_coverage: ExtractionCoverageGate
+    metrics: Mapping[str, BinarySeparationMetrics]
+    correlations: Mapping[str, float | None]
+    extraction_sha256: str
+    pairs_sha256: str
+    decision: str
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
+
+
+class PropositionEvaluationExecutor:
+    def __init__(
+        self,
+        extractor: PropositionExtractor,
+        *,
+        timer: Callable[[], float] = time.perf_counter,
+    ) -> None:
+        self._extractor = extractor
+        self._timer = timer
+
+    def extract(
+        self,
+        manifest: PropositionSourceManifest,
+        output: Path,
+    ) -> PropositionExtractionSummary:
+        journal = PropositionExtractionJournal.open(output, manifest.run_id)
+        sources = {(source.kind, source.source_id): source for source in manifest.sources}
+        foreign = set(journal.results).difference(sources)
+        if foreign:
+            raise ValueError("extraction journal contains sources outside the manifest")
+        for identity, result in journal.results.items():
+            source = sources[identity]
+            if result.source_sha256 != source.sha256 or result.source_text != source.text:
+                raise ValueError("retained extraction does not match the source manifest")
+        preexisting = len(journal.completed)
+        for source in manifest.sources:
+            if (source.kind, source.source_id) in journal.completed:
+                continue
+            started = self._timer()
+            try:
+                propositions = self._extractor.extract(source)
+                result = PropositionExtractionResult.create(
+                    manifest.run_id,
+                    source.kind,
+                    source.source_id,
+                    source.text,
+                    propositions,
+                    max(0.0, (self._timer() - started) * 1000.0),
+                )
+            except Exception as error:  # noqa: BLE001 - every source needs a terminal row
+                code = getattr(error, "code", type(error).__name__)
+                result = PropositionExtractionResult.create(
+                    manifest.run_id,
+                    source.kind,
+                    source.source_id,
+                    source.text,
+                    (),
+                    max(0.0, (self._timer() - started) * 1000.0),
+                    error=(str(code), _sanitized_error(error)),
+                )
+            journal.append(result)
+        values = tuple(journal.results.values())
+        return PropositionExtractionSummary(
+            total_sources=len(manifest.sources),
+            preexisting_sources=preexisting,
+            extracted_sources=len(values) - preexisting,
+            successful_sources=sum(item.status is ExtractionStatus.SUCCESS for item in values),
+            empty_sources=sum(item.status is ExtractionStatus.EMPTY for item in values),
+            failed_sources=sum(item.status is ExtractionStatus.FAILURE for item in values),
+        )
+
+
+def build_pair_records(
+    manifest: PropositionSourceManifest,
+    records: Sequence[Phase3CandidateRecord],
+    journal: PropositionExtractionJournal,
+    embedder: Embedder,
+    *,
+    decisive_document_ids: set[str],
+    audit_document_ids: set[str],
+) -> tuple[tuple[PropositionPairRecord, ...], ExtractionCoverageGate]:
+    if journal.run_id != manifest.run_id:
+        raise ValueError("extraction journal belongs to a foreign run")
+    identities = {(source.kind, source.source_id): source for source in manifest.sources}
+    if set(journal.results) != set(identities):
+        raise ValueError("extraction journal is incomplete or contains foreign sources")
+    successful = {
+        identity: result
+        for identity, result in journal.results.items()
+        if result.status is ExtractionStatus.SUCCESS
+    }
+    candidate_document_ids = {record.document_id for record in records}
+    claim_ids = {record.query_id for record in records}
+    coverage = ExtractionCoverage(
+        total_sources=len(manifest.sources),
+        schema_valid_sources=sum(
+            result.status is not ExtractionStatus.FAILURE for result in journal.results.values()
+        ),
+        total_claims=len(claim_ids),
+        usable_claims=sum((SourceKind.CLAIM, value) in successful for value in claim_ids),
+        total_candidate_documents=len(candidate_document_ids),
+        usable_candidate_documents=sum(
+            (SourceKind.DOCUMENT, value) in successful for value in candidate_document_ids
+        ),
+        decisive_documents=len(decisive_document_ids),
+        usable_decisive_documents=sum(
+            (SourceKind.DOCUMENT, value) in successful for value in decisive_document_ids
+        ),
+        audit_documents=len(audit_document_ids),
+        usable_audit_documents=sum(
+            (SourceKind.DOCUMENT, value) in successful for value in audit_document_ids
+        ),
+    )
+    gate = evaluate_extraction_coverage(coverage)
+    if not gate.passed:
+        return (), gate
+
+    target = tuple(
+        sorted(
+            (
+                record
+                for record in records
+                if record.gold_label in {"entailment", "contradiction"}
+                or (
+                    record.gold_label == "neutral"
+                    and record.predicted_label in {"entailment", "contradiction"}
+                )
+            ),
+            key=lambda item: item.candidate_id,
+        )
+    )
+    scorable = [
+        record
+        for record in target
+        if (SourceKind.CLAIM, record.query_id) in successful
+        and (SourceKind.DOCUMENT, record.document_id) in successful
+    ]
+    surfaces = sorted(
+        {
+            surface
+            for record in scorable
+            for result in (
+                successful[(SourceKind.CLAIM, record.query_id)],
+                successful[(SourceKind.DOCUMENT, record.document_id)],
+            )
+            for proposition in result.propositions
+            for surface in _proposition_surfaces(proposition)
+        }
+    )
+    vectors = embedder.embed(surfaces)
+    if len(vectors) != len(surfaces):
+        raise ValueError("embedder returned the wrong number of vectors")
+    vector_by_surface = dict(zip(surfaces, vectors, strict=True))
+
+    def similarity(left: str, right: str) -> float:
+        return _cosine(vector_by_surface[left], vector_by_surface[right])
+
+    pairs = tuple(
+        PropositionPairRecord(
+            record.candidate_id,
+            record.query_id,
+            record.document_id,
+            record.gold_label,
+            record.predicted_label,
+            record.evidence_margin,
+            record.polarity_margin,
+            record.colbert_score,
+            score_proposition_pairs(
+                successful[(SourceKind.CLAIM, record.query_id)].propositions,
+                successful[(SourceKind.DOCUMENT, record.document_id)].propositions,
+                similarity,
+            ),
+        )
+        for record in scorable
+    )
+    return pairs, gate
+
+
+def build_proposition_report(
+    run_id: str,
+    pairs: Sequence[PropositionPairRecord],
+    coverage: ExtractionCoverageGate,
+    *,
+    extraction_sha256: str,
+    pairs_sha256: str,
+    audit_complete: bool,
+    expected_decisive: int = 120,
+    expected_false_positives: int = 4316,
+) -> PropositionEvaluationReport:
+    if not audit_complete:
+        raise ValueError("audit review must be complete before report interpretation")
+    if not coverage.passed:
+        raise ValueError("extraction coverage gate must pass before report derivation")
+    for name, digest in (
+        ("extraction_sha256", extraction_sha256),
+        ("pairs_sha256", pairs_sha256),
+    ):
+        _validate_digest(name, digest)
+    decisive = sum(item.gold_label in {"entailment", "contradiction"} for item in pairs)
+    false_positives = sum(
+        item.gold_label == "neutral" and item.predicted_label in {"entailment", "contradiction"}
+        for item in pairs
+    )
+    if decisive != expected_decisive or false_positives != expected_false_positives:
+        raise ValueError("pair artifact does not match the fixed comparison boundary")
+    labels = tuple(item.gold_label in {"entailment", "contradiction"} for item in pairs)
+    feature_names = (
+        "entity",
+        "predicate",
+        "argument_direction",
+        "polarity",
+        "qualifier",
+        "proposition_pair_mean",
+    )
+    metrics = {
+        name: score_binary_separation(
+            labels,
+            tuple(float(getattr(item.features, name)) for item in pairs),
+        )
+        for name in feature_names
+    }
+    pair_mean = tuple(item.features.proposition_pair_mean for item in pairs)
+    correlations = {
+        "colbert": _pearson(pair_mean, tuple(item.colbert_score for item in pairs)),
+        "evidence_margin": _pearson(pair_mean, tuple(item.evidence_margin for item in pairs)),
+        "polarity_margin": _pearson(pair_mean, tuple(item.polarity_margin for item in pairs)),
+    }
+    control = metrics["proposition_pair_mean"]
+    decision = (
+        "graph-next"
+        if control.roc_auc >= 0.65 and control.average_precision >= 2.0 * control.prevalence
+        else "stop"
+    )
+    return PropositionEvaluationReport(
+        "proposition-pair-report/v1",
+        run_id,
+        decisive,
+        false_positives,
+        coverage,
+        metrics,
+        correlations,
+        extraction_sha256,
+        pairs_sha256,
+        decision,
+    )
+
+
 class PropositionExtractionJournal:
     def __init__(
         self,
@@ -288,6 +601,12 @@ def build_source_manifest(
     phase3_sha256: str,
     records: Sequence[Phase3CandidateRecord],
     documents: Mapping[str, EvidenceDocument],
+    extractor_model: str,
+    prompt_id: str,
+    prompt_sha256: str,
+    schema_sha256: str,
+    seed: int,
+    embedding_model: str,
     expected_claims: int = 160,
 ) -> PropositionSourceManifest:
     _unique_candidates(records)
@@ -322,6 +641,12 @@ def build_source_manifest(
         evaluation_sha256,
         phase3_sha256,
         _source_set_digest(ordered),
+        extractor_model,
+        prompt_id,
+        prompt_sha256,
+        schema_sha256,
+        seed,
+        embedding_model,
         ordered,
     )
 
@@ -527,3 +852,51 @@ def _validate_digest(name: str, value: object) -> None:
 def _validate_text(name: str, value: object) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be non-empty text")
+
+
+def _proposition_surfaces(proposition: GroundedProposition) -> tuple[str, ...]:
+    return (
+        proposition.subject.text,
+        proposition.predicate.text,
+        proposition.object.text,
+        *(qualifier.span.text for qualifier in proposition.qualifiers),
+    )
+
+
+def _cosine(left: Sequence[float], right: Sequence[float]) -> float:
+    if not left or len(left) != len(right):
+        raise ValueError("embedding vectors must have the same non-zero dimension")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value)
+        for value in (*left, *right)
+    ):
+        raise ValueError("embedding vectors must contain finite numeric values")
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0 or right_norm == 0:
+        raise ValueError("embedding vectors must be non-zero")
+    return max(
+        -1.0,
+        min(1.0, sum(a * b for a, b in zip(left, right, strict=True)) / left_norm / right_norm),
+    )
+
+
+def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
+    if len(left) != len(right) or not left:
+        raise ValueError("correlation vectors must have equal non-zero length")
+    left_mean = sum(left) / len(left)
+    right_mean = sum(right) / len(right)
+    centered_left = tuple(value - left_mean for value in left)
+    centered_right = tuple(value - right_mean for value in right)
+    denominator = math.sqrt(
+        sum(value * value for value in centered_left)
+        * sum(value * value for value in centered_right)
+    )
+    if denominator == 0:
+        return None
+    return sum(a * b for a, b in zip(centered_left, centered_right, strict=True)) / denominator
+
+
+def _sanitized_error(error: Exception) -> str:
+    message = " ".join(str(error).split())
+    return f"{type(error).__name__}: {message[:240]}"

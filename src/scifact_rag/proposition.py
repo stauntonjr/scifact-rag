@@ -115,6 +115,7 @@ class ExtractionCoverage:
 class ExtractionCoverageGate:
     passed: bool
     failed_conditions: tuple[str, ...]
+    coverage: ExtractionCoverage
 
 
 def source_digest(source: str) -> str:
@@ -225,7 +226,7 @@ def evaluate_extraction_coverage(coverage: ExtractionCoverage) -> ExtractionCove
         failed.append("usable-decisive-documents")
     if coverage.usable_audit_documents != coverage.audit_documents:
         failed.append("usable-audit-documents")
-    return ExtractionCoverageGate(not failed, tuple(failed))
+    return ExtractionCoverageGate(not failed, tuple(failed), coverage)
 
 
 def _score_pair(
