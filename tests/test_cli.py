@@ -185,8 +185,11 @@ _RETRIEVAL_COMPONENTS = (
 class FakeRetrievalCorpus:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._queries = {"1": "first", "2": "second"}
-        self._qrels = {"1": {"10": 1}, "2": {"20": 1}}
+        self._queries = {
+            **{str(index): f"query {index}" for index in range(1, 161)},
+            "999": "outside validation",
+        }
+        self._qrels = {str(index): {str(index * 10): 1} for index in range(1, 161)}
 
     def queries(self):
         return self._queries
@@ -256,7 +259,7 @@ def test_run_retrieval_eval_verifies_boundary_and_builds_frozen_strategies(
 
         def run(self, **kwargs):
             observed["executor"] = kwargs
-            return RetrievalEvaluationExecutionSummary(6, 1, 5, 0)
+            return RetrievalEvaluationExecutionSummary(480, 1, 479, 0)
 
     raw_records = (object(),)
     report = object()
@@ -289,35 +292,37 @@ def test_run_retrieval_eval_verifies_boundary_and_builds_frozen_strategies(
     result = CliRunner().invoke(
         app,
         ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+        env={"COLUMNS": "240"},
     )
 
     assert result.exit_code == 0
     assert json.loads(result.stdout) == {
-        "expected_rows": 6,
+        "expected_rows": 480,
         "failed_rows": 0,
         "preexisting_rows": 1,
         "report_path": "artifacts/retrieval-validation-1/results.report.json",
-        "written_rows": 5,
+        "written_rows": 479,
     }
     assert observed["ensure"] == (data_dir, QrelsSplit.TRAIN_VALIDATION)
     assert observed["built"] == list(RETRIEVAL_DEFAULT_STRATEGIES)
     assert applications[RETRIEVAL_DEFAULT_STRATEGIES[0]].calls == [("probe", 10)]
-    assert observed["executor"] == {
-        "run_id": "retrieval-validation-1",
-        "queries": corpus.queries(),
-        "strategies": RETRIEVAL_DEFAULT_STRATEGIES,
-        "cutoff": 10,
-        "output": Path("artifacts/retrieval-validation-1/results.jsonl"),
-    }
+    executor = observed["executor"]
+    assert executor["run_id"] == "retrieval-validation-1"  # type: ignore[index]
+    assert set(executor["queries"]) == set(corpus.qrels())  # type: ignore[index]
+    assert "999" not in executor["queries"]  # type: ignore[operator]
+    assert executor["strategies"] == RETRIEVAL_DEFAULT_STRATEGIES  # type: ignore[index]
+    assert executor["cutoff"] == 10  # type: ignore[index]
+    assert executor["output"] == Path(  # type: ignore[index]
+        "artifacts/retrieval-validation-1/results.jsonl"
+    )
     assert observed["read_path"] == Path("artifacts/retrieval-validation-1/results.jsonl")
     assert observed["report_records"] is raw_records
-    assert observed["report_kwargs"] == {
-        "run_id": "retrieval-validation-1",
-        "queries": corpus.queries(),
-        "qrels": corpus.qrels(),
-        "strategies": RETRIEVAL_DEFAULT_STRATEGIES,
-        "cutoff": 10,
-    }
+    report_kwargs = observed["report_kwargs"]
+    assert report_kwargs["run_id"] == "retrieval-validation-1"  # type: ignore[index]
+    assert set(report_kwargs["queries"]) == set(corpus.qrels())  # type: ignore[index]
+    assert report_kwargs["qrels"] == corpus.qrels()  # type: ignore[index]
+    assert report_kwargs["strategies"] == RETRIEVAL_DEFAULT_STRATEGIES  # type: ignore[index]
+    assert report_kwargs["cutoff"] == 10  # type: ignore[index]
     assert observed["report"] is report
     assert observed["report_path"] == Path("artifacts/retrieval-validation-1/results.report.json")
 
@@ -340,10 +345,60 @@ def test_run_retrieval_eval_stops_before_composition_on_digest_mismatch(
     result = CliRunner().invoke(
         app,
         ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+        env={"COLUMNS": "240"},
     )
 
     assert result.exit_code == 2
     assert "corpus SHA-256" in result.stderr
+
+
+def test_run_retrieval_eval_rejects_a_validation_qrel_without_query_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir, corpus = _retrieval_cli_fixture(tmp_path)
+    del corpus._queries["3"]
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", lambda *args: corpus)
+
+    def unexpected_build(**kwargs):
+        raise AssertionError("missing validation query text must stop before composition")
+
+    monkeypatch.setattr(cli_module, "build_application", unexpected_build)
+
+    result = CliRunner().invoke(
+        app,
+        ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+        env={"COLUMNS": "240"},
+    )
+
+    assert result.exit_code == 2
+    assert "validation qrels query 3 is missing from queries.jsonl" in result.stderr
+
+
+def test_run_retrieval_eval_requires_the_fixed_160_validation_queries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir, corpus = _retrieval_cli_fixture(tmp_path)
+    del corpus._qrels["160"]
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["qrels_sha256"] = canonical_qrels_sha256(corpus.qrels())
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", lambda *args: corpus)
+
+    def unexpected_build(**kwargs):
+        raise AssertionError("wrong validation cardinality must stop before composition")
+
+    monkeypatch.setattr(cli_module, "build_application", unexpected_build)
+
+    result = CliRunner().invoke(
+        app,
+        ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+        env={"COLUMNS": "240"},
+    )
+
+    assert result.exit_code == 2
+    assert "validation qrels must contain exactly 160 queries" in result.stderr
 
 
 def test_run_retrieval_eval_requires_every_runtime_component(

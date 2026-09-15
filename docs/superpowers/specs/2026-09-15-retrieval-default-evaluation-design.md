@@ -129,10 +129,12 @@ application, reading the corpus, opening PostgreSQL, or calling ColBERT.
 At execution, the CLI verifies the three file/dataset digests, source split, fixed strategies, and
 cutoff before constructing retrievers. The application image deliberately excludes `.git`, so
 `repository_commit` is operator-recorded provenance rather than a runtime assertion. The required
-application-image component digest binds the executable container to that recorded source build.
-Other required component names document at least the PostgreSQL image, MiniLM checkpoint, ColBERT
-checkpoint and tokenizer, and PostgreSQL retrieval extensions. Identifiers and revisions are
-operator-recorded values; the runner does not infer mutable service versions after the run starts.
+application-image entry records the exact observed executable-container identity used for the run;
+the CLI requires that entry but does not prove that its revision is immutable or that it was built
+from the recorded commit. Other required component names document at least the PostgreSQL image,
+MiniLM checkpoint, ColBERT checkpoint and tokenizer, and PostgreSQL retrieval extensions.
+Identifiers and revisions are operator attestations whose observation method must be retained in
+the live report; the runner does not infer mutable service versions after the run starts.
 
 ## Raw result contract
 

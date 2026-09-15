@@ -29,7 +29,7 @@ wrongly typed, or noncanonical fields fail validation.
 | `evidence_class` | Exactly `internal-comparative` |
 | `strategies` | The three strategies above, in that order |
 | `cutoff` | Exactly 10 |
-| `components` | Non-empty, uniquely named component identifiers and immutable revisions |
+| `components` | Non-empty, uniquely named operator-attested component identifiers and revisions |
 | `started_at` | ISO-8601 UTC timestamp ending in `Z` |
 | `completed_at` | Matching UTC completion timestamp or `null` before execution |
 | `host` | Non-empty operator-recorded host identity |
@@ -42,9 +42,10 @@ uses compact key-sorted JSON. Grades remain non-negative integers; they are not 
 binary labels for the digest.
 
 The application image excludes `.git`, so the runner cannot infer or verify
-`repository_commit` inside the container. The operator records that source provenance, while the
-required `application-image` revision binds execution to the built artifact. A live manifest must
-also contain these component names:
+`repository_commit` inside the container. The operator records that source provenance and the
+exact observed `application-image` identity used for execution. The CLI verifies presence and
+consistency of the component inventory; it does not prove that a supplied revision is immutable or
+that an operator attestation is correct. A live manifest must contain these component names:
 
 - `application-image`
 - `postgres-image`
@@ -55,8 +56,10 @@ also contain these component names:
 - `pgvector-extension`
 - `vchord-bm25-extension`
 
-The runner requires their presence but does not replace operator-recorded immutable identifiers by
-querying mutable services after the run starts.
+The retained live report must state how each exact identifier/revision was observed and whether it
+is a digest, source revision, or version. The runner does not replace those operator attestations by
+querying mutable services after the run starts, and reports must not describe the CLI check as
+proof of immutability.
 
 ## Validate, run, and resume
 

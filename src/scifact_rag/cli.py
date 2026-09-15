@@ -206,6 +206,19 @@ def run_retrieval_eval(
                 f"{name} does not match the run manifest",
                 param_hint="--manifest",
             )
+    if len(qrels) != 160:
+        raise typer.BadParameter(
+            "validation qrels must contain exactly 160 queries",
+            param_hint="--data-dir",
+        )
+    all_queries = corpus.queries()
+    missing_query_ids = sorted(set(qrels) - set(all_queries), key=int)
+    if missing_query_ids:
+        raise typer.BadParameter(
+            f"validation qrels query {missing_query_ids[0]} is missing from queries.jsonl",
+            param_hint="--data-dir",
+        )
+    queries = {query_id: all_queries[query_id] for query_id in qrels}
 
     components = {component.component: component for component in run_manifest.components}
     required_components = (
@@ -225,7 +238,6 @@ def run_retrieval_eval(
                 param_hint="--manifest",
             )
 
-    queries = corpus.queries()
     retrievers = {
         strategy: _ApplicationSearchRetriever(build_application(retrieval_strategy=strategy))
         for strategy in run_manifest.strategies
