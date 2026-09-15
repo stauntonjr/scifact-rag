@@ -15,6 +15,7 @@ from scifact_rag.evaluation import (
     GoldRationale,
     ScientificStance,
 )
+from scifact_rag.metrics import evaluate_rankings
 from scifact_rag.scientific_inference import (
     DEBERTA_MODEL,
     DEBERTA_REVISION,
@@ -38,6 +39,9 @@ from scifact_rag.scientific_inference_evaluation import (
     ScientificInferenceJournal,
     ScientificInferenceResult,
     ScientificInferenceRunManifest,
+    build_scientific_inference_report,
+    write_scientific_inference_failures,
+    write_scientific_inference_report,
 )
 from scifact_rag.strategies import (
     COREF_NOMINAL_DP_MINILM,
@@ -462,3 +466,109 @@ def test_request_failure_is_terminal_after_exactly_one_attempt(tmp_path) -> None
 
 
 _STARTED_SCHEMA_FOR_TEST = "scientific-inference-attempt-started/v1"
+
+
+def scored_result(
+    candidate_id: str,
+    document_id: str,
+    gold: ScientificInferenceLabel,
+    logits: InferenceLogits,
+    *,
+    baseline_rank: int,
+) -> ScientificInferenceResult:
+    return replace(
+        successful_inference_result_fixture(),
+        candidate_id=candidate_id,
+        document_id=document_id,
+        document_sha256=candidate_id,
+        baseline_rank=baseline_rank,
+        gold_label=gold,
+        logits=logits,
+        predicted_label=logits.predicted_label,
+        evidence_margin=logits.evidence_margin,
+        polarity_margin=logits.polarity_margin,
+        evidence_coverage=(
+            "annotated-evidence-present" if document_id == "10" else "not-annotated"
+        ),
+    )
+
+
+def test_report_derives_metrics_controls_and_ranking_from_raw_records() -> None:
+    records = (
+        scored_result(
+            "1" * 64,
+            "10",
+            ScientificInferenceLabel.ENTAILMENT,
+            InferenceLogits(3.0, 0.0, -1.0),
+            baseline_rank=1,
+        ),
+        scored_result(
+            "2" * 64,
+            "11",
+            ScientificInferenceLabel.CONTRADICTION,
+            InferenceLogits(0.0, 1.0, 2.0),
+            baseline_rank=2,
+        ),
+        scored_result(
+            "3" * 64,
+            "12",
+            ScientificInferenceLabel.NEUTRAL,
+            InferenceLogits(0.0, 0.0, 2.0),
+            baseline_rank=3,
+        ),
+        scored_result(
+            "4" * 64,
+            "13",
+            ScientificInferenceLabel.NEUTRAL,
+            InferenceLogits(-1.0, 0.0, 2.0),
+            baseline_rank=4,
+        ),
+        replace(
+            preassembly_failure_fixture(),
+            candidate_id="5" * 64,
+            document_id="14",
+            document_sha256="5" * 64,
+            baseline_rank=5,
+            gold_label=ScientificInferenceLabel.NEUTRAL,
+        ),
+    )
+
+    report = build_scientific_inference_report(
+        records,
+        evaluation_set=single_case_fixture(),
+        run_id="run-1",
+        expected_candidates=6,
+        outcome_unknown_candidates=1,
+    )
+
+    assert report.complete is False
+    assert report.scored_candidates == 4
+    assert report.failed_candidates == 1
+    assert report.outcome_unknown_candidates == 1
+    assert report.three_way.confusion["entailment"]["entailment"] == 1
+    assert report.label_prior.predicted_label == "neutral"
+    assert report.evidence_partitions.annotated_evidence_present == 1
+    assert report.ranking == evaluate_rankings(
+        {"1": {"10": 1}}, {"1": ["10", "11", "12", "13", "14"]}, 10
+    )
+
+
+def test_report_and_failure_outputs_are_atomic_and_failure_tags_start_empty(tmp_path) -> None:
+    failure = preassembly_failure_fixture()
+    report = build_scientific_inference_report(
+        (failure,),
+        evaluation_set=single_case_fixture(),
+        run_id="run-1",
+        expected_candidates=1,
+        outcome_unknown_candidates=0,
+    )
+    report_path = tmp_path / "report.json"
+    failure_path = tmp_path / "failures.jsonl"
+
+    write_scientific_inference_report(report, report_path)
+    write_scientific_inference_failures((failure,), failure_path)
+
+    assert json.loads(report_path.read_text(encoding="utf-8"))["failed_candidates"] == 1
+    failure_row = json.loads(failure_path.read_text(encoding="utf-8"))
+    assert failure_row["error_stage"] == "assembly"
+    assert failure_row["phenomenon_tags"] == []

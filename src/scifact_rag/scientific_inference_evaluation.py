@@ -5,21 +5,24 @@ import json
 import math
 import os
 import re
+import statistics
 import time
 import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from tempfile import NamedTemporaryFile
 from typing import Any
 
-from .domain import RetrievalCandidate
+from .domain import RetrievalCandidate, RetrievalMetrics
 from .evaluation import (
     ComponentRevision,
     GenerationEvaluationCase,
     GenerationEvaluationSet,
     ScientificStance,
 )
+from .metrics import evaluate_rankings
 from .ports import CandidatePoolSource, EvidenceBundleAssembler, ScientificInferenceClient
 from .scientific_inference import (
     DEBERTA_MODEL,
@@ -411,6 +414,88 @@ class ScientificInferenceExecutionSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class ScientificInferenceClassMetrics:
+    precision: float
+    recall: float
+    f1: float
+    support: int
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceThreeWayMetrics:
+    accuracy: float
+    macro_f1: float
+    classes: Mapping[str, ScientificInferenceClassMetrics]
+    confusion: Mapping[str, Mapping[str, int]]
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceLabelPriorControl:
+    predicted_label: str
+    accuracy: float
+    macro_f1: float
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceEvidencePartitions:
+    gold_document_absent: int
+    annotated_evidence_absent: int
+    annotated_evidence_present: int
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceEvidenceSentenceCoverage:
+    total: int
+    matched: int
+    recall: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class NumericSummary:
+    minimum: float
+    median: float
+    maximum: float
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceScoreSummaries:
+    entailment: NumericSummary | None
+    contradiction: NumericSummary | None
+    neutral: NumericSummary | None
+    evidence_margin: NumericSummary | None
+    polarity_margin: NumericSummary | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceCorrelations:
+    colbert_evidence_margin_spearman: float | None
+    colbert_polarity_margin_spearman: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceEvaluationReport:
+    schema_version: str
+    run_id: str
+    expected_candidates: int
+    terminal_candidates: int
+    scored_candidates: int
+    failed_candidates: int
+    outcome_unknown_candidates: int
+    skipped_candidates: int
+    terminal_coverage: float
+    complete: bool
+    three_way: ScientificInferenceThreeWayMetrics
+    label_prior: ScientificInferenceLabelPriorControl
+    evidence_partitions: ScientificInferenceEvidencePartitions
+    evidence_sentences: ScientificInferenceEvidenceSentenceCoverage
+    ranking: RetrievalMetrics
+    latency_ms: NumericSummary | None
+    scores: ScientificInferenceScoreSummaries
+    correlations: ScientificInferenceCorrelations
+    citation_provenance_valid_rate: float | None
+
+
+@dataclass(frozen=True, slots=True)
 class _PlannedCandidate:
     case: GenerationEvaluationCase
     candidate: RetrievalCandidate
@@ -737,6 +822,312 @@ def _sanitized_error(error: Exception, *, include_message: bool = True) -> str:
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def build_scientific_inference_report(
+    records: tuple[ScientificInferenceResult, ...],
+    *,
+    evaluation_set: GenerationEvaluationSet,
+    run_id: str,
+    expected_candidates: int,
+    outcome_unknown_candidates: int,
+) -> ScientificInferenceEvaluationReport:
+    if expected_candidates < 1 or outcome_unknown_candidates < 0:
+        raise ValueError("expected and outcome-unknown counts must be valid")
+    if len(records) + outcome_unknown_candidates > expected_candidates:
+        raise ValueError("terminal and outcome-unknown candidates exceed the expected count")
+    if any(record.run_id != run_id for record in records):
+        raise ValueError("report records must share the requested run_id")
+    candidate_ids = [record.candidate_id for record in records]
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise ValueError("report records must have unique candidate IDs")
+    scored = tuple(record for record in records if record.error_stage is None)
+    failed = len(records) - len(scored)
+    skipped = expected_candidates - len(records) - outcome_unknown_candidates
+    three_way = _three_way_metrics(scored)
+    label_prior = _label_prior_control(scored)
+    evidence_partitions, sentence_coverage = _evidence_coverage_metrics(records, evaluation_set)
+    rankings = _baseline_rankings(records, evaluation_set)
+    ranking = evaluate_rankings(
+        {
+            case.query_id: {document_id: 1 for document_id in case.cited_document_ids}
+            for case in evaluation_set.cases
+        },
+        rankings,
+        10,
+    )
+    evidence_pairs = [
+        (record.colbert_score, record.evidence_margin)
+        for record in scored
+        if record.colbert_score is not None and record.evidence_margin is not None
+    ]
+    polarity_pairs = [
+        (record.colbert_score, record.polarity_margin)
+        for record in scored
+        if record.colbert_score is not None and record.polarity_margin is not None
+    ]
+    provenance = [_citation_provenance_valid(record) for record in records if record.bundle_digest]
+    return ScientificInferenceEvaluationReport(
+        schema_version="scientific-inference-evaluation-report/v1",
+        run_id=run_id,
+        expected_candidates=expected_candidates,
+        terminal_candidates=len(records),
+        scored_candidates=len(scored),
+        failed_candidates=failed,
+        outcome_unknown_candidates=outcome_unknown_candidates,
+        skipped_candidates=skipped,
+        terminal_coverage=len(records) / expected_candidates,
+        complete=failed == 0 and outcome_unknown_candidates == 0 and skipped == 0,
+        three_way=three_way,
+        label_prior=label_prior,
+        evidence_partitions=evidence_partitions,
+        evidence_sentences=sentence_coverage,
+        ranking=ranking,
+        latency_ms=_numeric_summary(
+            [record.latency_ms for record in scored if record.latency_ms is not None]
+        ),
+        scores=ScientificInferenceScoreSummaries(
+            entailment=_numeric_summary(
+                [record.logits.entailment for record in scored if record.logits is not None]
+            ),
+            contradiction=_numeric_summary(
+                [record.logits.contradiction for record in scored if record.logits is not None]
+            ),
+            neutral=_numeric_summary(
+                [record.logits.neutral for record in scored if record.logits is not None]
+            ),
+            evidence_margin=_numeric_summary(
+                [record.evidence_margin for record in scored if record.evidence_margin is not None]
+            ),
+            polarity_margin=_numeric_summary(
+                [record.polarity_margin for record in scored if record.polarity_margin is not None]
+            ),
+        ),
+        correlations=ScientificInferenceCorrelations(
+            colbert_evidence_margin_spearman=_spearman(evidence_pairs),
+            colbert_polarity_margin_spearman=_spearman(polarity_pairs),
+        ),
+        citation_provenance_valid_rate=(sum(provenance) / len(provenance) if provenance else None),
+    )
+
+
+def write_scientific_inference_report(
+    report: ScientificInferenceEvaluationReport,
+    destination: Path,
+) -> None:
+    _atomic_write(
+        destination,
+        json.dumps(asdict(report), indent=2, sort_keys=True) + "\n",
+    )
+
+
+def write_scientific_inference_failures(
+    records: tuple[ScientificInferenceResult, ...],
+    destination: Path,
+) -> None:
+    rows: list[dict[str, object]] = []
+    for record in sorted(records, key=lambda item: (int(item.query_id), int(item.document_id))):
+        misclassified = (
+            record.predicted_label is not None and record.predicted_label is not record.gold_label
+        )
+        if record.error_stage is None and not misclassified:
+            continue
+        rows.append(
+            {
+                "schema_version": "scientific-inference-failure/v1",
+                "query_id": record.query_id,
+                "document_id": record.document_id,
+                "gold_label": record.gold_label.value,
+                "predicted_label": (
+                    record.predicted_label.value if record.predicted_label is not None else None
+                ),
+                "error_stage": record.error_stage,
+                "error_code": record.error_code,
+                "admitted_ordinals": [item.ordinal for item in record.admitted],
+                "admitted_text": [item.text for item in record.admitted],
+                "phenomenon_tags": [],
+            }
+        )
+    serialized = "".join(_canonical_json(row) + "\n" for row in rows)
+    _atomic_write(destination, serialized)
+
+
+def _three_way_metrics(
+    records: tuple[ScientificInferenceResult, ...],
+) -> ScientificInferenceThreeWayMetrics:
+    labels = tuple(label.value for label in ScientificInferenceLabel)
+    confusion = {gold: {predicted: 0 for predicted in labels} for gold in labels}
+    for record in records:
+        assert record.predicted_label is not None
+        confusion[record.gold_label.value][record.predicted_label.value] += 1
+    classes: dict[str, ScientificInferenceClassMetrics] = {}
+    for label in labels:
+        true_positive = confusion[label][label]
+        support = sum(confusion[label].values())
+        predicted = sum(confusion[gold][label] for gold in labels)
+        precision = true_positive / predicted if predicted else 0.0
+        recall = true_positive / support if support else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        classes[label] = ScientificInferenceClassMetrics(precision, recall, f1, support)
+    accuracy = sum(confusion[label][label] for label in labels) / len(records) if records else 0.0
+    return ScientificInferenceThreeWayMetrics(
+        accuracy=accuracy,
+        macro_f1=sum(metric.f1 for metric in classes.values()) / len(labels),
+        classes=classes,
+        confusion=confusion,
+    )
+
+
+def _label_prior_control(
+    records: tuple[ScientificInferenceResult, ...],
+) -> ScientificInferenceLabelPriorControl:
+    ordered = tuple(ScientificInferenceLabel)
+    counts = {label: sum(record.gold_label is label for record in records) for label in ordered}
+    predicted = max(ordered, key=lambda label: counts[label])
+    accuracy = counts[predicted] / len(records) if records else 0.0
+    per_class_f1: list[float] = []
+    for label in ordered:
+        true_positive = counts[label] if label is predicted else 0
+        predicted_count = len(records) if label is predicted else 0
+        support = counts[label]
+        precision = true_positive / predicted_count if predicted_count else 0.0
+        recall = true_positive / support if support else 0.0
+        per_class_f1.append(
+            2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        )
+    return ScientificInferenceLabelPriorControl(
+        predicted_label=predicted.value,
+        accuracy=accuracy,
+        macro_f1=sum(per_class_f1) / len(ordered),
+    )
+
+
+def _evidence_coverage_metrics(
+    records: tuple[ScientificInferenceResult, ...],
+    evaluation_set: GenerationEvaluationSet,
+) -> tuple[ScientificInferenceEvidencePartitions, ScientificInferenceEvidenceSentenceCoverage]:
+    by_key = {(record.query_id, record.document_id): record for record in records}
+    absent = 0
+    evidence_absent = 0
+    evidence_present = 0
+    total_sentences = 0
+    matched_sentences = 0
+    for case in evaluation_set.cases:
+        for rationale in case.rationales:
+            record = by_key.get((case.query_id, rationale.doc_id))
+            if record is None:
+                absent += 1
+                total_sentences += len(rationale.sentences)
+                continue
+            if record.evidence_coverage == "annotated-evidence-present":
+                evidence_present += 1
+            else:
+                evidence_absent += 1
+            normalized_evidence = [_normalize_text(item.text) for item in record.admitted]
+            for sentence in rationale.sentences:
+                total_sentences += 1
+                matched_sentences += any(
+                    _normalize_text(sentence) in evidence for evidence in normalized_evidence
+                )
+    return (
+        ScientificInferenceEvidencePartitions(absent, evidence_absent, evidence_present),
+        ScientificInferenceEvidenceSentenceCoverage(
+            total=total_sentences,
+            matched=matched_sentences,
+            recall=(matched_sentences / total_sentences if total_sentences else None),
+        ),
+    )
+
+
+def _baseline_rankings(
+    records: tuple[ScientificInferenceResult, ...],
+    evaluation_set: GenerationEvaluationSet,
+) -> dict[str, list[str]]:
+    return {
+        case.query_id: [
+            record.document_id
+            for record in sorted(
+                (
+                    item
+                    for item in records
+                    if item.query_id == case.query_id and item.baseline_rank is not None
+                ),
+                key=lambda item: (int(item.baseline_rank or 0), int(item.document_id)),
+            )
+        ]
+        for case in evaluation_set.cases
+    }
+
+
+def _numeric_summary(values: list[float]) -> NumericSummary | None:
+    if not values:
+        return None
+    return NumericSummary(min(values), statistics.median(values), max(values))
+
+
+def _spearman(pairs: list[tuple[float, float]]) -> float | None:
+    if len(pairs) < 2:
+        return None
+    left = _average_ranks([pair[0] for pair in pairs])
+    right = _average_ranks([pair[1] for pair in pairs])
+    left_mean = statistics.mean(left)
+    right_mean = statistics.mean(right)
+    numerator = sum((x - left_mean) * (y - right_mean) for x, y in zip(left, right))
+    left_scale = math.sqrt(sum((x - left_mean) ** 2 for x in left))
+    right_scale = math.sqrt(sum((y - right_mean) ** 2 for y in right))
+    if left_scale == 0 or right_scale == 0:
+        return None
+    return numerator / (left_scale * right_scale)
+
+
+def _average_ranks(values: list[float]) -> list[float]:
+    ordered = sorted(range(len(values)), key=lambda index: (values[index], index))
+    ranks = [0.0] * len(values)
+    start = 0
+    while start < len(ordered):
+        end = start + 1
+        while end < len(ordered) and values[ordered[end]] == values[ordered[start]]:
+            end += 1
+        rank = (start + 1 + end) / 2
+        for position in ordered[start:end]:
+            ranks[position] = rank
+        start = end
+    return ranks
+
+
+def _citation_provenance_valid(record: ScientificInferenceResult) -> bool:
+    ordinals: set[int] = set()
+    for item in record.admitted:
+        if (
+            item.doc_id != record.document_id
+            or item.representation != COREF_NOMINAL_DP_MINILM
+            or item.ordinal in ordinals
+            or item.text_sha256 != _text_digest(item.text)
+        ):
+            return False
+        ordinals.add(item.ordinal)
+    return bool(record.admitted)
+
+
+def _atomic_write(destination: Path, serialized: str) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staged_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=destination.parent,
+            delete=False,
+        ) as staged:
+            staged.write(serialized)
+            staged.flush()
+            os.fsync(staged.fileno())
+            staged_path = Path(staged.name)
+        os.chmod(staged_path, 0o644)
+        staged_path.replace(destination)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
 
 
 def _parse_event(serialized: str) -> ScientificInferenceEvent:
