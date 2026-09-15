@@ -3,10 +3,11 @@
 ## Current objective
 
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
-comparison and the fixed retrieval-default comparison are complete. Phase 1 still has its frozen
-human review outstanding, and Issue #7 has applied ADR-0029's selected retrieval default.
-Scientific inference is the next architecture phase; graph, adapters, and template evaluation
-remain downstream.
+comparison, fixed retrieval-default comparison, and Phase 3 scientific-inference diagnostic are
+complete. Phase 1 still has its frozen human review outstanding, Issue #7 applied ADR-0029's
+selected retrieval default, and Issue #8 retained scientific-inference architecture without
+promoting its fixed DeBERTa scores. Proposition-graph scoring is the next architecture phase;
+adapters and template evaluation remain downstream.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -107,6 +108,9 @@ exact ColBERT tokenizer revision, four-generator ownership, and title/max-conten
 adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citation boundary.
 `docs/adr/0029-retrieval-default-selection.md` records the content-max ColBERT selection, BM25
 fallback, operational tradeoff, and subsequent Issue #7 implementation.
+`docs/adr/0030-scientific-inference-scoring.md` records the fixed broad-pool DeBERTa diagnostic,
+at-most-once journal, and no-fusion boundary. The completed result and no-promotion decision are in
+`docs/reports/phase-3-scientific-inference-validation.md`.
 
 ## Live environment observed 2026-08-27
 
@@ -154,6 +158,12 @@ fallback, operational tradeoff, and subsequent Issue #7 implementation.
   rankings. DP content-max ColBERT reached nDCG@10 0.742493, recall@10 0.806250, and 638.94 ms
   median latency; BM25 plus token windows reached 0.673519, 0.787500, and 78.70 ms. The result is
   internal comparative evidence because the validation split was already inspected.
+- Issue #8 completed the fixed scientific-inference diagnostic over 21,711 broad-pool candidates
+  from all 160 frozen validation claims. Every candidate has a terminal result, with zero failures
+  and zero unknown outcomes. Evidence-sentence recall is 0.899522, but three-way macro-F1 0.324781
+  trails the 0.332410 neutral-prior control because rare-class precision is poor. The service,
+  provenance-bearing journal, failure corpus, and reporting interface are retained; its scores are
+  not fused into retrieval or generation.
 - Local scaffold baseline: `703c8e5`.
 - Dataclass domain/ports, application services, SciFact/MiniLM/Postgres/generator adapters, Typer
   CLI, Docker Compose, dependency contract, ADR, research note, and focused tests are authored.

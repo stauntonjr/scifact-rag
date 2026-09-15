@@ -351,6 +351,15 @@ The scorer proceeds to default ranking or generation only if it contributes uniq
 fixed validation boundary. If it merely reproduces ColBERT ordering or harms evidence recall, retain
 the interface and failure corpus but do not promote the model.
 
+### Outcome (2026-09-15)
+
+Issue #8 completed the fixed diagnostic over all 21,711 candidates in the 160 frozen claim pools
+with no failed or unknown outcomes. Evidence-sentence recall was 0.899522, but three-way macro-F1
+was 0.324781 versus 0.332410 for the neutral-prior control; rare-class precision was 0.036027 for
+entailment and 0.009807 for contradiction. The channel is retained with its provenance and failure
+corpus but is not promoted into retrieval or generation. See
+`docs/reports/phase-3-scientific-inference-validation.md`.
+
 ## Phase 4: add proposition-graph scoring
 
 ### Goal
