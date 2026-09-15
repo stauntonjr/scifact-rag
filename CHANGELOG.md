@@ -6,6 +6,10 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Froze a 24-claim, length- and stance-stratified human groundedness review before the repaired
+  validation outputs are generated. The blinded rubric separates grounding, material
+  overstatement, and six scientific-context omission types from automatic stance and citation
+  scores; it cannot retroactively supply the missing non-inferiority margin or authorize promotion.
 - Made SciFact generation evaluation reproducible and directly scoreable without changing the
   interactive RAG prompt. Evaluation requests now use a manifest-verified prompt profile, fixed
   seed 1729, and a strict leading SUPPORT/CONTRADICT/NOT_ENOUGH_INFO verdict; raw text remains

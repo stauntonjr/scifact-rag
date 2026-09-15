@@ -211,6 +211,10 @@ Record paired per-query measurements for:
 The first comparison does not use an LLM judge. Deterministic annotations and a fixed human rubric
 remain distinguishable in the result artifact.
 
+The fixed human subset selection and rubric are recorded in
+`docs/project/generation-human-review-v1.md`. The reviewer receives blinded policy/output rows;
+automatic stance and citation scores remain outside that worksheet.
+
 ### Decision rule
 
 - Keep `whole-document` if neither chunk-aware policy preserves answer/stance correctness and
