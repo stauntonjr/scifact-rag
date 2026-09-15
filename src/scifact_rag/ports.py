@@ -10,6 +10,7 @@ from .domain import (
     CoreferenceAnalysis,
     EvidenceChunk,
     EvidenceDocument,
+    GeneratedAnswer,
     RetrievalCandidate,
     SearchHit,
     SentenceSpan,
@@ -167,6 +168,18 @@ class AnswerGenerator(Protocol):
     def model(self) -> str: ...
 
     def generate(self, query: str, evidence: Sequence[SearchHit]) -> str: ...
+
+
+@runtime_checkable
+class MeasuredAnswerGenerator(Protocol):
+    @property
+    def model(self) -> str: ...
+
+    def generate_with_metrics(
+        self,
+        query: str,
+        evidence: Sequence[SearchHit],
+    ) -> GeneratedAnswer: ...
 
 
 class GenerationContextAssembler(Protocol):

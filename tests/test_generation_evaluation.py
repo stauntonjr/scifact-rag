@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from scifact_rag.domain import SearchHit
+from scifact_rag.domain import GeneratedAnswer, SearchHit
 from scifact_rag.evaluation import (
     GenerationEvaluationCase,
     GenerationEvaluationSet,
@@ -16,7 +18,10 @@ from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.generation_evaluation import (
     GenerationEvaluationExecutor,
     GenerationEvaluationRecord,
+    GenerationEvaluationReport,
     PairedGenerationEvaluator,
+    build_generation_evaluation_report,
+    write_generation_evaluation_report,
 )
 
 
@@ -63,6 +68,19 @@ class RecordingGenerator:
     def generate(self, query: str, evidence: Sequence[SearchHit]) -> str:
         self.calls.append((query, list(evidence)))
         return self.responses[evidence[0].text]
+
+
+class MeasuredRecordingGenerator(RecordingGenerator):
+    def generate_with_metrics(
+        self,
+        query: str,
+        evidence: Sequence[SearchHit],
+    ) -> GeneratedAnswer:
+        return GeneratedAnswer(
+            text=self.generate(query, evidence),
+            input_tokens=137,
+            generated_tokens=9,
+        )
 
 
 def _case() -> GenerationEvaluationCase:
@@ -366,3 +384,118 @@ def test_paired_evaluator_records_no_retrieval_as_valid_insufficient_evidence() 
     assert all(result.error_type is None for result in results)
     assert all(assembler.calls == [] for assembler in assemblers.values())
     assert generator.calls == []
+
+
+def test_paired_evaluator_separates_assembly_and_generator_time_and_token_usage() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    clock_values = iter((0.0, 0.1, 0.1, 0.12, 0.12, 0.32))
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={
+            GenerationContextStrategyName.WHOLE_DOCUMENT: RecordingAssembler([parent]),
+        },
+        generator=MeasuredRecordingGenerator({parent.text: "Supported [1]"}),
+        clock=lambda: next(clock_values),
+    )
+
+    result = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=(GenerationContextStrategyName.WHOLE_DOCUMENT,),
+    )[0]
+
+    assert result.retrieval_latency_ms == pytest.approx(100.0)
+    assert result.context_assembly_latency_ms == pytest.approx(20.0)
+    assert result.generator_latency_ms == pytest.approx(200.0)
+    assert result.input_tokens == 137
+    assert result.generated_tokens == 9
+
+
+def test_generation_evaluation_report_aggregates_each_policy_without_dropping_failures() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+    base = evaluator.evaluate(_case(), retrieval_limit=1)
+    records = (
+        GenerationEvaluationRecord(
+            "development-1",
+            replace(
+                base[0],
+                input_tokens=100,
+                generated_tokens=10,
+                generator_latency_ms=100.0,
+                context_assembly_latency_ms=2.0,
+            ),
+        ),
+        GenerationEvaluationRecord(
+            "development-1",
+            replace(
+                base[1],
+                input_tokens=50,
+                generated_tokens=9,
+                generator_latency_ms=80.0,
+                context_assembly_latency_ms=20.0,
+                answer_text="insufficient evidence",
+                citation_valid=False,
+            ),
+        ),
+        GenerationEvaluationRecord(
+            "development-1",
+            replace(
+                base[2],
+                raw_generated_text=None,
+                answer_text=None,
+                citations=(),
+                citation_valid=None,
+                input_tokens=None,
+                generated_tokens=None,
+                error_type="TimeoutError",
+                error_message="generation timed out",
+            ),
+        ),
+    )
+
+    report = build_generation_evaluation_report(
+        records,
+        run_id="development-1",
+        expected_rows=3,
+    )
+
+    assert report.completed_rows == 3
+    assert report.failed_rows == 1
+    assert report.complete is True
+    assert [summary.context_strategy for summary in report.strategies] == list(
+        GenerationContextStrategyName
+    )
+    whole, top_dp, adaptive = report.strategies
+    assert whole.successful_rows == 1
+    assert whole.median_input_tokens == 100
+    assert whole.mean_conditional_evidence_recall == 1.0
+    assert top_dp.insufficient_evidence_rate == 1.0
+    assert top_dp.citation_valid_rate == 0.0
+    assert adaptive.failed_rows == 1
+    assert adaptive.median_input_tokens is None
+
+
+def test_generation_evaluation_report_writes_canonical_json_atomically(tmp_path: Path) -> None:
+    report = GenerationEvaluationReport(
+        schema_version="generation-evaluation-report/v1",
+        run_id="development-1",
+        expected_rows=3,
+        completed_rows=0,
+        failed_rows=0,
+        complete=False,
+        strategies=(),
+    )
+    destination = tmp_path / "nested" / "results.report.json"
+
+    write_generation_evaluation_report(report, destination)
+
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "generation-evaluation-report/v1"
+    assert payload["run_id"] == "development-1"
+    assert payload["complete"] is False

@@ -20,7 +20,10 @@ from scifact_rag.evaluation import (
     ScientificStance,
 )
 from scifact_rag.generation import GenerationContextStrategyName
-from scifact_rag.generation_evaluation import GenerationEvaluationExecutionSummary
+from scifact_rag.generation_evaluation import (
+    GenerationEvaluationExecutionSummary,
+    GenerationEvaluationReport,
+)
 from scifact_rag.strategies import RetrievalStrategyName
 
 
@@ -254,9 +257,41 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
             built.update(kwargs)
             return GenerationEvaluationExecutionSummary(3, 0, 3, 0)
 
+    report = GenerationEvaluationReport(
+        "generation-evaluation-report/v1",
+        "development-1",
+        3,
+        3,
+        0,
+        True,
+        (),
+    )
+
+    def fake_write(actual_report, destination):
+        built["report"] = actual_report
+        built["report_path"] = destination
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli_module, "build_generation_evaluator", fake_build)
     monkeypatch.setattr(cli_module, "GenerationEvaluationExecutor", FakeExecutor)
+    monkeypatch.setattr(
+        cli_module,
+        "read_generation_evaluation_records",
+        lambda path: (),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "build_generation_evaluation_report",
+        lambda records, **kwargs: report,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "write_generation_evaluation_report",
+        fake_write,
+        raising=False,
+    )
 
     result = CliRunner().invoke(
         app,
@@ -274,6 +309,7 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
         "expected_rows": 3,
         "failed_rows": 0,
         "preexisting_rows": 0,
+        "report_path": "artifacts/results.report.json",
         "written_rows": 3,
     }
     assert built["retrieval_strategy"] is RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT
@@ -281,3 +317,5 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
     assert built["evaluation_set"] == evaluation_set
     assert built["retrieval_limit"] == 5
     assert built["output"] == Path("artifacts/results.jsonl")
+    assert built["report"] is report
+    assert built["report_path"] == Path("artifacts/results.report.json")

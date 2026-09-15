@@ -16,7 +16,12 @@ from .evaluation import (
     write_generation_evaluation_set,
 )
 from .generation import GenerationContextStrategyName
-from .generation_evaluation import GenerationEvaluationExecutor
+from .generation_evaluation import (
+    GenerationEvaluationExecutor,
+    build_generation_evaluation_report,
+    read_generation_evaluation_records,
+    write_generation_evaluation_report,
+)
 from .strategies import RetrievalStrategyName
 
 app = typer.Typer(no_args_is_help=True, help="Grounded retrieval and generation over SciFact.")
@@ -205,13 +210,23 @@ def run_generation_eval(
             param_hint="--manifest",
         ) from exc
     evaluator = build_generation_evaluator(retrieval_strategy=retrieval_strategy)
+    results_path = Path(run_manifest.results_path)
     summary = GenerationEvaluationExecutor(evaluator).run(
         run_id=run_manifest.run_id,
         evaluation_set=cases,
         retrieval_limit=run_manifest.retrieval_limit,
-        output=Path(run_manifest.results_path),
+        output=results_path,
     )
-    _emit(asdict(summary))
+    report_path = results_path.with_suffix(".report.json")
+    report = build_generation_evaluation_report(
+        read_generation_evaluation_records(results_path),
+        run_id=run_manifest.run_id,
+        expected_rows=len(cases.cases) * len(GenerationContextStrategyName),
+    )
+    write_generation_evaluation_report(report, report_path)
+    response = asdict(summary)
+    response["report_path"] = str(report_path)
+    _emit(response)
 
 
 @app.command("evaluate")

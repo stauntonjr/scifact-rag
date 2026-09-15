@@ -3,18 +3,20 @@ from __future__ import annotations
 import json
 import os
 import re
+import statistics
 import time
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 from .application import finalize_generated_answer
-from .domain import SearchHit
+from .domain import GeneratedAnswer, SearchHit
 from .evaluation import GenerationEvaluationCase, GenerationEvaluationSet
 from .generation import GenerationContextStrategyName
-from .ports import AnswerGenerator, GenerationContextAssembler, Retriever
+from .ports import AnswerGenerator, GenerationContextAssembler, MeasuredAnswerGenerator, Retriever
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +28,10 @@ class GenerationEvaluationResult:
     context_strategy: GenerationContextStrategyName
     retrieval_limit: int
     retrieval_latency_ms: float
-    generation_latency_ms: float
+    context_assembly_latency_ms: float
+    generator_latency_ms: float
+    input_tokens: int | None
+    generated_tokens: int | None
     retrieved_parent_ids: tuple[str, ...]
     retrieved_gold_parent_ids: tuple[str, ...]
     relevant_parent_retrieved: bool
@@ -108,6 +113,147 @@ class GenerationEvaluationExecutionSummary:
     preexisting_rows: int
     written_rows: int
     failed_rows: int
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationStrategySummary:
+    context_strategy: GenerationContextStrategyName
+    rows: int
+    successful_rows: int
+    failed_rows: int
+    relevant_parent_retrieval_rate: float
+    mean_conditional_evidence_recall: float | None
+    citation_valid_rate: float | None
+    insufficient_evidence_rate: float | None
+    median_supplied_contexts: float | None
+    median_input_tokens: float | None
+    median_generated_tokens: float | None
+    median_context_assembly_latency_ms: float | None
+    median_generator_latency_ms: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationReport:
+    schema_version: str
+    run_id: str
+    expected_rows: int
+    completed_rows: int
+    failed_rows: int
+    complete: bool
+    strategies: tuple[GenerationStrategySummary, ...]
+
+
+def build_generation_evaluation_report(
+    records: Sequence[GenerationEvaluationRecord],
+    *,
+    run_id: str,
+    expected_rows: int,
+) -> GenerationEvaluationReport:
+    if expected_rows < 1 or len(records) > expected_rows:
+        raise ValueError("expected_rows must be positive and cover every completed record")
+    if any(record.run_id != run_id for record in records):
+        raise ValueError("generation evaluation report records must share the requested run_id")
+    keys = {(record.result.query_id, record.result.context_strategy) for record in records}
+    if len(keys) != len(records):
+        raise ValueError("generation evaluation report records must be unique by query and policy")
+    summaries: list[GenerationStrategySummary] = []
+    for strategy in GenerationContextStrategyName:
+        results = [
+            record.result for record in records if record.result.context_strategy is strategy
+        ]
+        successful = [result for result in results if result.error_type is None]
+        evidence_recalls = [
+            result.gold_evidence_sentence_recall
+            for result in results
+            if result.gold_evidence_sentence_recall is not None
+        ]
+        citation_validity = [
+            result.citation_valid for result in results if result.citation_valid is not None
+        ]
+        summaries.append(
+            GenerationStrategySummary(
+                context_strategy=strategy,
+                rows=len(results),
+                successful_rows=len(successful),
+                failed_rows=len(results) - len(successful),
+                relevant_parent_retrieval_rate=(
+                    sum(result.relevant_parent_retrieved for result in results) / len(results)
+                    if results
+                    else 0.0
+                ),
+                mean_conditional_evidence_recall=_mean(evidence_recalls),
+                citation_valid_rate=(
+                    sum(citation_validity) / len(citation_validity) if citation_validity else None
+                ),
+                insufficient_evidence_rate=(
+                    sum(result.answer_text == "insufficient evidence" for result in successful)
+                    / len(successful)
+                    if successful
+                    else None
+                ),
+                median_supplied_contexts=_median(
+                    [result.supplied_context_count for result in results]
+                ),
+                median_input_tokens=_median(
+                    [result.input_tokens for result in results if result.input_tokens is not None]
+                ),
+                median_generated_tokens=_median(
+                    [
+                        result.generated_tokens
+                        for result in results
+                        if result.generated_tokens is not None
+                    ]
+                ),
+                median_context_assembly_latency_ms=_median(
+                    [result.context_assembly_latency_ms for result in results]
+                ),
+                median_generator_latency_ms=_median(
+                    [result.generator_latency_ms for result in results]
+                ),
+            )
+        )
+    return GenerationEvaluationReport(
+        schema_version="generation-evaluation-report/v1",
+        run_id=run_id,
+        expected_rows=expected_rows,
+        completed_rows=len(records),
+        failed_rows=sum(record.result.error_type is not None for record in records),
+        complete=len(records) == expected_rows,
+        strategies=tuple(summaries),
+    )
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    return statistics.fmean(values) if values else None
+
+
+def _median(values: Sequence[int | float]) -> float | None:
+    return float(statistics.median(values)) if values else None
+
+
+def write_generation_evaluation_report(
+    report: GenerationEvaluationReport,
+    destination: Path,
+) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staged_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as staged:
+            json.dump(asdict(report), staged, indent=2, sort_keys=True)
+            staged.write("\n")
+            staged.flush()
+            os.fsync(staged.fileno())
+            staged_path = Path(staged.name)
+        staged_path.replace(destination)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
 
 
 class PairedGenerationEvaluator:
@@ -210,7 +356,10 @@ class PairedGenerationEvaluator:
             context_strategy=strategy,
             retrieval_limit=retrieval_limit,
             retrieval_latency_ms=retrieval_latency_ms,
-            generation_latency_ms=0.0,
+            context_assembly_latency_ms=0.0,
+            generator_latency_ms=0.0,
+            input_tokens=None,
+            generated_tokens=None,
             retrieved_parent_ids=(),
             retrieved_gold_parent_ids=(),
             relevant_parent_retrieved=False,
@@ -238,14 +387,36 @@ class PairedGenerationEvaluator:
         retrieval_latency_ms: float,
         retrieved_gold_ids: tuple[str, ...],
     ) -> GenerationEvaluationResult:
-        started = self._clock()
         contexts: tuple[SearchHit, ...] = ()
+        context_assembly_latency_ms = 0.0
+        generator_latency_ms = 0.0
+        input_tokens = None
+        generated_tokens = None
         try:
-            contexts = tuple(self._assemblers[strategy].assemble(case.claim, retrieved))
+            assembly_started = self._clock()
+            try:
+                contexts = tuple(self._assemblers[strategy].assemble(case.claim, retrieved))
+            finally:
+                context_assembly_latency_ms = (self._clock() - assembly_started) * 1000.0
             allowed = {hit.doc_id for hit in retrieved}
             if not contexts or any(context.doc_id not in allowed for context in contexts):
                 raise ValueError("generation context must contain retrieved parent documents")
-            raw_generated = self._generator.generate(case.claim, contexts)
+            generation_started = self._clock()
+            try:
+                generated = (
+                    self._generator.generate_with_metrics(case.claim, contexts)
+                    if isinstance(self._generator, MeasuredAnswerGenerator)
+                    else GeneratedAnswer(
+                        self._generator.generate(case.claim, contexts),
+                        None,
+                        None,
+                    )
+                )
+            finally:
+                generator_latency_ms = (self._clock() - generation_started) * 1000.0
+            raw_generated = generated.text
+            input_tokens = generated.input_tokens
+            generated_tokens = generated.generated_tokens
             answer_text, citations, citation_valid = finalize_generated_answer(
                 raw_generated,
                 allowed,
@@ -260,7 +431,6 @@ class PairedGenerationEvaluator:
             citation_valid = None
             error_type = type(exc).__name__
             error_message = str(exc)
-        latency_ms = (self._clock() - started) * 1000.0
         evidence_count, matched_count, evidence_recall = _evidence_sentence_recall(
             case,
             contexts,
@@ -275,7 +445,10 @@ class PairedGenerationEvaluator:
             context_strategy=strategy,
             retrieval_limit=retrieval_limit,
             retrieval_latency_ms=retrieval_latency_ms,
-            generation_latency_ms=latency_ms,
+            context_assembly_latency_ms=context_assembly_latency_ms,
+            generator_latency_ms=generator_latency_ms,
+            input_tokens=input_tokens,
+            generated_tokens=generated_tokens,
             retrieved_parent_ids=tuple(hit.doc_id for hit in retrieved),
             retrieved_gold_parent_ids=retrieved_gold_ids,
             relevant_parent_retrieved=bool(retrieved_gold_ids),
@@ -338,7 +511,7 @@ class GenerationEvaluationExecutor:
         retrieval_limit: int,
         output: Path,
     ) -> GenerationEvaluationExecutionSummary:
-        records = _read_records(output)
+        records = read_generation_evaluation_records(output)
         existing: dict[tuple[str, GenerationContextStrategyName], GenerationEvaluationRecord] = {}
         evaluation_query_ids = {case.query_id for case in evaluation_set.cases}
         for record in records:
@@ -384,7 +557,7 @@ class GenerationEvaluationExecutor:
         )
 
 
-def _read_records(path: Path) -> tuple[GenerationEvaluationRecord, ...]:
+def read_generation_evaluation_records(path: Path) -> tuple[GenerationEvaluationRecord, ...]:
     if not path.exists():
         return ()
     try:

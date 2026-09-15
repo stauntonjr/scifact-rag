@@ -78,6 +78,19 @@ and flushes one canonical JSONL record at a time. On restart it validates the ex
 runs only missing `(query_id, context_strategy)` pairs; duplicate, foreign-run, malformed, and
 out-of-set rows fail explicitly.
 
+Each successful raw row preserves the generator's unmodified text, the answer after the same
+citation fallback used by `ask`, parsed citations, supplied context text and parent IDs, normalized
+gold-sentence coverage, retrieval time, context-assembly time, generator HTTP time, and the
+Qwen-serving endpoint's `prompt_tokens` and `completion_tokens`. Token counts remain `null` only
+when a compatible endpoint omits its standard usage object; they are never estimated with the
+MiniLM or ColBERT tokenizer. Retrieval, assembly, and generation exceptions remain explicit rows.
+
+After every invocation, the runner atomically refreshes an aggregate report next to the raw file.
+For a manifest whose `results_path` is `data/evaluation/example/results.jsonl`, the report is
+`data/evaluation/example/results.report.json`. It reports completion and failures before the
+per-policy retrieval, evidence-retention, citation, insufficiency, context-count, token, and
+latency summaries. The raw JSONL remains authoritative.
+
 ## Fields
 
 | Field | Contract |

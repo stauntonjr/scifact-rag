@@ -96,7 +96,9 @@ That document also records the pinned official SciFact sentence-level source and
 has SHA-256 `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105`.
 The paired runner retrieves parents once per claim, applies all three policies, flushes each raw
 result row durably, and resumes only missing claim-policy pairs. Its run manifest must declare
-`context_strategy` as `paired`; it does not change the interactive `ask` default.
+`context_strategy` as `paired`; it does not change the interactive `ask` default. Server-reported
+Qwen prompt/completion tokens, separate assembly/generator timings, and a sibling
+`results.report.json` aggregate remain traceable to the raw rows.
 
 ## Run with Docker Compose
 

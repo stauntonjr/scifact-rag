@@ -122,6 +122,13 @@ class Answer:
 
 
 @dataclass(frozen=True, slots=True)
+class GeneratedAnswer:
+    text: str
+    input_tokens: int | None
+    generated_tokens: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class RetrievalMetrics:
     queries: int
     cutoff: int
