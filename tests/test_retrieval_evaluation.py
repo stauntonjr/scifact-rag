@@ -156,9 +156,7 @@ def test_qrels_digest_is_stable_across_mapping_order() -> None:
 
 
 def test_qrels_digest_preserves_relevance_grades() -> None:
-    assert canonical_qrels_sha256({"1": {"10": 1}}) != canonical_qrels_sha256(
-        {"1": {"10": 2}}
-    )
+    assert canonical_qrels_sha256({"1": {"10": 1}}) != canonical_qrels_sha256({"1": {"10": 2}})
 
 
 @pytest.mark.parametrize(
@@ -334,9 +332,7 @@ def test_retrieval_executor_writes_every_pair_in_canonical_order(tmp_path: Path)
     ]
     records = read_retrieval_evaluation_records(output)
     assert [(record.result.strategy, record.result.query_id) for record in records] == [
-        (strategy, query_id)
-        for strategy in RETRIEVAL_DEFAULT_STRATEGIES
-        for query_id in ("1", "2")
+        (strategy, query_id) for strategy in RETRIEVAL_DEFAULT_STRATEGIES for query_id in ("1", "2")
     ]
     assert records[0].result.hits == (
         RankedRetrievalHit("2", 0.7),
@@ -383,8 +379,7 @@ def test_retrieval_executor_resumes_only_missing_pairs(tmp_path: Path) -> None:
     [
         "not json\n",
         RetrievalEvaluationRecord("another-run", _result(query_id="1")).to_json(),
-        RetrievalEvaluationRecord("retrieval-validation-1", _result(query_id="1")).to_json()
-        * 2,
+        RetrievalEvaluationRecord("retrieval-validation-1", _result(query_id="1")).to_json() * 2,
         RetrievalEvaluationRecord("retrieval-validation-1", _result(query_id="9")).to_json(),
         RetrievalEvaluationRecord(
             "retrieval-validation-1",
@@ -502,9 +497,7 @@ def test_retrieval_report_penalizes_failed_and_missing_rows_as_empty_rankings() 
 
 
 def test_retrieval_report_marks_complete_when_every_planned_row_exists() -> None:
-    records = _report_records() + (
-        _record("2", RETRIEVAL_DEFAULT_STRATEGIES[2]),
-    )
+    records = _report_records() + (_record("2", RETRIEVAL_DEFAULT_STRATEGIES[2]),)
 
     report = build_retrieval_evaluation_report(
         records,
@@ -547,9 +540,7 @@ def test_retrieval_report_rejects_inconsistent_raw_evidence(mutation: str) -> No
     queries = {"1": "first", "2": "second"}
     qrels = {"1": {"10": 1}, "2": {"20": 1}}
     if mutation == "foreign-run":
-        records[0] = _record(
-            "1", RETRIEVAL_DEFAULT_STRATEGIES[0], run_id="another-run"
-        )
+        records[0] = _record("1", RETRIEVAL_DEFAULT_STRATEGIES[0], run_id="another-run")
     elif mutation == "duplicate":
         records.append(records[0])
     elif mutation == "qrels-mismatch":

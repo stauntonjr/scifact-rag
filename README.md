@@ -102,6 +102,24 @@ Qwen prompt/completion tokens, a fixed per-request seed, a parseable SciFact ver
 assembly/generator timings, and a sibling
 `results.report.json` aggregate remain traceable to the raw rows.
 
+Retrieval-default comparison is a separate fixed run over the 160-query validation split. It
+compares BM25/token-window RRF with the two selected ColBERT interval scorers, retains every raw
+ranking or failure, resumes only missing query/strategy pairs, and derives metrics plus per-query
+gains/losses from those rows:
+
+```bash
+docker compose run --rm app retrieval-eval-dry-run \
+  --manifest artifacts/retrieval-default-validation/manifest.json
+docker compose run --rm app run-retrieval-eval \
+  --manifest artifacts/retrieval-default-validation/manifest.json \
+  --data-dir data
+```
+
+The complete manifest, digest, component, resume, and no-repair contract is in
+[`docs/project/retrieval-evaluation.md`](docs/project/retrieval-evaluation.md). This comparison is
+internal evidence because the split has already been inspected; implementing or running it does
+not itself change the retrieval default.
+
 ## Run with Docker Compose
 
 The generator is external to this Compose project. It must be reachable from the host at

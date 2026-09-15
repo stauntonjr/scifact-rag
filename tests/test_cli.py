@@ -13,6 +13,7 @@ from scifact_rag.adapters.openai_compatible import (
     SCIFACT_EVALUATION_PROMPT_SHA256,
     SCIFACT_EVALUATION_SEED,
 )
+from scifact_rag.adapters.scifact import QrelsSplit
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
 from scifact_rag.composition import build_application
 from scifact_rag.evaluation import (
@@ -28,6 +29,13 @@ from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.generation_evaluation import (
     GenerationEvaluationExecutionSummary,
     GenerationEvaluationReport,
+)
+from scifact_rag.retrieval_evaluation import (
+    RETRIEVAL_DEFAULT_STRATEGIES,
+    RetrievalEvaluationExecutionSummary,
+    RetrievalRunManifest,
+    canonical_qrels_sha256,
+    sha256_file,
 )
 from scifact_rag.strategies import RetrievalStrategyName
 
@@ -97,6 +105,282 @@ def test_generation_evaluation_dry_run_canonicalizes_a_complete_manifest(
         "embedding-model",
         "generator-model",
     ]
+
+
+def _retrieval_manifest(**overrides: object) -> RetrievalRunManifest:
+    values: dict[str, object] = {
+        "schema_version": "retrieval-run-manifest/v1",
+        "run_id": "retrieval-validation-1",
+        "repository_commit": "a" * 40,
+        "corpus_sha256": "b" * 64,
+        "queries_sha256": "c" * 64,
+        "qrels_sha256": "d" * 64,
+        "source_split": "train-validation",
+        "evidence_class": "internal-comparative",
+        "strategies": RETRIEVAL_DEFAULT_STRATEGIES,
+        "cutoff": 10,
+        "components": (
+            ComponentRevision("vector-model", "minilm", "revision"),
+            ComponentRevision("application-image", "scifact-rag", "sha256:123"),
+        ),
+        "started_at": "2026-09-15T12:00:00Z",
+        "completed_at": None,
+        "host": "spark-3a8f",
+        "results_path": "artifacts/retrieval-validation-1/results.jsonl",
+        "test_qrels_inspected": True,
+    }
+    values.update(overrides)
+    return RetrievalRunManifest(**values)  # type: ignore[arg-type]
+
+
+def test_retrieval_eval_dry_run_canonicalizes_without_composition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(_retrieval_manifest().to_json(), encoding="utf-8")
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("dry-run must not construct the corpus or application")
+
+    monkeypatch.setattr(cli_module, "build_application", unexpected_call)
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", unexpected_call)
+
+    result = CliRunner().invoke(
+        app,
+        ["retrieval-eval-dry-run", "--manifest", str(manifest)],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == json.loads(_retrieval_manifest().to_json())
+
+
+def test_retrieval_eval_dry_run_rejects_invalid_manifest(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    payload = json.loads(_retrieval_manifest().to_json())
+    payload["cutoff"] = 20
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        ["retrieval-eval-dry-run", "--manifest", str(manifest)],
+    )
+
+    assert result.exit_code == 2
+    assert "cutoff must be 10" in result.stderr
+
+
+_RETRIEVAL_COMPONENTS = (
+    "application-image",
+    "postgres-image",
+    "embedding-model",
+    "colbert-model",
+    "colbert-tokenizer",
+    "pg-tokenizer-extension",
+    "pgvector-extension",
+    "vchord-bm25-extension",
+)
+
+
+class FakeRetrievalCorpus:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self._queries = {"1": "first", "2": "second"}
+        self._qrels = {"1": {"10": 1}, "2": {"20": 1}}
+
+    def queries(self):
+        return self._queries
+
+    def qrels(self):
+        return self._qrels
+
+
+def _retrieval_cli_fixture(tmp_path: Path) -> tuple[Path, Path, FakeRetrievalCorpus]:
+    data_dir = tmp_path / "data"
+    root = data_dir / "scifact"
+    (root / "qrels").mkdir(parents=True)
+    (root / "corpus.jsonl").write_bytes(b'{"_id":"10","text":"body"}\n')
+    (root / "queries.jsonl").write_bytes(b'{"_id":"1","text":"first"}\n')
+    (root / "qrels/train.tsv").write_text(
+        "query-id\tcorpus-id\tscore\n1\t10\t1\n",
+        encoding="utf-8",
+    )
+    corpus = FakeRetrievalCorpus(root)
+    components = tuple(
+        ComponentRevision(component, component, f"{component}-revision")
+        for component in _RETRIEVAL_COMPONENTS
+    )
+    manifest = _retrieval_manifest(
+        corpus_sha256=sha256_file(root / "corpus.jsonl"),
+        queries_sha256=sha256_file(root / "queries.jsonl"),
+        qrels_sha256=canonical_qrels_sha256(corpus.qrels()),
+        components=components,
+    )
+    manifest_path = tmp_path / "retrieval-manifest.json"
+    manifest_path.write_text(manifest.to_json(), encoding="utf-8")
+    return manifest_path, data_dir, corpus
+
+
+def test_run_retrieval_eval_verifies_boundary_and_builds_frozen_strategies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir, corpus = _retrieval_cli_fixture(tmp_path)
+    observed: dict[str, object] = {"built": []}
+
+    class FakeApplication:
+        def __init__(self, strategy: RetrievalStrategyName) -> None:
+            self.strategy = strategy
+            self.calls: list[tuple[str, int]] = []
+
+        def search(self, query: str, *, limit: int):
+            self.calls.append((query, limit))
+            return []
+
+    applications: dict[RetrievalStrategyName, FakeApplication] = {}
+
+    def fake_ensure(actual_data_dir: Path, split: QrelsSplit):
+        observed["ensure"] = (actual_data_dir, split)
+        return corpus
+
+    def fake_build(*, retrieval_strategy: RetrievalStrategyName):
+        observed["built"].append(retrieval_strategy)  # type: ignore[union-attr]
+        application = FakeApplication(retrieval_strategy)
+        applications[retrieval_strategy] = application
+        return application
+
+    class FakeExecutor:
+        def __init__(self, retrievers) -> None:
+            assert tuple(retrievers) == RETRIEVAL_DEFAULT_STRATEGIES
+            retrievers[RETRIEVAL_DEFAULT_STRATEGIES[0]].search("probe", 10)
+
+        def run(self, **kwargs):
+            observed["executor"] = kwargs
+            return RetrievalEvaluationExecutionSummary(6, 1, 5, 0)
+
+    raw_records = (object(),)
+    report = object()
+
+    def fake_read(path: Path):
+        observed["read_path"] = path
+        return raw_records
+
+    def fake_report_builder(records, **kwargs):
+        observed["report_records"] = records
+        observed["report_kwargs"] = kwargs
+        return report
+
+    def fake_report_writer(actual_report, path: Path):
+        observed["report"] = actual_report
+        observed["report_path"] = path
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", fake_ensure)
+    monkeypatch.setattr(cli_module, "build_application", fake_build)
+    monkeypatch.setattr(cli_module, "RetrievalEvaluationExecutor", FakeExecutor, raising=False)
+    monkeypatch.setattr(cli_module, "read_retrieval_evaluation_records", fake_read, raising=False)
+    monkeypatch.setattr(
+        cli_module, "build_retrieval_evaluation_report", fake_report_builder, raising=False
+    )
+    monkeypatch.setattr(
+        cli_module, "write_retrieval_evaluation_report", fake_report_writer, raising=False
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {
+        "expected_rows": 6,
+        "failed_rows": 0,
+        "preexisting_rows": 1,
+        "report_path": "artifacts/retrieval-validation-1/results.report.json",
+        "written_rows": 5,
+    }
+    assert observed["ensure"] == (data_dir, QrelsSplit.TRAIN_VALIDATION)
+    assert observed["built"] == list(RETRIEVAL_DEFAULT_STRATEGIES)
+    assert applications[RETRIEVAL_DEFAULT_STRATEGIES[0]].calls == [("probe", 10)]
+    assert observed["executor"] == {
+        "run_id": "retrieval-validation-1",
+        "queries": corpus.queries(),
+        "strategies": RETRIEVAL_DEFAULT_STRATEGIES,
+        "cutoff": 10,
+        "output": Path("artifacts/retrieval-validation-1/results.jsonl"),
+    }
+    assert observed["read_path"] == Path("artifacts/retrieval-validation-1/results.jsonl")
+    assert observed["report_records"] is raw_records
+    assert observed["report_kwargs"] == {
+        "run_id": "retrieval-validation-1",
+        "queries": corpus.queries(),
+        "qrels": corpus.qrels(),
+        "strategies": RETRIEVAL_DEFAULT_STRATEGIES,
+        "cutoff": 10,
+    }
+    assert observed["report"] is report
+    assert observed["report_path"] == Path("artifacts/retrieval-validation-1/results.report.json")
+
+
+def test_run_retrieval_eval_stops_before_composition_on_digest_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir, corpus = _retrieval_cli_fixture(tmp_path)
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["corpus_sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", lambda *args: corpus)
+
+    def unexpected_build(**kwargs):
+        raise AssertionError("digest mismatch must stop before composition")
+
+    monkeypatch.setattr(cli_module, "build_application", unexpected_build)
+
+    result = CliRunner().invoke(
+        app,
+        ["run-retrieval-eval", "--manifest", str(manifest_path), "--data-dir", str(data_dir)],
+    )
+
+    assert result.exit_code == 2
+    assert "corpus SHA-256" in result.stderr
+
+
+def test_run_retrieval_eval_requires_every_runtime_component(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir, corpus = _retrieval_cli_fixture(tmp_path)
+    complete = json.loads(manifest_path.read_text(encoding="utf-8"))
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", lambda *args: corpus)
+
+    def unexpected_build(**kwargs):
+        raise AssertionError("missing components must stop before composition")
+
+    monkeypatch.setattr(cli_module, "build_application", unexpected_build)
+
+    for missing in _RETRIEVAL_COMPONENTS:
+        payload = dict(complete)
+        payload["components"] = [
+            component for component in complete["components"] if component["component"] != missing
+        ]
+        manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "run-retrieval-eval",
+                "--manifest",
+                str(manifest_path),
+                "--data-dir",
+                str(data_dir),
+            ],
+        )
+
+        assert result.exit_code == 2
+        compact_error = "".join(result.stderr.split())
+        assert "missingrequiredcomponent:" in compact_error
+        assert missing in compact_error
 
 
 def test_build_generation_evaluation_manifest_writes_exact_official_evidence(

@@ -118,7 +118,11 @@ class RetrievalEvaluationResult:
         if (self.error_type is None) != (self.error_message is None):
             raise ValueError("error_type and error_message must both be set or both be null")
         if self.error_type is not None:
-            if not self.error_type.strip() or not self.error_message or not self.error_message.strip():
+            if (
+                not self.error_type.strip()
+                or not self.error_message
+                or not self.error_message.strip()
+            ):
                 raise ValueError("error fields must be non-empty")
             if self.hits:
                 raise ValueError("a failed retrieval result must not contain hits")
@@ -233,9 +237,7 @@ def read_retrieval_evaluation_records(path: Path) -> tuple[RetrievalEvaluationRe
         try:
             records.append(RetrievalEvaluationRecord.from_json(line))
         except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"retrieval evaluation row {line_number} is invalid: {exc}"
-            ) from exc
+            raise ValueError(f"retrieval evaluation row {line_number} is invalid: {exc}") from exc
     return tuple(records)
 
 
@@ -419,18 +421,13 @@ def build_retrieval_evaluation_report(
     rankings_by_strategy: dict[RetrievalStrategyName, dict[str, list[str]]] = {}
     for strategy in selected:
         strategy_records = tuple(
-            by_key[(query_id, strategy)]
-            for query_id in query_ids
-            if (query_id, strategy) in by_key
+            by_key[(query_id, strategy)] for query_id in query_ids if (query_id, strategy) in by_key
         )
         successful = tuple(
             record for record in strategy_records if record.result.error_type is None
         )
         rankings = {
-            query_id: [
-                hit.doc_id
-                for hit in by_key[(query_id, strategy)].result.hits
-            ]
+            query_id: [hit.doc_id for hit in by_key[(query_id, strategy)].result.hits]
             if (query_id, strategy) in by_key
             and by_key[(query_id, strategy)].result.error_type is None
             else []
@@ -594,7 +591,10 @@ class RetrievalRunManifest:
             raise ValueError("source_split must be train-validation")
         if self.evidence_class != "internal-comparative":
             raise ValueError("evidence_class must be internal-comparative")
-        if not isinstance(self.strategies, tuple) or self.strategies != RETRIEVAL_DEFAULT_STRATEGIES:
+        if (
+            not isinstance(self.strategies, tuple)
+            or self.strategies != RETRIEVAL_DEFAULT_STRATEGIES
+        ):
             raise ValueError("strategies must match the frozen retrieval-default candidates")
         if isinstance(self.cutoff, bool) or self.cutoff != 10:
             raise ValueError("cutoff must be 10")
@@ -652,8 +652,6 @@ class RetrievalRunManifest:
             if not isinstance(value, dict) or set(value) != component_fields:
                 raise ValueError("manifest component fields do not match ComponentRevision")
             components.append(ComponentRevision(**value))
-        raw["strategies"] = tuple(
-            RetrievalStrategyName(value) for value in raw["strategies"]
-        )
+        raw["strategies"] = tuple(RetrievalStrategyName(value) for value in raw["strategies"])
         raw["components"] = tuple(components)
         return cls(**raw)

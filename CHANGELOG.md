@@ -6,6 +6,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added a fixed, resumable three-strategy retrieval-default comparison over the already-inspected
+  validation split. The CLI validates exact dataset digests and runtime-component provenance before
+  composition, durably retains every per-query ranking or failure, and derives metrics plus
+  BM25-to-ColBERT query transitions only from raw rows. This is internal comparative evidence; the
+  product retrieval default has not changed.
 - Simplified generation-context evaluation to the two distinct policies supported by the corrected
   validation: `whole-document` and `adaptive`. The legacy `top-dp-chunks` CLI value remains a
   compatibility alias for adaptive assembly, while new paired runs no longer spend a duplicate

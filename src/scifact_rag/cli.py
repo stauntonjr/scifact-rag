@@ -13,7 +13,9 @@ from .adapters.openai_compatible import (
     SCIFACT_EVALUATION_SEED,
 )
 from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
+from .application import RagApplication
 from .composition import build_application, build_generation_evaluator
+from .domain import SearchHit
 from .evaluation import (
     GenerationEvaluationSet,
     GenerationRunManifest,
@@ -27,6 +29,15 @@ from .generation_evaluation import (
     generation_evaluation_expected_rows,
     read_generation_evaluation_records,
     write_generation_evaluation_report,
+)
+from .retrieval_evaluation import (
+    RetrievalEvaluationExecutor,
+    RetrievalRunManifest,
+    build_retrieval_evaluation_report,
+    canonical_qrels_sha256,
+    read_retrieval_evaluation_records,
+    sha256_file,
+    write_retrieval_evaluation_report,
 )
 from .strategies import RetrievalStrategyName
 
@@ -123,6 +134,124 @@ def generation_eval_dry_run(
     except (OSError, TypeError, ValueError) as exc:
         raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
     typer.echo(validated.to_json(), nl=False)
+
+
+@app.command("retrieval-eval-dry-run")
+def retrieval_eval_dry_run(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete retrieval-run-manifest/v1 JSON file.",
+        ),
+    ],
+) -> None:
+    """Validate and emit a retrieval run manifest without service or dataset calls."""
+    try:
+        validated = RetrievalRunManifest.from_json(manifest.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
+    typer.echo(validated.to_json(), nl=False)
+
+
+class _ApplicationSearchRetriever:
+    def __init__(self, application: RagApplication) -> None:
+        self._application = application
+
+    def search(self, query: str, limit: int) -> list[SearchHit]:
+        return self._application.search(query, limit=limit)
+
+
+@app.command("run-retrieval-eval")
+def run_retrieval_eval(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete retrieval-run-manifest/v1 JSON file.",
+        ),
+    ],
+    data_dir: Annotated[Path, typer.Option(help="BEIR dataset parent directory.")] = Path("data"),
+) -> None:
+    """Run or resume the fixed retrieval-default comparison."""
+    try:
+        run_manifest = RetrievalRunManifest.from_json(manifest.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
+
+    corpus = BeirSciFact.ensure(data_dir, QrelsSplit.TRAIN_VALIDATION)
+    qrels = corpus.qrels()
+    digest_checks = (
+        (
+            "corpus SHA-256",
+            run_manifest.corpus_sha256,
+            sha256_file(corpus.root / "corpus.jsonl"),
+        ),
+        (
+            "queries SHA-256",
+            run_manifest.queries_sha256,
+            sha256_file(corpus.root / "queries.jsonl"),
+        ),
+        ("qrels SHA-256", run_manifest.qrels_sha256, canonical_qrels_sha256(qrels)),
+    )
+    for name, expected, actual in digest_checks:
+        if actual != expected:
+            raise typer.BadParameter(
+                f"{name} does not match the run manifest",
+                param_hint="--manifest",
+            )
+
+    components = {component.component: component for component in run_manifest.components}
+    required_components = (
+        "application-image",
+        "postgres-image",
+        "embedding-model",
+        "colbert-model",
+        "colbert-tokenizer",
+        "pg-tokenizer-extension",
+        "pgvector-extension",
+        "vchord-bm25-extension",
+    )
+    for component_name in required_components:
+        if component_name not in components:
+            raise typer.BadParameter(
+                f"missing required component: {component_name}",
+                param_hint="--manifest",
+            )
+
+    queries = corpus.queries()
+    retrievers = {
+        strategy: _ApplicationSearchRetriever(build_application(retrieval_strategy=strategy))
+        for strategy in run_manifest.strategies
+    }
+    results_path = Path(run_manifest.results_path)
+    summary = RetrievalEvaluationExecutor(retrievers).run(
+        run_id=run_manifest.run_id,
+        queries=queries,
+        strategies=run_manifest.strategies,
+        cutoff=run_manifest.cutoff,
+        output=results_path,
+    )
+    report_path = results_path.with_suffix(".report.json")
+    records = read_retrieval_evaluation_records(results_path)
+    report = build_retrieval_evaluation_report(
+        records,
+        run_id=run_manifest.run_id,
+        queries=queries,
+        qrels=qrels,
+        strategies=run_manifest.strategies,
+        cutoff=run_manifest.cutoff,
+    )
+    write_retrieval_evaluation_report(report, report_path)
+    response = asdict(summary)
+    response["report_path"] = str(report_path)
+    _emit(response)
 
 
 @app.command("build-generation-eval-manifest")
