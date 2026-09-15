@@ -475,25 +475,18 @@ To prevent activity from replacing progress:
 - Stop a phase when its exit gate is met or its hypothesis fails; record the decision before
   beginning another architecture branch.
 
-## Planned work items
+## Remaining work items
 
-Create these Issues in order, splitting only when a reviewer could accept one result and reject the
-next:
-
-1. Freeze generation-evaluation manifest and run-artifact contract.
-2. Retain the completed whole-document versus adaptive automatic comparison and its historical
-   three-name evidence.
-3. Complete the frozen blinded human review and close the generation-context decision without
+1. Complete the already-frozen blinded generation review and close that decision without
    post-result tuning.
-4. Compare the three frozen retrieval-default candidates on validation.
-5. Decide and document the retrieval default.
-6. Add one fixed scientific stance/inference scorer.
-7. Define the proposition and provenance schema in an ADR.
-8. Implement corpus proposition extraction and typed PostgreSQL projection.
-9. Add candidate-scoped induced-graph scoring and its fixed ablation.
-10. Complete the CLI release gate and publish the acceptance report.
-11. Add HTTP, MCP, and web adapters as separate post-release Issues.
-12. Decide whether to begin the separate template/Pi effectiveness program.
+2. Complete the CLI release gate and publish the acceptance report.
+3. Add HTTP, MCP, and web adapters as separate post-release Issues.
+4. Decide whether to begin the separate template/Pi effectiveness program.
+
+Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
+unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved
+issue with a fresh extraction-method hypothesis and decision boundary; they are not implied by this
+ordered list.
 
 ## Evidence and decision artifacts
 

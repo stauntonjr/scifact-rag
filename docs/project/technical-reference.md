@@ -521,10 +521,10 @@ scifact-rag run-proposition-pair-eval \
   --evaluation-set EVALUATION --data-dir DATA
 ```
 
-The run command refuses an unqualified extractor, applies the frozen coverage gates before loading
-MiniLM, and withholds its canonical report until every audit row has a valid human review. The
-report schema retains feature metrics and distributions, audit strata/dispositions, extraction
-failure and latency evidence, correlations, and all artifact digests.
+The run command refuses an unqualified extractor, applies the frozen coverage gates before MiniLM
+feature computation, and withholds its canonical report until every audit row has a valid human
+review. The report schema retains feature metrics and distributions, audit strata/dispositions,
+extraction failure and latency evidence, correlations, and all artifact digests.
 
 The first live qualification stopped before full extraction: positive relation and no-relation
 passed; explicit negation and scientific qualifier failed exact source-span grounding. No feature

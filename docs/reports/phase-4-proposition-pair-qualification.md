@@ -2,8 +2,8 @@
 
 Date: 2026-09-15
 
-Governing decision: [ADR-0031](../adr/0031-proposition-graph-scoring.md)  
-Governing issue: [#9](https://github.com/stauntonjr/scifact-rag/issues/9)  
+Governing decision: [ADR-0031](../adr/0031-proposition-graph-scoring.md)
+Governing issue: [#9](https://github.com/stauntonjr/scifact-rag/issues/9)
 Evidence class: internal engineering qualification; no proposition-quality result
 
 ## Result
@@ -37,9 +37,9 @@ interpretation.
 
 ## Qualification
 
-Model: `nvidia/Qwen3.6-35B-A3B-NVFP4`  
-Prompt: `grounded-proposition-extraction-v1` (`d5059711...`)  
-JSON Schema: `71dbcc03...`  
+Model: `nvidia/Qwen3.6-35B-A3B-NVFP4`
+Prompt: `grounded-proposition-extraction-v1` (`d5059711...`)
+JSON Schema: `71dbcc03...`
 Seed: `1729`; temperature: `0`; thinking: disabled
 
 | Probe | Outcome | Grounded propositions | Latency (ms) | Failure |

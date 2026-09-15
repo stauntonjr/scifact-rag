@@ -48,7 +48,7 @@ does not authorize fusion or default promotion.
 
 ### Positive
 
-- The scientific representation hypothesis is tested before infrastructure is built.
+- The scientific representation hypothesis can be tested before infrastructure is built.
 - Only sources needed by the fixed candidate pool incur extraction cost.
 - The exact retained Phase 3 manifest/results digests and every candidate identity are revalidated
   against the fixed evaluation set and corpus before the Phase 4 source manifest is accepted.
