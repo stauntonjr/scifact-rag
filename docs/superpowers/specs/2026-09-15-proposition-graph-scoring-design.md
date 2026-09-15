@@ -1,280 +1,222 @@
-# Proposition-graph scoring design
+# Grounded proposition-pair diagnostic design
 
 - Date: 2026-09-15
-- Status: proposed for human review
+- Status: accepted with scope guidance
 - Governing issue: [#9](https://github.com/stauntonjr/scifact-rag/issues/9)
 - Governing ADR: [ADR-0031](../../adr/0031-proposition-graph-scoring.md)
+- Human decision: approve `c3395d7` direction, trim the first implementation before coding
 
 ## Objective
 
-Audit the dominant Phase 3 stance-classification errors, then add one provenance-bearing
-proposition-graph scorer over every document in the existing broad candidate pool. The slice must
-test whether explicit entity, relation, argument, polarity, and qualifier alignment separates true
-SciFact evidence from the topically similar negatives that caused the fixed NLI model's precision
-collapse.
+Within one implementation cycle, produce a frozen artifact showing whether grounded proposition-
+pair features separate annotated decisive evidence from the Phase 3 neutral-to-decisive false-
+positive population.
 
-This is an internal architectural diagnostic. It does not change retrieval or generation defaults
-and does not claim clean generalization from the already-inspected 160-claim validation split.
+The experiment decomposes claim and candidate text into source-grounded `(subject, predicate,
+object, polarity, qualifiers)` records, computes five fixed pairwise features, and stops. It does
+not build a connected graph, graph-path feature, corpus-wide projection, PostgreSQL schema, runtime
+retrieval strategy, or default integration.
 
-## Context and observed evidence
+## Evidence and hypothesis
 
-The fixed Phase 3 run scored 21,711 candidates. Only 120 candidates had an annotated decisive
-relation, while the model predicted 4,392 candidates as entailment or contradiction. It produced
-4,316 neutral-to-decisive false positives and a three-way macro-F1 of 0.324781. Evidence assembly
-recalled 188 of 209 annotated sentences and admitted annotated evidence for 201 of 202 candidate
-documents, so missing evidence cannot explain the false-positive volume.
+Phase 3 scored 21,711 candidates. Only 120 had an annotated decisive relation, while DeBERTa
+predicted 4,392 as decisive and produced 4,316 neutral-to-decisive false positives. Evidence
+assembly recalled 188 of 209 annotated sentences and admitted annotated evidence for 201 of 202
+candidate documents. The dominant unresolved question is therefore not evidence availability but
+whether explicit proposition structure can distinguish decisive relations from topical overlap.
 
-The remaining ambiguity is material: a non-annotated candidate is operationally neutral for the
-benchmark, but that does not prove its text is logically neutral toward the claim. The next slice
-must distinguish likely annotation mismatch from actual model reasoning failures before using the
-failure corpus as an architectural oracle.
-
-Existing project surfaces already provide:
-
-- a DGX-hosted Qwen OpenAI-compatible endpoint;
-- sentence and source-span handling;
-- typed SQLAlchemy Core/PostgreSQL persistence;
-- an existing broad candidate pool and complete candidate feature matrix;
-- MiniLM semantic similarity and ColBERT relevance scoring;
-- raw Phase 3 logits, evidence bundles, labels, and failure records.
+A benchmark-neutral candidate is an operational label, not proof that its text is logically
+neutral. A fixed error audit must separate likely annotation mismatch from model reasoning failure
+before the proposition results are accepted or interpreted.
 
 ## Capability and solution disposition
 
-The solution disposition is **adapt**. Reuse the existing Qwen endpoint, composition root,
-PostgreSQL store, evidence spans, MiniLM embedder, candidate pool, and feature-matrix boundary.
-Build only proposition-specific contracts, strict extraction validation, versioned persistence,
-matching, diagnostics, and focused tests.
-
-The inactive `semantic-evidence-ledger` capability owns append-oriented assertions and provenance.
-Issue #9 proposes its first project-specific activation for versioned extracted source assertions
-and their rebuildable scoring projection. This activation does not implement assertion challenges,
-cross-source truth resolution, or a canonical scientific truth projection. Those responsibilities
-remain owned by the capability and unavailable until separately designed.
-
-Human approval of this design explicitly authorizes that narrow activation. Without that approval,
-implementation stops after the proposed design and ADR.
-
-Other capability dispositions:
+The solution disposition is **adapt**. Reuse the existing Qwen OpenAI-compatible endpoint, source
+spans, MiniLM embedder, frozen candidate pool, Phase 3 artifacts, CLI composition style, and
+evaluation/report patterns. Add no package, service, database table, API surface, or runtime
+retrieval strategy.
 
 | Capability | Disposition | Reason |
 |---|---|---|
-| `application-composition-root` | `use-active` | New ports and adapters use existing explicit wiring. |
-| `cli-interface` | `use-active` | Projection and diagnostic operations remain CLI-first. |
-| `product-validation-challenges` | `use-active` | The fixed Phase 3 failure corpus supplies real challenge examples. |
-| `semantic-evidence-ledger` | `propose-activation` | Versioned source assertions and exact provenance are required. |
-| All other inactive capabilities | `not-applicable` | No memory, handoff, architecture-metrics, security, API, or deployment capability is needed. |
+| `application-composition-root` | `use-active` | The diagnostic uses explicit existing adapters. |
+| `cli-interface` | `use-active` | One opt-in CLI command drives the experiment. |
+| `product-validation-challenges` | `use-active` | Phase 3 errors are real retained challenge examples. |
+| `semantic-evidence-ledger` | `not-applicable` for this slice | Immutable diagnostic JSONL is evaluation evidence, not a runtime assertion ledger or canonical projection. Activation is deferred until proposition signal justifies durable application storage. |
+| All other inactive capabilities | `not-applicable` | The experiment needs no memory, handoff, architecture-metrics, security, API, or deployment capability. |
 
-## Approaches considered
+This narrower disposition supersedes the proposed partial activation in `c3395d7`. The inactive
+capability continues to own any later durable assertion, challenge, and resolution lifecycle; this
+experiment must not invent one.
 
-### A. Calibrate or threshold the current NLI logits
+## Alternatives
 
-This is the cheapest route to a better validation number, but it optimizes an already-inspected,
-0.55%-positive boundary and does not resolve annotation semantics, scientific argument alignment,
-or qualifier errors. It is rejected for this phase.
+- **Calibrate DeBERTa:** rejected because it tunes an inspected, 0.55%-positive boundary without
+  testing scientific structure.
+- **Build PostgreSQL/graph infrastructure now:** deferred because pairwise proposition features can
+  test the representation hypothesis first.
+- **Add AGE, biomedical entity linking, or another extractor:** deferred because each adds an
+  independent variable and operational cost.
+- **Strict Qwen extraction into immutable diagnostic artifacts:** selected because it reuses the
+  running model and preserves exact source evidence without committing to runtime infrastructure.
 
-### B. Add another NLI or dedicated OpenIE service
+## Frozen source set
 
-A model comparison could improve extraction or stance quality, but it adds checkpoint selection,
-service qualification, GPU memory, and a new comparison dimension before the representation is
-proven useful. It is deferred. The first slice adapts the already-hosted Qwen model.
+Build the source manifest before extraction from exactly:
 
-### C. Strict Qwen extraction plus typed PostgreSQL projection and in-process graph matching
+1. all 160 claims in the existing frozen `train-validation` evaluation set;
+2. every distinct candidate document in those claims' unchanged Phase 2 broad pools;
+3. no unrelated SciFact document.
 
-This is selected. It adds no runtime service or package, makes every extracted assertion
-inspectable, and tests the proposition representation independently of learned graph ranking.
-Strict source-span validation rejects unsupported output rather than turning model text into fact.
+Deduplicate sources by `(source_kind, source_id, source_sha256)`. The manifest binds the evaluation-
+set digest, Phase 3 results digest, retrieval strategy and pool configuration, ordered query and
+document identities, extractor configuration, prompt/schema digest, and output paths. A mismatch
+stops before opening results.
 
-### D. Apache AGE and native graph queries
+## Frozen error-audit sample
 
-AGE may be useful after graph query requirements and scale are measured. Ordinary typed tables and
-recursive SQL are sufficient for the first candidate-scoped graph, avoid another extension, and
-keep provenance straightforward. AGE remains deferred.
+Create a deterministic 100-row manifest before proposition results are opened:
 
-## Fixed Phase 3 error audit
-
-Before proposition-scoring results are opened, generate a deterministic 100-row audit manifest:
-
-1. include all 50 errors whose gold label is entailment or contradiction;
+1. include all 50 Phase 3 errors whose gold label is entailment or contradiction;
 2. select 25 neutral-to-entailment false positives;
 3. select 25 neutral-to-contradiction false positives;
-4. for each false-positive direction, sort by evidence margin, partition into five equal-frequency
+4. for each false-positive direction, sort by evidence margin, split into five equal-frequency
    bands, and choose five candidates per band by ascending stable candidate ID.
 
-The manifest stores the source Phase 3 artifact digest, candidate ID, query ID, document ID, claim,
-evidence bundle, gold and predicted labels, logits, margins, and stratum. Selection code must fail
-if counts, identities, or the source digest differ from the fixed run.
+Each row retains the source Phase 3 digest, candidate identity, claim and document identity,
+evidence bundle, labels, logits, margins, and stratum. Review assigns one disposition:
 
-A review record may assign exactly one disposition:
+- `likely_annotation_gap`;
+- `related_insufficient`;
+- `model_reasoning_error`;
+- `evidence_selection_error`;
+- `indeterminate`.
 
-- `likely_annotation_gap`: the candidate appears decisive but is not an annotated SciFact relation;
-- `related_insufficient`: topically or propositionally related without establishing the claim;
-- `model_reasoning_error`: the admitted text does not justify the predicted stance;
-- `evidence_selection_error`: decisive source evidence exists but is absent or obscured in the bundle;
-- `indeterminate`: the available abstract and annotations do not support a reliable disposition.
+Optional phenomenon tags remain limited to synonymy, argument direction, polarity, negation,
+population/intervention/comparator/outcome qualifiers, association-versus-causation,
+species/evidence boundary, and cross-sentence reasoning. Reviewer identity and concise rationale
+are required. These are diagnostic judgments, not training labels or benchmark truth.
 
-It may also assign any of the predeclared phenomenon tags: synonymy, argument direction, polarity,
-negation, population/intervention/comparator/outcome qualifier, association-versus-causation,
-species/evidence boundary, or cross-sentence reasoning. Reviewer identity and a concise rationale
-are mandatory. These are diagnostic judgments, not new training labels or benchmark truth.
-Because the sample is stratified, the report gives counts by stratum and never extrapolates an
-overall error prevalence.
+The sample must be frozen before extraction, but review may proceed independently of extraction.
+It must be complete before proposition results are interpreted or accepted. Because selection is
+stratified, the report gives per-stratum counts and does not extrapolate population prevalence.
 
-## Proposition contract
+## Proposition schema and grounding
 
-An extracted proposition is a source assertion, not accepted truth. Each proposition contains:
+One extracted proposition contains:
 
-- stable identity from projection version, source identity, sentence span, and canonical payload;
-- source kind (`document` or `claim`) and source identifier;
-- complete source text digest;
-- sentence text and exact start/end offsets in that source;
-- subject, predicate, and object arguments;
-- polarity (`positive` or `negative`);
-- modality (`asserted`, `possible`, `conditional`, or `unknown`);
-- zero or more typed qualifiers for population, species, intervention, comparator, outcome,
-  measurement, time, and study context;
-- extractor model, prompt/schema version, extraction timestamp, and projection version.
+- stable source kind, source ID, and source digest;
+- sentence text and half-open Unicode code-point offsets in the complete source;
+- non-empty subject, predicate, and object surface text with exact source offsets;
+- polarity: `positive` or `negative`;
+- zero or more qualifiers with role, surface text, and exact source offsets;
+- extractor model, prompt/schema version, and deterministic request configuration.
 
-Every subject, predicate, object, and qualifier stores verbatim surface text plus exact offsets in
-the source. Canonical keys are deterministic lowercase Unicode/whitespace/punctuation
-normalizations of the verified surface text. They improve exact graph joins but are not biomedical
-entity resolution.
+Qualifier roles are fixed to population, species, intervention, comparator, outcome, measurement,
+time, and study context. Canonical keys are computed locally by lowercase Unicode, whitespace, and
+edge-punctuation normalization of verified surfaces. They are matching aids, not biomedical entity
+resolution.
 
-Offsets use Python Unicode code-point indexing with a half-open `[start, end)` interval. Validation
-requires `source[start:end] == surface_text`, containment within the sentence span, non-overlapping
-source identity, allowed enum values, and a non-empty subject, predicate, and object. Invalid model
-output becomes an explicit extraction failure; it is never repaired silently.
+Every span must satisfy `source[start:end] == surface_text` and remain inside its sentence span.
+The application rejects unsupported enum values, malformed JSON, missing fields, duplicate stable
+identities, invented text, and out-of-range or mismatched spans. It never repairs model text or
+promotes extracted assertions into scientific truth.
 
-## Extraction adapter
+## Extraction adapter and artifacts
 
-Add a model-neutral `PropositionExtractor` port and one OpenAI-compatible Qwen adapter. The adapter
-sends a versioned system instruction, JSON Schema response format, temperature zero, one source
-document or claim per request, and the configured deterministic seed. The model returns only
-surface strings and offsets; the application computes canonical keys and identities after strict
-validation.
+Add a model-neutral `PropositionExtractor` port and one Qwen OpenAI-compatible adapter. Send one
+source per request with a versioned system instruction, strict JSON Schema response format,
+temperature zero, and the configured seed. The response carries the source identity and digest so
+the client can reject cross-request contamination.
 
-The response must match the exact schema, source digest, and source identifier. JSON outside the
-schema, mismatched spans, invented text, non-finite metadata, duplicate proposition identities, or
-transport failure becomes a typed failure. No regex recovery, alternate model, retry with a
-different prompt, or ungrounded normalization is allowed inside a fixed projection run.
+Persist a manifest plus append-only result JSONL with exactly one terminal record per source. A
+terminal record is either schema-valid propositions, a valid empty extraction, or a typed failure.
+Append and flush before proceeding. Resume skips terminal sources and retries only sources absent
+from the artifact. Duplicate or conflicting terminal identities invalidate the run. This is a
+diagnostic artifact, not a general assertion store.
 
-The first qualification uses fixed positive, negative, qualified, and no-proposition probes. It
-establishes schema and span fidelity only, not scientific extraction quality. If the existing Qwen
-endpoint cannot pass qualification, the scope-revision trigger fires and implementation stops
-before corpus projection.
+Qualification uses four fixed probes: positive relation, explicit negation, scientific qualifier,
+and no relation. It establishes schema and span fidelity only. Failure stops before candidate-pool
+extraction; no alternate prompt, retry variant, or fallback model is allowed inside the run.
 
-## Versioned PostgreSQL projection
+## Predeclared extraction stop rule
 
-Use ordinary typed tables:
+After source extraction and before pairwise feature computation, stop and diagnose extraction if
+any condition fails:
 
-- `proposition_projection_runs`: version, corpus digest, extractor model, prompt/schema digest,
-  status, timestamps, expected/complete/failed source counts;
-- `source_propositions`: immutable proposition rows keyed by projection version and proposition ID;
-- `proposition_arguments`: subject, predicate, object, and qualifier surface spans with canonical
-  keys and qualifier roles;
-- `proposition_extraction_failures`: source identity, typed error, and safe diagnostic metadata.
+- 100% of the 160 claims have at least one valid grounded proposition;
+- 100% of annotated decisive candidate documents have at least one valid grounded proposition;
+- 100% of documents represented in the 100-row audit have at least one valid grounded proposition;
+- at least 99% of all source records are terminal and schema-valid, including valid empty results;
+- at least 95% of distinct candidate documents contain one or more valid grounded propositions.
 
-Rows are append-oriented within a version. A completed version is immutable. Rebuilding creates a
-new version; it never mutates a completed projection. An incomplete version cannot be selected by
-the scorer. Deleting source documents continues to cascade through explicit foreign keys, while
-the projection run retains aggregate failure evidence.
+The thresholds are qualification gates, not quality claims. A stopped run retains coverage and
+failure evidence but does not proceed to scoring, graph work, or prompt/model changes.
 
-The store exposes narrow ports to start a projection, persist one source result transactionally,
-mark completion only when source accounting is exact, load one complete version, and load candidate
-propositions. It refuses mixed corpus/model/prompt identities and stale or incomplete versions.
+## Five fixed proposition-pair features
 
-## Query-time induced graph and features
+Embed each verified subject, predicate, object, and qualifier surface with the existing MiniLM
+model. Map cosine similarity from `[-1, 1]` to `[0, 1]`. For every claim/document proposition pair,
+compute:
 
-For a query, retrieve the existing broad pool first. Extract the claim once, then load propositions
-for every candidate document from one complete projection version. Build an in-memory induced
-bipartite graph with proposition nodes and canonical argument/entity nodes. Shared canonical entity
-keys connect propositions across all candidates; graph construction is not gated by current top-10
-recall.
+1. `entity`: maximum of subject-subject, subject-object, object-subject, and object-object
+   similarities;
+2. `predicate`: predicate-predicate similarity;
+3. `argument_direction`: `((subject-subject + object-object) - (subject-object + object-subject)) / 2`,
+   retaining its `[-1, 1]` range;
+4. `polarity`: `1` for equal polarity and `-1` for conflicting polarity;
+5. `qualifier`: mean, over claim qualifiers, of the best same-role document-qualifier similarity;
+   use `0` when the claim has no qualifiers or a role is absent from the document proposition.
 
-One matcher computes the following raw features for every candidate:
+Select one proposition pair per claim/document candidate using the highest arithmetic mean of
+`entity`, `predicate`, and `(argument_direction + 1) / 2`; break ties by stable proposition IDs.
+Report the five selected raw features. Also report a frozen `proposition_pair_mean`, the arithmetic
+mean after mapping both signed features to `[0, 1]`. It is a diagnostic score, not a probability.
 
-- `graph-entity`: maximum MiniLM similarity between claim and document subject/object arguments;
-- `graph-predicate`: maximum MiniLM similarity between predicates;
-- `graph-argument`: best aligned subject-to-subject plus object-to-object similarity, retaining the
-  crossed subject/object score as an argument-reversal diagnostic;
-- `graph-polarity`: best aligned proposition pair scored `1` for matching polarity, `-1` for
-  conflicting polarity, and `0` when no proposition pair exists;
-- `graph-qualifier`: mean best-match similarity for claim qualifiers of the same role, with missing
-  roles retained as zero rather than silently ignored;
-- `graph-path`: reciprocal shortest evidence-bearing path between claim argument nodes and candidate
-  proposition nodes using exact canonical entity joins, or zero when disconnected;
-- `graph-composite`: the arithmetic mean of the six features after fixed range mapping to `[0, 1]`.
+No threshold, weight, learned adjustment, graph traversal, synonym edge, or post-result formula
+change is allowed.
 
-No feature threshold, learned weight, label-trained adjustment, or post-result formula change is
-allowed. Each channel is exposed independently through the existing complete feature matrix. The
-composite is an opt-in scorer, not a relevance probability. Every score record retains the matched
-claim/document proposition IDs and exact source spans that produced it.
+## Diagnostic and decision rule
 
-Documents with a completed, valid zero-proposition extraction receive explicit zero features.
-Documents with missing or failed extraction make the diagnostic incomplete; they do not receive a
-neutral or zero substitute.
+The diagnostic joins all 120 annotated decisive candidates with all 4,316 Phase 3 neutral-to-
+decisive false positives and reports, for each feature and the fixed mean:
 
-## Composition and CLI
+- ROC-AUC and average precision for decisive-versus-false-positive separation;
+- label prevalence as the average-precision control;
+- score distributions by gold label, Phase 3 prediction, audit stratum, and audit disposition;
+- extraction coverage, typed failures, span validation, latency, and exact artifact digests;
+- correlations with ColBERT, Phase 3 evidence margin, and polarity margin.
 
-Add explicit composition functions rather than modifying the default application implicitly.
-CLI operations are:
+The representation earns a separately governed graph-connectivity experiment only if the fixed
+`proposition_pair_mean` achieves ROC-AUC at least `0.65` and average precision at least twice the
+decisive prevalence on this fixed comparison, with all extraction gates passing. This threshold
+justifies another experiment; it does not authorize retrieval fusion or default promotion.
 
-- build and validate the Phase 3 error-audit manifest;
-- initialize or resume one proposition projection version;
-- inspect projection coverage and failures;
-- run the fixed proposition-graph diagnostic.
+If either threshold fails, stop this branch of experimentation and retain the schema, artifacts,
+and report without building graph paths or PostgreSQL infrastructure.
 
-Existing `search`, `ask`, and retrieval-evaluation defaults remain unchanged. A named opt-in graph
-strategy may be exposed only after the projection and scorer contracts are complete; it must fail
-clearly when the configured projection version is unavailable.
+## Interfaces and implementation boundary
 
-## Fixed diagnostic
+Add one opt-in CLI workflow with dry-run manifest validation, extraction/resume, audit validation,
+and report derivation. The internal modules are limited to proposition contracts/matching, the
+Qwen adapter, and diagnostic execution/reporting. Existing `search`, `ask`, retrieval evaluation,
+PostgreSQL schemas, Compose services, and defaults remain unchanged.
 
-The first diagnostic uses the same 160-claim internal validation partition and the unchanged Phase
-2 broad candidate pool. It reports:
+Focused tests cover strict spans and schema rejection, stable identities, resume/duplicate
+handling, deterministic 100-row audit selection, the five exact formulas and tie-break, extraction
+stop rules, and raw/report consistency. The revised budget permits no more than 10 new focused test
+functions and no harness expansion.
 
-- corpus and claim extraction coverage, zero-proposition counts, failures, and latency;
-- exact source-span provenance validity;
-- ranking metrics for each raw graph feature and the fixed composite;
-- correlations with ColBERT and Phase 3 inference margins;
-- separation of each audited Phase 3 error stratum and reviewer disposition;
-- unchanged default retrieval metrics as a control;
-- complete component, dataset, prompt, model, projection, and artifact digests.
+## Execution order
 
-The graph scorer is not fused with the default in this run. Results may justify a later fixed
-fusion comparison only through a separate owner-approved issue. The public test set is not opened.
+1. Freeze schemas, formulas, source manifest, audit selection, gates, and artifact identities.
+2. Implement contracts and focused tests.
+3. Implement and qualify the Qwen extraction adapter.
+4. Freeze the audit manifest; audit review and candidate-source extraction may proceed independently.
+5. Apply the extraction stop rule.
+6. If it passes, compute the pairwise artifacts and fixed report.
+7. Complete the audit before interpreting the report.
+8. Record the stop-or-graph-next decision; do not implement a graph in Issue #9.
 
-## Failure and recovery behavior
-
-- Projection configuration mismatch stops before extraction.
-- Per-source invalid output or transport failure is durable and visible.
-- Resume skips transactionally completed sources and retries only sources with no committed result;
-  this is idempotent client behavior, not an exactly-once remote guarantee.
-- A projection with any missing accounting cannot become complete.
-- An incomplete projection cannot be scored or represented as a leaderboard result.
-- Diagnostic artifacts are immutable after results are opened; repair requires a new run identity.
-- No failure falls back to a different extractor, prompt, graph representation, or ranking policy.
-
-## Verification and proportionality
-
-Focused tests cover contracts that could invalidate results: strict source spans, schema rejection,
-stable identities, transactional projection accounting, incomplete-version refusal, graph feature
-construction, complete candidate scoring, deterministic audit sampling, and report/raw consistency.
-The implementation budget permits no more than 15 new focused test functions and no combinatorial
-harness expansion.
-
-Regular CI uses fake extractors and stores. Live DGX qualification performs only the fixed schema
-and span probes before the one corpus projection. Exactly one complete repository gate runs on the
-final current attempt. Independent review covers the stable candidate once per attempt.
-
-## Rollout and stop gates
-
-1. Approve this design, ADR-0031, and the narrow `semantic-evidence-ledger` activation.
-2. Write the implementation plan and freeze schemas, prompts, formulas, and artifact identities.
-3. Implement contracts, adapter, projection store, matcher, CLI, and focused tests.
-4. Qualify Qwen schema/span fidelity. Stop if qualification fails.
-5. Freeze and review the 100-row Phase 3 audit sample.
-6. Build one corpus projection and run one fixed internal diagnostic.
-7. Retain or reject the graph scorer from evidence; do not promote defaults in Issue #9.
-
-The contract must be revised before adding a dependency, service, extractor comparison, learned
-weight, calibration, AGE, graph candidate generation, or a new evaluation boundary.
+Any PostgreSQL table, runtime scorer, new dependency or service, graph/path feature, model or prompt
+comparison, calibration, learned weight, public-test access, or default change requires a new issue
+and owner approval.

@@ -1,91 +1,93 @@
-# ADR-0031: Versioned proposition projection and candidate-scoped graph scoring
+# ADR-0031: Test grounded proposition pairs before building a graph
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-15
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: [#9](https://github.com/stauntonjr/scifact-rag/issues/9)
 
 ## Context
 
-The Phase 3 NLI diagnostic produced 4,316 neutral-to-decisive false positives in a pool where only
-0.55% of candidates have annotated decisive relations. Evidence coverage was high, so missing
-evidence does not explain the precision collapse. General-language NLI over a bundled abstract also
-does not explicitly preserve scientific entities, argument direction, polarity, or qualifiers.
+The fixed Phase 3 NLI diagnostic produced 4,316 neutral-to-decisive false positives among 21,711
+candidates. Evidence coverage was high, so the next hypothesis is that explicit scientific
+subjects, predicates, objects, polarity, and qualifiers can distinguish decisive evidence from
+topically related negatives.
 
-The project already has a broad candidate pool, exact evidence spans, MiniLM, typed PostgreSQL
-persistence, an explicit scorer boundary, and a DGX-hosted Qwen endpoint. Its roadmap selects a
-proposition graph as the next scorer and defers Apache AGE until ordinary PostgreSQL is measured as
-insufficient. The inactive `semantic-evidence-ledger` capability owns source assertions and
-provenance, so an independent proposition ledger would violate the capability reuse rule.
+The first proposed Phase 4 design also included a corpus-wide PostgreSQL projection, induced graph,
+six graph features, path scoring, and a partial `semantic-evidence-ledger` activation. Human review
+accepted the representation direction but found that infrastructure disproportionate before the
+scientific hypothesis is tested. Exact entity joins also make graph-path failure confounded with
+the deliberately deferred biomedical synonym problem.
 
 ## Decision
 
-Activate the project-specific assertion-projection portion of `semantic-evidence-ledger`. Extract
-strictly source-grounded propositions with the existing Qwen endpoint, validate every returned
-surface against exact source offsets, and persist immutable versioned projection rows in ordinary
-typed PostgreSQL tables. Extracted propositions are source assertions, never canonical scientific
-truth.
+Run one bounded proposition-pair diagnostic before building graph infrastructure. Extract only the
+160 frozen claims and distinct documents in their unchanged broad candidate pools. Use the existing
+Qwen endpoint with strict JSON Schema and exact source-span validation, and retain immutable local
+manifest and JSONL artifacts. Do not add PostgreSQL tables or a runtime proposition store.
 
-Retrieve the existing broad candidate pool first, build an induced in-memory proposition/entity
-graph over all candidates, and emit independent entity, predicate, argument, polarity, qualifier,
-path, and fixed equal-composite features through the existing candidate feature matrix. Use no
-learned weights or label-trained thresholds. The first fixed diagnostic does not fuse or promote
-the graph channel.
+Compute exactly five predeclared pairwise features: entity similarity, predicate similarity,
+argument direction, polarity agreement, and same-role qualifier similarity. Select a proposition
+pair by the fixed structural formula and report a fixed equal mean. Defer graph connectivity and
+path scoring.
 
-Before interpreting graph results, freeze a deterministic 100-row stratified audit of Phase 3
-errors and distinguish likely annotation mismatch, related-but-insufficient evidence, model
-reasoning error, evidence-selection error, and indeterminate cases. These review dispositions are
-diagnostic judgments, not benchmark labels.
+Freeze the 100-row Phase 3 error-audit manifest before extraction. Audit review may run independently
+of extraction but must finish before results are interpreted. Apply the predeclared extraction
+coverage stop rule before feature computation.
 
-This decision does not activate challenge adjudication or canonical truth resolution, add Apache
-AGE, add a model service or dependency, calibrate NLI, train a model, generate candidates from the
-graph, or change retrieval or generation defaults.
+The `semantic-evidence-ledger` capability remains inactive. These finite diagnostic artifacts are
+owned by the active product-validation capability and are not a runtime assertion ledger or
+canonical truth projection. Any durable proposition store, challenge lifecycle, or truth
+resolution must activate or supersede that capability through a later owner decision.
+
+The representation earns a separate graph experiment only if all extraction gates pass and the
+fixed proposition-pair mean reaches ROC-AUC `0.65` plus average precision at least twice the
+decisive prevalence on the predeclared decisive-versus-Phase-3-false-positive comparison. Passing
+does not authorize fusion or default promotion.
 
 ## Consequences
 
 ### Positive
 
-- Scientific relations and their qualifiers become inspectable scoring inputs.
-- Every graph feature remains traceable to exact source text and extractor provenance.
-- The graph can score candidates that would otherwise move only in a second ranking pass.
-- Existing PostgreSQL, model hosting, composition, and feature-matrix surfaces are reused.
-- The error audit prevents unannotated candidates from being treated silently as semantic truth.
+- The scientific representation hypothesis is tested before infrastructure is built.
+- Only sources needed by the fixed candidate pool incur extraction cost.
+- Strict source grounding and assertion-not-truth semantics remain intact.
+- Graph paths, PostgreSQL lifecycle, and capability activation must earn their complexity.
+- Failure can terminate this experiment within one implementation cycle.
 
 ### Negative
 
-- Qwen extraction adds one generative request per source and can fail strict span validation.
-- Deterministic canonical keys do not resolve biomedical synonyms.
-- In-memory graph construction and repeated MiniLM field comparisons add query latency.
-- The already-inspected validation boundary supports internal diagnosis, not clean promotion.
-- A partial capability activation requires explicit documentation of deferred ledger semantics.
+- Local artifacts cannot serve runtime retrieval or other consumers.
+- The experiment does not measure connected graph behavior.
+- MiniLM surface similarity does not resolve biomedical synonyms.
+- Qwen extraction may fail the predeclared coverage gate.
+- The inspected validation boundary supports diagnosis, not clean generalization.
 
 ### Risks and mitigations
 
 - **Hallucinated extraction:** require exact source spans and fail closed.
-- **Prompt or model drift:** bind immutable model, prompt/schema, corpus, and projection identities.
-- **Silent stale projection:** score only a completed version matching the configured corpus digest.
-- **Graph score overinterpretation:** retain every raw feature and prohibit probability or truth claims.
-- **Metric overfitting:** freeze formulas and audit selection before opening graph results; do not tune.
-- **Infrastructure expansion:** stop if qualification requires another model, service, or dependency.
+- **Prompt/model drift:** bind model, prompt/schema, source, and artifact digests.
+- **Audit delay:** freeze first, run review independently, require completion only before interpretation.
+- **Coverage ambiguity:** require 100% usable claims, decisive documents, and audit documents; 99%
+  schema-valid terminal sources; and 95% usable candidate documents.
+- **Metric fishing:** freeze five formulas and the stop/continuation threshold before extraction.
 
 ## Alternatives considered
 
 | Alternative | Evidence | Reason not selected |
 |---|---|---|
-| Calibrate DeBERTa | Raw logits and labels exist | Optimizes an inspected, severely imbalanced boundary without fixing task semantics |
-| Add a dedicated NLI/OpenIE model | Could improve domain fit | Introduces model selection, service qualification, and GPU cost before representation value is known |
-| Apache AGE | Provides graph query syntax | Typed tables and recursive SQL are sufficient for the first bounded candidate graph |
-| Keep only bundled NLI | Phase 3 interface is complete | Rare-class precision is too low for promotion and arguments remain implicit |
+| Calibrate DeBERTa | Raw logits and labels exist | Tunes the symptom on an inspected and highly imbalanced boundary |
+| Build full PostgreSQL proposition projection | Would support runtime scoring | Infrastructure is unnecessary to answer the first hypothesis |
+| Add graph-path scoring now | Would test connectivity | Exact joins confound path utility with unresolved synonymy |
+| Add another extractor or entity linker | Could improve domain fit | Adds a model/dependency comparison before representation value is known |
 
 ## Verification and revisit trigger
 
-Verify strict extraction schema and source spans, immutable projection accounting, stale/incomplete
-projection refusal, complete per-candidate features, deterministic error sampling, exact provenance,
-and report/raw consistency with focused tests and one final repository gate. Qualify the live Qwen
-endpoint on fixed schema/span probes before corpus extraction, then run one frozen internal
-diagnostic.
+Focused tests verify strict spans, schema validation, identities, deterministic audit selection,
+resume semantics, exact feature formulas, coverage gates, and report derivation. Fixed DGX probes
+qualify schema/span behavior before extraction. The existing full repository gate remains the final
+engineering check; no harness expansion is part of the change.
 
-Revisit the extractor only if fixed qualification fails or extraction coverage makes the projection
-unusable. Revisit PostgreSQL storage only after measured query or maintenance limitations. Any
-fusion, default promotion, biomedical entity linker, graph candidate generator, learned scorer,
-challenge ledger, or canonical resolution requires a separate owner-approved decision.
+If extraction fails the frozen gate, stop and diagnose rather than changing the prompt or model in
+the same run. If the fixed pair score fails either signal threshold, retain the evidence and do not
+build the graph. If it passes both, a new owner-approved issue may design graph connectivity,
+durable PostgreSQL projection, and the associated `semantic-evidence-ledger` activation.
