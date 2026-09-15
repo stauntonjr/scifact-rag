@@ -15,7 +15,10 @@ from scifact_rag.adapters.openai_compatible import (
 )
 from scifact_rag.adapters.scifact import QrelsSplit
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
-from scifact_rag.composition import build_application, build_generation_evaluator
+from scifact_rag.composition import (
+    build_application,
+    build_generation_evaluator,
+)
 from scifact_rag.evaluation import (
     ComponentRevision,
     EvaluationPurpose,
@@ -37,6 +40,11 @@ from scifact_rag.retrieval_evaluation import (
     canonical_qrels_sha256,
     sha256_file,
 )
+from scifact_rag.scientific_inference import DEBERTA_MODEL, DEBERTA_REVISION
+from scifact_rag.scientific_inference_evaluation import (
+    ScientificInferenceExecutionSummary,
+    ScientificInferenceRunManifest,
+)
 from scifact_rag.strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
 
@@ -46,6 +54,136 @@ def test_cli_exposes_the_first_five_commands() -> None:
     assert result.exit_code == 0
     for command in ("download", "ingest", "search", "ask", "evaluate"):
         assert command in result.stdout
+
+
+def _scientific_inference_manifest(
+    evaluation_digest: str = "e" * 64,
+) -> ScientificInferenceRunManifest:
+    component_names = (
+        "application-image",
+        "postgres-image",
+        "colbert-model",
+        "colbert-tokenizer",
+        "deberta-model",
+        "deberta-tokenizer",
+        "transformers",
+        "inference-container",
+    )
+    return ScientificInferenceRunManifest(
+        schema_version="scientific-inference-run-manifest/v1",
+        run_id="scientific-inference-1",
+        repository_commit="a" * 40,
+        evaluation_manifest_sha256=evaluation_digest,
+        source_split="train-validation",
+        evidence_class="internal-diagnostic",
+        candidate_pool_strategy=DEFAULT_RETRIEVAL_STRATEGY.value,
+        candidate_limit_per_generator=50,
+        ranking_cutoff=10,
+        dp_representation="coref-nominal-dp-minilm",
+        colbert_model="answerdotai/answerai-colbert-small-v1",
+        colbert_revision="c72aa89bc61afdd85373643f3a1a75b2aad6e0fe",
+        model=DEBERTA_MODEL,
+        model_revision=DEBERTA_REVISION,
+        tokenizer=DEBERTA_MODEL,
+        tokenizer_revision=DEBERTA_REVISION,
+        transformers_version="4.55.0",
+        container_image="scifact-rag-scientific-inference@sha256:123",
+        endpoint="http://scientific-inference:80",
+        context_limit=512,
+        request_attempt_policy="at-most-once-per-run",
+        components=tuple(
+            ComponentRevision(name, name, f"{name}-revision") for name in component_names
+        ),
+        started_at="2026-09-15T14:00:00Z",
+        completed_at=None,
+        host="spark-3a8f",
+        results_path="artifacts/scientific-inference-1/results.jsonl",
+        test_qrels_inspected=True,
+    )
+
+
+def test_scientific_inference_dry_run_never_constructs_services(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(_scientific_inference_manifest().to_json(), encoding="utf-8")
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("dry-run must not construct a corpus, database, or model service")
+
+    monkeypatch.setattr(
+        cli_module, "build_scientific_inference_executor", fail_if_called, raising=False
+    )
+    monkeypatch.setattr(cli_module.BeirSciFact, "ensure", fail_if_called)
+
+    result = CliRunner().invoke(
+        app,
+        ["scientific-inference-eval-dry-run", "--manifest", str(manifest)],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["run_id"] == "scientific-inference-1"
+
+
+def _scientific_evaluation_set() -> GenerationEvaluationSet:
+    return GenerationEvaluationSet(
+        tuple(
+            GenerationEvaluationCase(
+                schema_version="generation-evaluation-case/v1",
+                query_id=str(index),
+                claim=f"claim {index}",
+                source_split="train-validation",
+                expected_stance=ScientificStance.NOT_ENOUGH_INFO,
+                cited_document_ids=(str(index * 10),),
+                rationales=(),
+            )
+            for index in range(1, 161)
+        )
+    )
+
+
+def test_run_scientific_inference_preflights_then_passes_the_frozen_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = _scientific_evaluation_set()
+    evaluation_path = tmp_path / "evaluation.jsonl"
+    evaluation_path.write_text(cases.to_jsonl(), encoding="utf-8")
+    manifest = _scientific_inference_manifest(cases.sha256)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(manifest.to_json(), encoding="utf-8")
+    observed: dict[str, object] = {}
+
+    class FakeExecutor:
+        def run(self, **kwargs):
+            observed.update(kwargs)
+            return ScientificInferenceExecutionSummary(160, 0, 160, 0, 0, True)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_module, "build_scientific_inference_executor", FakeExecutor)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-scientific-inference-eval",
+            "--manifest",
+            str(manifest_path),
+            "--evaluation-set",
+            str(evaluation_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert observed == {
+        "run_id": "scientific-inference-1",
+        "evaluation_set": cases,
+        "retrieval_limit": 10,
+        "output": Path("artifacts/scientific-inference-1/results.jsonl"),
+    }
+    emitted = json.loads(result.stdout)
+    assert emitted["report_path"].endswith("results.report.json")
+    assert emitted["failures_path"].endswith("results.failures.jsonl")
 
 
 def test_generation_evaluation_dry_run_canonicalizes_a_complete_manifest(

@@ -462,3 +462,25 @@ See [the composition ADR](../adr/0013-scifact-rag-composition-and-runtime.md),
 [the reranking solution assessment](../research/scifact-rag-reranking.md), and
 [the late-interaction solution assessment](../research/scifact-rag-late-interaction.md), and
 [the listwise solution assessment](../research/scifact-rag-listwise-reranking.md).
+# Scientific inference diagnostic
+
+Phase 3 adds an opt-in, model-neutral scientific-inference path governed by ADR-0030 and GitHub
+Issue #8. It scores every document in the selected broad candidate pool without changing retrieval
+order or generation behavior.
+
+The operator controls the GPU service lifecycle:
+
+```bash
+docker compose --profile scientific-inference build scientific-inference app
+docker compose --profile scientific-inference up -d scientific-inference
+docker compose --profile scientific-inference run --rm app \
+  scientific-inference-eval-dry-run --manifest MANIFEST
+docker compose --profile scientific-inference run --rm app \
+  run-scientific-inference-eval --manifest MANIFEST \
+  --evaluation-set artifacts/scifact-generation-validation.jsonl
+```
+
+The run journal is the canonical artifact. Each candidate has a stable identity before evidence
+assembly; a request attempt is appended and synced before its sole HTTP request. An unmatched
+attempt start is `outcome_unknown` and is never resent under the same run ID. A terminal failure
+also requires a new run ID for any retry. An incomplete journal is not a leaderboard result.

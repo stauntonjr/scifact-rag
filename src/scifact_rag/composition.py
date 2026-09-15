@@ -12,7 +12,8 @@ from .adapters.openai_compatible import (
 )
 from .adapters.postgres import PostgresEvidenceStore
 from .adapters.reranker import RankLlmReranker, TeiReranker, VllmColbertReranker
-from .adapters.tokenization import HuggingFaceTokenBudget
+from .adapters.scientific_inference import TransformersScientificInferenceClient
+from .adapters.tokenization import HuggingFacePairTokenBudget, HuggingFaceTokenBudget
 from .application import RagApplication
 from .generation import (
     DpChunkContextAssembler,
@@ -38,6 +39,15 @@ from .retrievers import (
     VectorCandidateGenerator,
     VectorCandidateScorer,
     VectorRetriever,
+)
+from .scientific_inference import (
+    DEBERTA_MODEL,
+    DEBERTA_REVISION,
+    ScientificEvidenceAssembler,
+)
+from .scientific_inference_evaluation import (
+    ScientificInferenceEvaluationExecutor,
+    ScientificInferenceEvaluator,
 )
 from .strategies import (
     COREF_NOMINAL_DP_COLBERT,
@@ -77,6 +87,10 @@ class Settings:
     late_interaction_base_url: str
     late_interaction_model: str
     rank_llm_base_url: str
+    scientific_inference_base_url: str = "http://scientific-inference:80"
+    scientific_inference_model: str = DEBERTA_MODEL
+    scientific_inference_revision: str = DEBERTA_REVISION
+    scientific_inference_max_tokens: int = 512
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -106,6 +120,16 @@ class Settings:
                 "answerdotai/answerai-colbert-small-v1",
             ),
             rank_llm_base_url=os.getenv("RANK_LLM_BASE_URL", "http://rankllm:80"),
+            scientific_inference_base_url=os.getenv(
+                "SCIENTIFIC_INFERENCE_BASE_URL", "http://scientific-inference:80"
+            ),
+            scientific_inference_model=os.getenv("SCIENTIFIC_INFERENCE_MODEL", DEBERTA_MODEL),
+            scientific_inference_revision=os.getenv(
+                "SCIENTIFIC_INFERENCE_REVISION", DEBERTA_REVISION
+            ),
+            scientific_inference_max_tokens=int(
+                os.getenv("SCIENTIFIC_INFERENCE_MAX_TOKENS", "512")
+            ),
         )
 
 
@@ -516,6 +540,42 @@ def build_generation_evaluator(
             prompt_profile=GenerationPromptProfile.SCIFACT_CLAIM_VERIFICATION,
             seed=SCIFACT_EVALUATION_SEED,
         ),
+    )
+
+
+def build_scientific_inference_executor(
+    settings: Settings | None = None,
+) -> ScientificInferenceEvaluationExecutor:
+    resolved = settings or Settings.from_environment()
+    if (
+        resolved.scientific_inference_model != DEBERTA_MODEL
+        or resolved.scientific_inference_revision != DEBERTA_REVISION
+        or resolved.scientific_inference_max_tokens != 512
+    ):
+        raise ValueError("scientific inference settings must match the frozen model boundary")
+    application = build_application(
+        resolved,
+        retrieval_strategy=DEFAULT_RETRIEVAL_STRATEGY,
+        generation_context_strategy=GenerationContextStrategyName.WHOLE_DOCUMENT,
+    )
+    store = PostgresEvidenceStore(resolved.database_url)
+    colbert = VllmColbertReranker(
+        resolved.late_interaction_base_url,
+        resolved.late_interaction_model,
+    )
+    pair_budget = HuggingFacePairTokenBudget(
+        resolved.scientific_inference_model,
+        resolved.scientific_inference_revision,
+        maximum_pair_tokens=resolved.scientific_inference_max_tokens,
+    )
+    assembler = ScientificEvidenceAssembler(store, colbert, pair_budget)
+    client = TransformersScientificInferenceClient(
+        resolved.scientific_inference_base_url,
+        resolved.scientific_inference_revision,
+    )
+    return ScientificInferenceEvaluationExecutor(
+        application,
+        ScientificInferenceEvaluator(assembler, client),
     )
 
 

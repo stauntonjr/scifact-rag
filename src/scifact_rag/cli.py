@@ -14,7 +14,11 @@ from .adapters.openai_compatible import (
 )
 from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
 from .application import RagApplication
-from .composition import build_application, build_generation_evaluator
+from .composition import (
+    build_application,
+    build_generation_evaluator,
+    build_scientific_inference_executor,
+)
 from .domain import SearchHit
 from .evaluation import (
     GenerationEvaluationSet,
@@ -38,6 +42,13 @@ from .retrieval_evaluation import (
     read_retrieval_evaluation_records,
     sha256_file,
     write_retrieval_evaluation_report,
+)
+from .scientific_inference_evaluation import (
+    ScientificInferenceJournal,
+    ScientificInferenceRunManifest,
+    build_scientific_inference_report,
+    write_scientific_inference_failures,
+    write_scientific_inference_report,
 )
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
@@ -152,6 +163,27 @@ def retrieval_eval_dry_run(
     """Validate and emit a retrieval run manifest without service or dataset calls."""
     try:
         validated = RetrievalRunManifest.from_json(manifest.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
+    typer.echo(validated.to_json(), nl=False)
+
+
+@app.command("scientific-inference-eval-dry-run")
+def scientific_inference_eval_dry_run(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete scientific-inference-run-manifest/v1 JSON file.",
+        ),
+    ],
+) -> None:
+    """Validate an inference manifest without constructing data or model services."""
+    try:
+        validated = ScientificInferenceRunManifest.from_json(manifest.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError) as exc:
         raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
     typer.echo(validated.to_json(), nl=False)
@@ -392,6 +424,95 @@ def run_generation_eval(
     write_generation_evaluation_report(report, report_path)
     response = asdict(summary)
     response["report_path"] = str(report_path)
+    _emit(response)
+
+
+@app.command("run-scientific-inference-eval")
+def run_scientific_inference_eval(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete scientific-inference-run-manifest/v1 JSON file.",
+        ),
+    ],
+    evaluation_set: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Canonical generation-evaluation-case/v1 JSONL input.",
+        ),
+    ],
+) -> None:
+    """Run or inspect the fixed, resumable scientific-inference diagnostic."""
+    try:
+        run_manifest = ScientificInferenceRunManifest.from_json(
+            manifest.read_text(encoding="utf-8")
+        )
+        cases = GenerationEvaluationSet.from_jsonl(evaluation_set.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if run_manifest.evaluation_manifest_sha256 != cases.sha256:
+        raise typer.BadParameter(
+            "evaluation manifest SHA-256 does not match the run manifest",
+            param_hint="--evaluation-set",
+        )
+    if {case.source_split for case in cases.cases} != {"train-validation"}:
+        raise typer.BadParameter(
+            "scientific inference requires the train-validation split",
+            param_hint="--evaluation-set",
+        )
+    if len(cases.cases) != 160:
+        raise typer.BadParameter(
+            "scientific inference evaluation must contain exactly 160 cases",
+            param_hint="--evaluation-set",
+        )
+    components = {component.component: component for component in run_manifest.components}
+    required_components = (
+        "application-image",
+        "postgres-image",
+        "colbert-model",
+        "colbert-tokenizer",
+        "deberta-model",
+        "deberta-tokenizer",
+        "transformers",
+        "inference-container",
+    )
+    for component_name in required_components:
+        if component_name not in components:
+            raise typer.BadParameter(
+                f"missing required component: {component_name}",
+                param_hint="--manifest",
+            )
+
+    results_path = Path(run_manifest.results_path)
+    summary = build_scientific_inference_executor().run(
+        run_id=run_manifest.run_id,
+        evaluation_set=cases,
+        retrieval_limit=run_manifest.ranking_cutoff,
+        output=results_path,
+    )
+    state = ScientificInferenceJournal.open(results_path, run_manifest.run_id).state
+    records = tuple(state.results.values())
+    report = build_scientific_inference_report(
+        records,
+        evaluation_set=cases,
+        run_id=run_manifest.run_id,
+        expected_candidates=summary.expected_candidates,
+        outcome_unknown_candidates=len(state.outcome_unknown),
+    )
+    report_path = results_path.with_suffix(".report.json")
+    failures_path = results_path.with_suffix(".failures.jsonl")
+    write_scientific_inference_report(report, report_path)
+    write_scientific_inference_failures(records, failures_path)
+    response = asdict(summary)
+    response.update({"report_path": str(report_path), "failures_path": str(failures_path)})
     _emit(response)
 
 
