@@ -442,3 +442,24 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
 - Prevention: unchanged representation ingestion must be tuple-idempotent at the document layer;
   the focused integration test is the durable guard. Full BM25 evaluations against this local
   extension are serialized rather than launched concurrently.
+
+## SCIFACT-RAG-003: CI package smoke used an unsupported Python interpreter
+
+- Date: 2026-09-15.
+- Workflow: run the authoritative `make smoke` gate in GitHub Actions after applying the selected
+  retrieval default and documentation cleanup.
+- Failed approach: retained the template's Python 3.11 workflow pin after SciFact RAG adopted
+  Python 3.12 as its minimum supported runtime. `uv run` selected Python 3.12 for project commands,
+  masking the mismatch until the standalone package-smoke script created a clean environment from
+  the workflow interpreter.
+- Error signature: wheel installation rejected Python 3.11.16 because the package requires
+  `>=3.12,<3.14`; harness validation, Ruff, Pyright, and 217 unit tests had already passed.
+- Mutation check: the failed GitHub run installed only ephemeral runner dependencies and did not
+  invoke PostgreSQL, a model service, the DGX, or an application evaluation.
+- Corrected path: configure Python 3.12 in every existing GitHub workflow that invokes
+  `make smoke`: harness verification, harness release, and harness upgrade.
+- Verification: a repository-wide workflow audit confirms all three `make smoke` workflows use
+  Python 3.12, matching `pyproject.toml`, `uv.lock`, the Docker image, and the documented project
+  runtime. The complete local and remote gates are retained in the Issue #7 engineering evidence.
+- Prevention: workflow interpreter pins must remain within the application's declared
+  `requires-python` range whenever the workflow executes application package smoke.
