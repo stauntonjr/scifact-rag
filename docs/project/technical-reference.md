@@ -494,3 +494,39 @@ Resume additionally requires the retained admitted chunk text and complete ordin
 match the stored `coref-nominal-dp-minilm` evidence before treating a candidate as complete.
 The classifier counts the exact premise/hypothesis pair before GPU inference and rejects an
 over-limit or count-mismatched request without running the model.
+
+# Grounded proposition-pair diagnostic
+
+Phase 4 adds an internal-only, opt-in workflow governed by ADR-0031 and Issue #9. It authenticates
+the exact retained Phase 3 files, rejoins every candidate to the evaluation set and corpus, and
+freezes only claims and documents in those pools. The manifest binds the Qwen model, strict prompt
+and schema digests, seed, MiniLM model, and ordered source digests. The append-only extraction
+journal accepts one terminal exact-span result per source and resumes only sources with no row.
+
+The commands are deliberately separate:
+
+```bash
+scifact-rag prepare-proposition-pair-eval \
+  --phase3-manifest PHASE3_MANIFEST --phase3-results PHASE3_RESULTS \
+  --evaluation-set EVALUATION --data-dir DATA --output-dir OUTPUT
+scifact-rag proposition-pair-eval-dry-run \
+  --manifest OUTPUT/manifest.json --audit OUTPUT/audit.jsonl \
+  --phase3-manifest PHASE3_MANIFEST --phase3-results PHASE3_RESULTS \
+  --evaluation-set EVALUATION --data-dir DATA
+scifact-rag qualify-proposition-extraction --manifest OUTPUT/manifest.json
+scifact-rag run-proposition-pair-eval \
+  --manifest OUTPUT/manifest.json --audit OUTPUT/audit.jsonl \
+  --qualification OUTPUT/qualification.json \
+  --phase3-manifest PHASE3_MANIFEST --phase3-results PHASE3_RESULTS \
+  --evaluation-set EVALUATION --data-dir DATA
+```
+
+The run command refuses an unqualified extractor, applies the frozen coverage gates before loading
+MiniLM, and withholds its canonical report until every audit row has a valid human review. The
+report schema retains feature metrics and distributions, audit strata/dispositions, extraction
+failure and latency evidence, correlations, and all artifact digests.
+
+The first live qualification stopped before full extraction: positive relation and no-relation
+passed; explicit negation and scientific qualifier failed exact source-span grounding. No feature
+score, graph, database projection, or product default resulted. See
+`docs/reports/phase-4-proposition-pair-qualification.md`.

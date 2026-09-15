@@ -5,9 +5,10 @@
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
 comparison, fixed retrieval-default comparison, and Phase 3 scientific-inference diagnostic are
 complete. Phase 1 still has its frozen human review outstanding, Issue #7 applied ADR-0029's
-selected retrieval default, and Issue #8 retained scientific-inference architecture without
-promoting its fixed DeBERTa scores. Proposition-graph scoring is the next architecture phase;
-adapters and template evaluation remain downstream.
+selected retrieval default, Issue #8 retained scientific-inference architecture without promoting
+its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its strict Qwen extraction
+qualification. Complete the outstanding blinded generation review, then harden the CLI vertical
+slice; graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -111,6 +112,9 @@ fallback, operational tradeoff, and subsequent Issue #7 implementation.
 `docs/adr/0030-scientific-inference-scoring.md` records the fixed broad-pool DeBERTa diagnostic,
 at-most-once journal, and no-fusion boundary. The completed result and no-promotion decision are in
 `docs/reports/phase-3-scientific-inference-validation.md`.
+`docs/adr/0031-proposition-graph-scoring.md` records the narrowed proposition-pair experiment. Its
+four-probe Qwen qualification stopped on exact-span failures before full extraction or scoring;
+see `docs/reports/phase-4-proposition-pair-qualification.md`.
 
 ## Live environment observed 2026-08-27
 
@@ -210,9 +214,9 @@ at-most-once journal, and no-fusion boundary. The completed result and no-promot
   nDCG 0.699656 and recall 0.803125. Neither clears the promotion gate, so no test confirmation or
   default change occurred.
 - The pooled candidate surface averages 105.97 documents, reaches recall 0.906250, and has oracle
-  nDCG 0.907664. Ranking is therefore the dominant measured bottleneck. An evidence-grounded
-  proposition graph remains an approved later scorer direction, stored first in typed PostgreSQL
-  tables; graph retrieval and Apache AGE remain deferred.
+  nDCG 0.907664. Ranking remains the dominant measured bottleneck. Issue #9 did not earn a graph:
+  the fixed Qwen extractor failed negation and qualifier span-grounding probes before pool
+  extraction. PostgreSQL graph storage, graph retrieval, and Apache AGE remain unauthorized.
 - Fixed four-channel robust normalized mean fusion reaches validation nDCG 0.688954, MAP 0.645051,
   recall 0.806250, precision 0.092500, and MRR 0.661119. It improves equal four-channel RRF nDCG by
   0.005333 without changing recall but remains below the validation leader, so it is selectable

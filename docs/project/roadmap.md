@@ -16,7 +16,7 @@ by product value:
 2. select a retrieval-default recommendation through one frozen comparison with its previously
    inspected evidence boundary disclosed;
 3. add explicit scientific inference and stance scoring;
-4. add a proposition graph as another evidence-grounded scorer;
+4. test grounded proposition structure before earning any graph work;
 5. harden and release the CLI vertical slice;
 6. add API, MCP, and web adapters only after the common application layer is accepted.
 
@@ -51,7 +51,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Current retrieval default | DP content-max ColBERT is applied through one shared default constant after it reached validation nDCG 0.742493 and recall 0.806250 versus 0.673519 and 0.787500 for BM25 plus token windows | BM25/token-window remains the fast/no-ColBERT fallback; no retrieval retuning is planned |
 | Generation | Corrected 160-claim automatic validation retains whole-document as default; adaptive is the one canonical chunk-aware policy and the frozen human review is pending | Do not rerun or tune on SciFact validation; complete the blinded review before closing Phase 1 |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
-| Graph | Candidate/scorer provenance can accept another channel; proposition extraction and graph storage are not implemented | Graph scoring can be added without rewriting retrieval, but must be separately measured |
+| Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
 | Interfaces | CLI is active; HTTP, MCP, and web UI are inactive | New interfaces remain out of the current product proof |
 | Planning | The public repository and bounded Issues exist; no dedicated SciFact roadmap Project is required for the current CLI proof | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
@@ -87,10 +87,9 @@ candidate generators ----> deduplicated broad candidate pool
                   qualified answer + parent citations
 ```
 
-Scientific verification and proposition-graph scores will enter through complete scorer channels.
-They will see the broad deduplicated candidate pool, not only the documents surviving an earlier
-top-10 ranking. This prevents first-pass recall from acting as an unjustified gate on second-pass
-evidence.
+Any future scientific scorer must enter through a complete scorer channel over the broad candidate
+pool, not only documents surviving an earlier top-10 ranking. The Phase 4 proposition attempt did
+not qualify its extractor, so no such channel is currently authorized.
 
 LangGraph is not part of the current topology. The path is a deterministic request pipeline with
 replaceable ports, not a stateful agent workflow. Reconsider LangGraph only if the product gains a
@@ -105,7 +104,7 @@ multi-step recovery that cannot remain clear in ordinary application services.
 | 1 | Evaluate generation context | Whole-document control versus canonical adaptive chunking | Automatic decision recorded; frozen human review completed |
 | 2 | Select the retrieval default | One defensible default plus retained opt-in experiments | Validation gate passed without test-set tuning |
 | 3 | Add scientific inference scoring | Support, contradiction, and insufficiency become explicit evidence | Fixed validation comparison demonstrates useful incremental signal |
-| 4 | Add proposition-graph scoring | Candidate-scoped graph evidence becomes a provenance-bearing ranking channel | Graph scorer improves a predeclared metric or closes a characterized failure set |
+| 4 | Test grounded proposition pairs | Determine whether explicit structure merits graph work | Stopped at the frozen extraction qualification; graph work is not earned |
 | 5 | Harden and release the CLI proof | Reproducible end-to-end application release | Clean DGX run and retained acceptance report pass |
 | 6 | Add composition adapters | API, MCP, and small web UI reuse the same application services | CLI semantics remain unchanged across adapters |
 | 7 | Evaluate the template and weaker models | Separate evidence about agent-development effectiveness | Product proof is already accepted |
@@ -360,72 +359,26 @@ entailment and 0.009807 for contradiction. The channel is retained with its prov
 corpus but is not promoted into retrieval or generation. See
 `docs/reports/phase-3-scientific-inference-validation.md`.
 
-## Phase 4: add proposition-graph scoring
+## Phase 4: test grounded proposition pairs
 
-### Goal
+### Outcome (2026-09-15)
 
-Represent the scientific relations inside the broad candidate pool so ranking and context assembly
-can reason over entities, predicates, arguments, polarity, qualifiers, and evidence spans.
+Issue #9 deliberately reduced the proposed graph system to one proposition-pair experiment. It
+froze 160 claims, the 4,867 distinct documents in their Phase 3 pools, a deterministic 100-row error
+audit, five untrained pair features, strict extraction gates, and a mechanical continuation rule.
+No PostgreSQL table, graph path, service, dependency, default, or capability activation was added.
 
-### Representation
+The existing Qwen NVFP4 endpoint then ran exactly four frozen qualification probes. Positive
+relation and no-relation passed. Explicit negation and scientific qualifier failed exact source-
+span grounding, so the predeclared stop rule fired before any of the 5,027 pool sources was sent and
+before MiniLM pair scoring or audit interpretation. The graph was not earned.
 
-Persist rebuildable, typed PostgreSQL projections for:
-
-- documents and exact source spans;
-- entity mentions and canonical entity records;
-- propositions or triples;
-- subject, predicate, object, and qualified argument roles;
-- polarity, modality, population, intervention, comparator, outcome, and study-context qualifiers;
-- provenance from every node and edge back to the document and exact evidence text;
-- extractor model/revision, extraction time, and projection version.
-
-Extracted propositions are source assertions, not accepted scientific truths. Similarity, graph
-paths, and repeated assertions must never silently become epistemic status.
-
-### Construction topology
-
-1. Extract and persist propositions once as a rebuildable corpus projection.
-2. Retrieve the broad lexical/vector candidate pool for a query.
-3. Construct an induced query-time graph from every candidate in that pool, before final top-k
-   ranking.
-4. Link query entities and relations to candidate propositions while retaining ambiguous matches.
-5. Emit one or more complete graph-derived scorer channels into the existing candidate feature
-   matrix.
-6. Let the ranking policy combine or select those scores under a separately frozen rule.
-
-This design gives the graph access to candidates that could move substantially in the second pass.
-It does not restrict graph scoring to first-pass top-10 results.
-
-### First graph signals
-
-The first fixed comparison should expose interpretable, untrained features:
-
-- canonical entity overlap;
-- predicate or relation compatibility;
-- subject/object argument alignment;
-- polarity and negation agreement or conflict;
-- qualifier compatibility;
-- shortest evidence-bearing path length;
-- count of independent evidence spans without treating the count as truth.
-
-Do not begin with learned fusion weights. Preserve every raw feature and its provenance so later
-ranking policies can be evaluated without re-extracting the corpus.
-
-### Storage decision
-
-Use ordinary typed PostgreSQL tables and recursive SQL first. Apache AGE remains deferred until a
-measured query or maintenance limitation cannot be expressed acceptably in that representation.
-Graph retrieval as an independent candidate generator is also deferred; scoring the existing broad
-pool is the first hypothesis.
-
-### Exit gate
-
-- Every graph score is traceable to exact source spans and extractor provenance.
-- A fixed ablation compares the graph channel with the Phase 2 default and Phase 3 verifier.
-- Promotion requires improved predeclared ranking or stance metrics, or a material reduction in a
-  predeclared scientific-inference failure category.
-- If the graph adds no unique signal, preserve the schema and report; do not expand to AGE, graph
-  candidate generation, or learned graph ranking.
+Retain the model-neutral contracts, strict adapter, authenticated Phase 3 boundary, and bounded CLI
+workflow as a failed-but-informative experiment. Do not change the prompt, retry the probes, swap
+extractors, activate `semantic-evidence-ledger`, or build graph infrastructure under Issue #9. Any
+new extraction-method comparison requires a separately approved issue and an uninspected decision
+boundary. The product roadmap returns to completing the outstanding blinded generation review and
+then hardening the CLI vertical slice.
 
 ## Phase 5: harden and release the CLI vertical slice
 

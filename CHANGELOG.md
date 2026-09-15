@@ -6,6 +6,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added a bounded, opt-in grounded proposition-pair diagnostic without changing retrieval,
+  generation, PostgreSQL, or capability defaults. Its authenticated preflight froze 160 claims,
+  4,867 candidate documents, and a deterministic 100-row audit, but the fixed Qwen qualification
+  stopped before pool extraction when explicit-negation and scientific-qualifier outputs failed
+  exact span grounding. No pair metrics or graph work were produced or authorized.
 - Added a fixed, resumable three-strategy retrieval-default comparison over the already-inspected
   validation split. The CLI validates exact dataset digests and checks the required
   operator-attested runtime-component inventory before composition, durably retains every
