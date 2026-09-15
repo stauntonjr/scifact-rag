@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import os
 import re
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from .evaluation import ComponentRevision
+from .ports import Retriever
 from .strategies import RetrievalStrategyName
 
 _SCHEMA_VERSION = "retrieval-run-manifest/v1"
@@ -58,6 +62,263 @@ def canonical_qrels_sha256(qrels: Mapping[str, Mapping[str, int]]) -> str:
     rows.sort(key=lambda row: str(row["query_id"]))
     encoded = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RankedRetrievalHit:
+    doc_id: str
+    score: float
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.doc_id, str) or not self.doc_id.isdigit():
+            raise ValueError("ranked hit doc_id must be a numeric string")
+        if isinstance(self.score, bool) or not isinstance(self.score, (int, float)):
+            raise TypeError("ranked hit score must be numeric")
+        if not math.isfinite(float(self.score)):
+            raise ValueError("ranked hit score must be finite")
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalEvaluationResult:
+    schema_version: str
+    query_id: str
+    strategy: RetrievalStrategyName
+    cutoff: int
+    latency_ms: float
+    hits: tuple[RankedRetrievalHit, ...]
+    error_type: str | None
+    error_message: str | None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "retrieval-evaluation-result/v1":
+            raise ValueError("schema_version must be retrieval-evaluation-result/v1")
+        if not isinstance(self.query_id, str) or not self.query_id.isdigit():
+            raise ValueError("query_id must be a numeric string")
+        if not isinstance(self.strategy, RetrievalStrategyName):
+            raise TypeError("strategy must be a RetrievalStrategyName")
+        if isinstance(self.cutoff, bool) or not isinstance(self.cutoff, int) or self.cutoff < 1:
+            raise ValueError("cutoff must be a positive integer")
+        if isinstance(self.latency_ms, bool) or not isinstance(self.latency_ms, (int, float)):
+            raise TypeError("latency_ms must be numeric")
+        if not math.isfinite(float(self.latency_ms)) or self.latency_ms < 0:
+            raise ValueError("latency_ms must be finite and non-negative")
+        if not isinstance(self.hits, tuple) or any(
+            not isinstance(hit, RankedRetrievalHit) for hit in self.hits
+        ):
+            raise TypeError("hits must be a tuple of RankedRetrievalHit values")
+        if len(self.hits) > self.cutoff:
+            raise ValueError("hits must not exceed cutoff")
+        doc_ids = [hit.doc_id for hit in self.hits]
+        if len(doc_ids) != len(set(doc_ids)):
+            raise ValueError("ranked hit doc_ids must be unique")
+        if (self.error_type is None) != (self.error_message is None):
+            raise ValueError("error_type and error_message must both be set or both be null")
+        if self.error_type is not None:
+            if not self.error_type.strip() or not self.error_message or not self.error_message.strip():
+                raise ValueError("error fields must be non-empty")
+            if self.hits:
+                raise ValueError("a failed retrieval result must not contain hits")
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalEvaluationRecord:
+    run_id: str
+    result: RetrievalEvaluationResult
+    schema_version: str = "retrieval-evaluation-record/v1"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.run_id, str) or not _SAFE_NAME.fullmatch(self.run_id):
+            raise ValueError("run_id must be a safe non-empty name")
+        if not isinstance(self.result, RetrievalEvaluationResult):
+            raise TypeError("result must be a RetrievalEvaluationResult")
+        if self.schema_version != "retrieval-evaluation-record/v1":
+            raise ValueError("schema_version must be retrieval-evaluation-record/v1")
+
+    def to_json(self) -> str:
+        values = asdict(self)
+        values["result"]["strategy"] = self.result.strategy.value
+        return json.dumps(values, sort_keys=True, separators=(",", ":")) + "\n"
+
+    @classmethod
+    def from_json(cls, serialized: str) -> RetrievalEvaluationRecord:
+        try:
+            raw = json.loads(serialized)
+        except json.JSONDecodeError as exc:
+            raise ValueError("retrieval evaluation record must be valid JSON") from exc
+        if not isinstance(raw, dict) or set(raw) != {"schema_version", "run_id", "result"}:
+            raise ValueError("retrieval evaluation record fields do not match the schema")
+        raw_result = raw["result"]
+        expected_result_fields = {field.name for field in fields(RetrievalEvaluationResult)}
+        if not isinstance(raw_result, dict) or set(raw_result) != expected_result_fields:
+            raise ValueError("retrieval evaluation result fields do not match the schema")
+        raw_hits = raw_result["hits"]
+        expected_hit_fields = {field.name for field in fields(RankedRetrievalHit)}
+        if not isinstance(raw_hits, list) or any(
+            not isinstance(hit, dict) or set(hit) != expected_hit_fields for hit in raw_hits
+        ):
+            raise ValueError("ranked retrieval hit fields do not match the schema")
+        result_values = dict(raw_result)
+        result_values["strategy"] = RetrievalStrategyName(result_values["strategy"])
+        result_values["hits"] = tuple(RankedRetrievalHit(**hit) for hit in raw_hits)
+        return cls(
+            run_id=raw["run_id"],
+            result=RetrievalEvaluationResult(**result_values),
+            schema_version=raw["schema_version"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalEvaluationExecutionSummary:
+    expected_rows: int
+    preexisting_rows: int
+    written_rows: int
+    failed_rows: int
+
+
+def read_retrieval_evaluation_records(path: Path) -> tuple[RetrievalEvaluationRecord, ...]:
+    if not path.exists():
+        return ()
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if any(not line.strip() for line in lines):
+        raise ValueError("retrieval evaluation JSONL must not contain blank rows")
+    records: list[RetrievalEvaluationRecord] = []
+    for line_number, line in enumerate(lines, start=1):
+        try:
+            records.append(RetrievalEvaluationRecord.from_json(line))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"retrieval evaluation row {line_number} is invalid: {exc}"
+            ) from exc
+    return tuple(records)
+
+
+def _append_retrieval_record(path: Path, record: RetrievalEvaluationRecord) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as output:
+        output.write(record.to_json())
+        output.flush()
+        os.fsync(output.fileno())
+
+
+class RetrievalEvaluationExecutor:
+    def __init__(
+        self,
+        retrievers: Mapping[RetrievalStrategyName, Retriever],
+        *,
+        clock: Callable[[], float] = time.perf_counter,
+    ) -> None:
+        self._retrievers = dict(retrievers)
+        self._clock = clock
+
+    def run(
+        self,
+        *,
+        run_id: str,
+        queries: Mapping[str, str],
+        strategies: Sequence[RetrievalStrategyName],
+        cutoff: int,
+        output: Path,
+    ) -> RetrievalEvaluationExecutionSummary:
+        if not isinstance(run_id, str) or not _SAFE_NAME.fullmatch(run_id):
+            raise ValueError("run_id must be a safe non-empty name")
+        if not isinstance(queries, Mapping) or not queries:
+            raise ValueError("queries must be a non-empty mapping")
+        if any(
+            not isinstance(query_id, str)
+            or not query_id.isdigit()
+            or not isinstance(query, str)
+            or not query.strip()
+            for query_id, query in queries.items()
+        ):
+            raise ValueError("queries require numeric string IDs and non-empty text")
+        selected = tuple(strategies)
+        if selected != RETRIEVAL_DEFAULT_STRATEGIES:
+            raise ValueError("strategies must match the frozen retrieval-default candidates")
+        if isinstance(cutoff, bool) or cutoff != 10:
+            raise ValueError("cutoff must be 10")
+        missing_retrievers = set(selected) - self._retrievers.keys()
+        if missing_retrievers:
+            raise ValueError(f"retrievers are missing strategies: {sorted(missing_retrievers)}")
+
+        existing_records = read_retrieval_evaluation_records(output)
+        existing: dict[tuple[str, RetrievalStrategyName], RetrievalEvaluationRecord] = {}
+        for record in existing_records:
+            result = record.result
+            if record.run_id != run_id:
+                raise ValueError("existing retrieval row belongs to another run")
+            if result.query_id not in queries:
+                raise ValueError("existing retrieval row has an unknown query")
+            if result.strategy not in selected:
+                raise ValueError("existing retrieval row has an unplanned strategy")
+            if result.cutoff != cutoff:
+                raise ValueError("existing retrieval row has a mismatched cutoff")
+            key = (result.query_id, result.strategy)
+            if key in existing:
+                raise ValueError("existing retrieval rows contain a duplicate pair")
+            existing[key] = record
+
+        written = 0
+        for strategy in selected:
+            for query_id in sorted(queries, key=int):
+                if (query_id, strategy) in existing:
+                    continue
+                result = self._evaluate(
+                    query_id=query_id,
+                    query=queries[query_id],
+                    strategy=strategy,
+                    cutoff=cutoff,
+                )
+                _append_retrieval_record(output, RetrievalEvaluationRecord(run_id, result))
+                written += 1
+
+        all_records = read_retrieval_evaluation_records(output)
+        return RetrievalEvaluationExecutionSummary(
+            expected_rows=len(queries) * len(selected),
+            preexisting_rows=len(existing_records),
+            written_rows=written,
+            failed_rows=sum(record.result.error_type is not None for record in all_records),
+        )
+
+    def _evaluate(
+        self,
+        *,
+        query_id: str,
+        query: str,
+        strategy: RetrievalStrategyName,
+        cutoff: int,
+    ) -> RetrievalEvaluationResult:
+        started = self._clock()
+        retrieved = None
+        error: Exception | None = None
+        try:
+            retrieved = self._retrievers[strategy].search(query, cutoff)
+        except Exception as exc:  # noqa: BLE001 - one failure must not suppress other rows
+            error = exc
+        finally:
+            latency_ms = (self._clock() - started) * 1000.0
+        if error is not None:
+            return RetrievalEvaluationResult(
+                schema_version="retrieval-evaluation-result/v1",
+                query_id=query_id,
+                strategy=strategy,
+                cutoff=cutoff,
+                latency_ms=latency_ms,
+                hits=(),
+                error_type=type(error).__name__,
+                error_message=str(error) or type(error).__name__,
+            )
+        if not isinstance(retrieved, list):
+            raise TypeError("retriever.search must return a list of SearchHit values")
+        return RetrievalEvaluationResult(
+            schema_version="retrieval-evaluation-result/v1",
+            query_id=query_id,
+            strategy=strategy,
+            cutoff=cutoff,
+            latency_ms=latency_ms,
+            hits=tuple(RankedRetrievalHit(hit.doc_id, hit.score) for hit in retrieved),
+            error_type=None,
+            error_message=None,
+        )
 
 
 def _parse_utc_timestamp(value: object, field_name: str) -> datetime:
