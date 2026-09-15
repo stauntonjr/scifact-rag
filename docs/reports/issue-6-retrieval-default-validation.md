@@ -40,7 +40,7 @@ owner-authorized implementation task.
 | Validation qrels SHA-256 | `16ccdc8a34fccf58157aed282232feb898c272755a0ae67a74c34aca000c6cc4` |
 | Started / completed | `2026-09-15T11:13:39Z` / `2026-09-15T11:19:07Z` |
 
-The runner selected exactly the 160 qrels-backed validation query IDs from the 1,109 training query
+The runner selected exactly the 160 qrels-backed validation query IDs from the 1,109 available query
 texts; 949 non-validation texts were excluded and no selected query lacked text. The canonical dry
 run matched the pre-execution manifest byte for byte before the result file was opened. The live
 comparison was then executed once with no parameter, depth, strategy, model, or data change.
