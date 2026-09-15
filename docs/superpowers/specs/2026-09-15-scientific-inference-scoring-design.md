@@ -6,6 +6,9 @@ Governing roadmap: `docs/project/roadmap.md`, Phase 3
 
 Status: owner-approved design
 
+Revision note: the owner approved replacing the initially selected ModernBERT checkpoint after its
+pinned configuration disclosed SciFact training exposure.
+
 ## Objective
 
 Add one provenance-bearing scientific inference channel over every document in the existing broad
@@ -24,17 +27,21 @@ design commit does not authorize creating that external planning state.
 
 ## Solution assessment
 
-Adopt [`tasksource/ModernBERT-large-nli`](https://huggingface.co/tasksource/ModernBERT-large-nli)
-as the one primary pretrained inference model, subject to runtime qualification and an immutable
-model revision. It provides native entailment, contradiction, and neutral outputs, has an
-Apache-2.0 license, and exposes a larger context boundary than the 512-token DeBERTa alternative.
-The application must not train or fine-tune it on SciFact evaluation labels.
+Adopt
+[`cross-encoder/nli-deberta-v3-large`](https://huggingface.co/cross-encoder/nli-deberta-v3-large)
+at immutable revision `bab4bc7178836f731dcfd18c06ca9def0a137712` as the one primary pretrained
+inference model. Its published training sources are SNLI and MultiNLI, it provides native
+entailment, contradiction, and neutral logits, and it has an Apache-2.0 license. No identified
+training source overlaps the SciFact evaluation relations, but this remains a provenance claim
+bounded by the published model card rather than an independent training-data audit. The
+application must not train or fine-tune it on SciFact evaluation labels.
 
-Adapt the existing explicit composition root, stored DP evidence views, hosted ColBERT scorer,
-canonical evaluation artifacts, resume semantics, and raw-row-derived report pattern. Build only
-the project-specific evidence-bundle contract, structured inference port, vLLM adapter,
-coordination service, and diagnostic evaluator. Defer score fusion, calibration, graph scoring,
-hierarchical evidence selection, a second NLI checkpoint, and any model training.
+Adapt the existing explicit composition root, stored 126-token MiniLM DP evidence views, hosted
+ColBERT scorer, canonical evaluation artifacts, resume semantics, and raw-row-derived report
+pattern. Build only the project-specific evidence-bundle contract, structured inference port,
+dedicated Transformers HTTP adapter and Compose service, coordination service, and diagnostic
+evaluator. Defer score fusion, calibration, graph scoring, hierarchical evidence selection, a
+second NLI checkpoint, and any model training.
 
 The declared controls are:
 
@@ -60,19 +67,32 @@ No inactive capability is reimplemented under a new name.
 
 ## Considered approaches
 
-### ModernBERT three-way inference over a bounded evidence bundle — selected
+### DeBERTa-v3-large three-way inference over a bounded evidence bundle — selected
 
-Rank the stored large-context DP chunks with the existing ColBERT service, admit complete chunks
-under the NLI tokenizer budget, restore them to source order, and run one document-level
-premise/hypothesis classification. This preserves cross-sentence context, scales beyond short
-abstracts, and yields the three signals required by the roadmap.
+Rank the stored 126-token raw DP chunks with the existing ColBERT service, admit complete chunks
+under the exact 512-token NLI pair budget, restore them to source order, and run one document-level
+premise/hypothesis classification. The selector can choose different bounded evidence from an
+arbitrarily long parent document, so document scalability comes from evidence selection rather
+than a single long model input. This preserves cross-sentence context without adding another DP
+optimizer and yields the three signals required by the roadmap.
 
-### DeBERTa-v3-large three-way inference — rejected for the first slice
+### ModernBERT three-way inference — rejected
 
-`cross-encoder/nli-deberta-v3-large` is a strong established sentence-pair control, but its
-512-token input boundary is poorly matched to the project's explicit long-document direction. A
-second hosted model would add cost without answering the first question: whether a structured
-inference feature contributes unique signal at all.
+The pinned `tasksource/ModernBERT-large-nli` configuration lists `scifact_entailment` among its
+training tasks. The frozen 160-claim validation partition is derived from SciFact training data,
+so this checkpoint cannot support a clean model-quality comparison on that boundary.
+
+`dleemiller/ModernCE-large-nli` is not a clean substitute: its model card says it initializes from
+the same tasksource checkpoint and freezes most inherited layers. Its later SNLI and MultiNLI
+fine-tuning does not remove the upstream SciFact exposure.
+
+### A vLLM-hosted DeBERTa classifier — rejected unless qualified separately
+
+The pinned NVIDIA vLLM runtime does not explicitly list DeBERTa among its supported model
+architectures. Automatic conversion is not sufficient evidence that the trained sequence-
+classification head and label order are preserved. The first implementation therefore uses a
+small dedicated Transformers service. A later migration to vLLM requires output parity against
+the pinned Transformers reference on the fixed qualification probes.
 
 ### Scientific-domain NLI training or checkpoint selection — deferred
 
@@ -90,7 +110,7 @@ broad deduplicated candidate pool
           |
           +--> existing retrieval and reranking features
           |
-          +--> stored large-context DP chunks
+          +--> stored 126-token raw DP chunks
                        |
                        v
               ColBERT chunk ordering
@@ -99,7 +119,7 @@ broad deduplicated candidate pool
           token-budgeted evidence assembler
                        |
                        v
-          ModernBERT three-way NLI service
+          DeBERTa three-way NLI service
                        |
                        v
       structured inference result plus provenance
@@ -121,7 +141,7 @@ explicit failure record. The inference stage must not see only the current top 1
 ### Evidence bundle assembler
 
 The assembler is a deterministic, model-tokenizer-aware application component. It accepts the raw
-claim, one candidate document, the document's stored `coref-nominal-dp-colbert` chunks, their
+claim, one candidate document, the document's stored `coref-nominal-dp-minilm` chunks, their
 ColBERT scores, and a token budget. It returns an immutable evidence bundle or a typed assembly
 failure.
 
@@ -130,14 +150,17 @@ failure.
 The model-neutral port accepts premise/hypothesis pairs and returns exactly three finite logits
 with an explicit canonical label mapping. It does not return an unlabeled positional vector.
 
-### vLLM scientific inference adapter
+### Transformers scientific inference adapter
 
-The adapter calls the DGX-hosted classification endpoint, validates its response, and maps the
-checkpoint's labels to `entailment`, `contradiction`, and `neutral`. It performs exactly one HTTP
-request for each attempt identifier. A timeout or transport failure becomes an explicit failure
-record; the adapter has no hidden request retry loop. vLLM's classification interface is
-documented at <https://docs.vllm.ai/en/v0.21.0/models/pooling_models/classify/>; compatibility is a
-runtime hypothesis until qualified in the project's pinned NVIDIA container.
+The adapter calls the DGX-hosted project-owned classification endpoint, validates its response,
+and maps the checkpoint's labels to `entailment`, `contradiction`, and `neutral`. It performs
+exactly one HTTP request for each attempt identifier. A timeout or transport failure becomes an
+explicit failure record; the adapter has no hidden request retry loop. The service must echo the
+attempt identifier and immutable model revision with three labeled raw logits. Echoing an attempt
+identifier is response correlation, not server-side idempotency.
+
+The internal endpoint is a model-serving boundary, not a user-facing SciFact application API, so
+it does not activate the inactive `http-api-interface` capability.
 
 ### Scientific inference scorer
 
@@ -153,20 +176,20 @@ only from those records, and creates the diagnostic leaderboard entry and retain
 
 For each claim and candidate document:
 
-1. Load every stored `coref-nominal-dp-colbert` chunk for that document.
+1. Load every stored `coref-nominal-dp-minilm` chunk for that document.
 2. Reject missing, duplicate-ordinal, foreign-document, or wrong-representation chunks.
 3. Score every chunk against the unmodified claim with the existing ColBERT service.
 4. Order chunks by descending finite ColBERT score, breaking ties by ascending chunk ordinal.
 5. Start the premise with the document title exactly once as contextual metadata.
 6. Iterate chunks in relevance order. Tentatively add each complete chunk, restore all admitted
    chunks to ordinal source order, add boundary markers for omitted ordinal ranges, serialize the
-   title and chunks, and measure the complete premise/hypothesis pair with the exact ModernBERT
+   title and chunks, and measure the complete premise/hypothesis pair with the exact DeBERTa
    tokenizer. Admit the chunk only when the serialized pair stays within the model limit. If a
    chunk does not fit, record `token_budget` and continue to later chunks that may fit.
 7. Submit the completed bundle as the premise and the raw claim as the hypothesis.
 
-The model limit is 2,048 tokens unless runtime qualification of the immutable checkpoint proves a
-different limit, in which case configuration and documentation must be reconciled before a run.
+The model limit is 512 tokens unless runtime qualification of the immutable checkpoint proves a
+smaller limit, in which case configuration and documentation must be reconciled before a run.
 Special tokens, title, separators, gap markers, and claim all count. No chunk is silently
 truncated. If the title and claim do not fit, or no complete evidence chunk can be admitted, the
 candidate receives an explicit assembly failure rather than an inference score.
@@ -267,17 +290,20 @@ The report is regenerated atomically from the journal. There is no cross-run inf
 cache in this first implementation.
 
 The run manifest records repository commit, validation input digest, candidate-pool strategy and
-depth, DP representation, ColBERT model/tokenizer revisions, ModernBERT model/tokenizer revisions,
-container identity, endpoint, context limit, request-attempt policy fixed at one, start and
-completion timestamps, host, raw result path, and evidence class. Dry-run validation performs no
-database or model calls.
+depth, DP representation, ColBERT model/tokenizer revisions, DeBERTa model/tokenizer revisions,
+Transformers version, container identity, endpoint, context limit, request-attempt policy fixed at
+one, start and completion timestamps, host, raw result path, and evidence class. Dry-run validation
+performs no database or model calls.
 
 ## Runtime topology and qualification
 
-ModernBERT runs as a separate explicit Docker Compose service using the project's pinned NVIDIA
-vLLM image. The application receives its endpoint through configuration. It must not start, stop,
-or reconfigure other DGX model services implicitly; the operator may free RAM before starting the
-new service.
+DeBERTa runs as a separate explicit Docker Compose service using a digest-pinned GPU-capable
+PyTorch container, pinned Transformers dependencies, and the immutable checkpoint revision. The
+service tokenizes each premise as text and each claim as its paired hypothesis, rejects over-limit
+requests rather than truncating them, and returns the checkpoint's raw sequence-classification
+logits through a narrow project-owned HTTP contract. The application receives its endpoint through
+configuration. It must not start, stop, or reconfigure other DGX model services implicitly; the
+operator may free RAM before starting the new service.
 
 Before model-quality evaluation, a runtime qualification must verify:
 
@@ -368,15 +394,15 @@ suite:
   candidates;
 - canonical raw-record append, validation, resume, and report derivation;
 - stance metrics, label-prior control, coverage partitions, and failed-row accounting;
-- dry-run isolation from PostgreSQL, ColBERT, and ModernBERT.
+- dry-run isolation from PostgreSQL, ColBERT, and DeBERTa.
 
 Regular CI uses unit and contract tests with fake inference and token-budget implementations. It
-does not require a GPU or download ModernBERT. DGX qualification is a separate integration gate.
+does not require a GPU or download DeBERTa. DGX qualification is a separate integration gate.
 
 The rollout sequence is:
 
 1. pass regular CI and repository smoke checks;
-2. qualify the live ModernBERT service and label mapping;
+2. qualify the live DeBERTa service and label mapping;
 3. run a small fixed operational smoke sample to expose serving and serialization failures only;
 4. run the frozen 160-claim validation evaluation once;
 5. retain the manifest, raw candidate rows, derived report, categorized failure artifact, exact
