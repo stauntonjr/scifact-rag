@@ -6,6 +6,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Completed the corrected automatic 160-claim generation-context comparison with 480/480 retained
+  rows, zero execution failures, 480 parseable verdicts, and exact response reuse for 249 duplicate
+  prompts. Whole-document scores 0.8125 stance accuracy versus 0.8250 for the identical DP/adaptive
+  policy, but they tie on long cases, DP does not lower median input, and it loses some gold
+  evidence. Whole-document remains default; the frozen 42-response human worksheet is pending.
 - Froze a 24-claim, length- and stance-stratified human groundedness review before the repaired
   validation outputs are generated. The blinded rubric separates grounding, material
   overstatement, and six scientific-context omission types from automatic stance and citation

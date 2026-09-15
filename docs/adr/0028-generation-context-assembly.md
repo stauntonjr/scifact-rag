@@ -1,6 +1,6 @@
 # ADR-0028: Document-aware generation context assembly
 
-- Status: accepted implementation; generation effectiveness not evaluated
+- Status: accepted; whole-document default retained after deterministic validation
 - Date: 2026-08-29
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: local generation-context decision; no GitHub Issue exists
@@ -96,6 +96,17 @@ and that unseeded temperature-0.1 sampling confounds their answer differences. D
 median input tokens overall or on the long/retrieved subset and omitted some gold evidence. The
 whole-document compatibility default is therefore retained. This is not a completed downstream
 quality comparison: deterministic stance output and the fixed human review are still missing.
+
+## 2026-09-14 corrected validation
+
+The repaired execution in `docs/reports/issue-5-generation-context-validation.md` completed 480/480
+rows with a strict parseable verdict and exact-prompt response reuse. Whole-document and DP stance
+accuracy were 0.8125 and 0.8250 overall and tied at 0.8387 on the 31 long/retrieved claims. DP did
+not reduce median input tokens, increased the long-subset median, and reduced conditional gold
+evidence recall. Whole-document is retained as the default. The two chunk strategy names produced
+identical contexts and outcomes for all 160 claims, so their duplication is a simplification
+follow-up rather than evidence for either label. The blinded human review remains pending and no
+prospective non-inferiority margin exists; no promotion claim is made.
 
 ## Verification and revisit trigger
 
