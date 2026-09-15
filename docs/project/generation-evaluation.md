@@ -4,6 +4,52 @@ The generation comparison uses a versioned `generation-run-manifest/v1` JSON doc
 manifest must accompany dry runs, live per-query results, and aggregate reports so a result cannot
 lose its data, model, strategy, or runtime boundary.
 
+## Build the fixed input manifest
+
+Generation evaluation needs the official SciFact sentence arrays in addition to the flattened BEIR
+corpus. Download the official public release from:
+
+```text
+https://scifact.s3-us-west-2.amazonaws.com/release/latest/data.tar.gz
+```
+
+The release observed and validated on 2026-09-14 has these SHA-256 digests:
+
+| Artifact | SHA-256 |
+|---|---|
+| `data.tar.gz` | `11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be` |
+| `data/corpus.jsonl` | `b8d6c89624cb2ed74dee8938effc4f5d8bd2086887880af8110d64be4ceade62` |
+| `data/claims_train.jsonl` | `f4c8fa82d8bd0653a9cc8d61a6ea48c25eacea64e90af5dbf390ebb1b74372f0` |
+
+The official URL contains `latest`, so a checksum change is a new data decision. Do not silently
+accept a different archive.
+
+After verifying and extracting it, build the deterministic validation input:
+
+```bash
+docker compose run --rm app build-generation-eval-manifest \
+  --data-dir data \
+  --official-data-dir data/scifact-original \
+  --split train-validation \
+  --output data/evaluation/scifact-generation-context/validation-input.jsonl
+```
+
+The builder cross-checks official claim text and evidence annotations against BEIR query metadata,
+cross-checks official cited documents against BEIR qrels, verifies every cited document exists in
+both corpora, and resolves each evidence index through the official sentence array. Missing,
+conflicting, duplicate, or out-of-range records fail rather than being approximated.
+
+The fixed outputs reproduced from the pinned source are:
+
+| Split | Cases | Support | Contradict | No evidence | Rationale sets | Evidence sentences | Manifest SHA-256 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `train-development` | 649 | 266 | 138 | 245 | 755 | 816 | `8ce286269e71115372160f45ba6c3c079d255efdd977b0d4417cd1a26845d90b` |
+| `train-validation` | 160 | 66 | 35 | 59 | 202 | 209 | `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105` |
+
+No-evidence cases are claims whose official `evidence` object is empty. Their qrels still identify
+the source-cited documents, so they are declared `NOT_ENOUGH_INFO` controls rather than generic
+unrelated-text negatives.
+
 ## Dry run
 
 Validate and canonicalize a complete manifest without constructing the application, opening

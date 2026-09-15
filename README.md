@@ -88,6 +88,9 @@ docker compose run --rm app generation-eval-dry-run \
 The field contract and the prohibition on default selection from the already-inspected test qrels
 are documented in
 [`docs/project/generation-evaluation.md`](docs/project/generation-evaluation.md).
+That document also records the pinned official SciFact sentence-level source and the
+`build-generation-eval-manifest` command. The deterministic validation input contains 160 cases and
+has SHA-256 `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105`.
 
 ## Run with Docker Compose
 

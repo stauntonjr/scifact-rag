@@ -137,6 +137,10 @@ context selection, adaptive exact-view policy, and parent-document citation boun
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or
   Qwen. Default-selection manifests cannot name the already-inspected test split.
+- Phase 1 Issue #4 adds the fixed input builder. It joins all 809 BEIR training claims and qrels to
+  the official SciFact sentence arrays, preserves exact SUPPORT/CONTRADICT rationales, and declares
+  empty official evidence as NOT_ENOUGH_INFO. The reproduced validation input contains 160 cases
+  and has SHA-256 `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105`.
 - Local scaffold baseline: `703c8e5`.
 - Dataclass domain/ports, application services, SciFact/MiniLM/Postgres/generator adapters, Typer
   CLI, Docker Compose, dependency contract, ADR, research note, and focused tests are authored.
