@@ -1,0 +1,10 @@
+FROM nvcr.io/nvidia/vllm:26.06-py3@sha256:bebcf9576b1720214319ee5c7ee4f7661954cbbf59ed3fcd188cd79a67f1967e
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY src/ src/
+
+RUN python3 -m pip install --no-deps .
+
+ENTRYPOINT ["python3", "-m", "scifact_rag.scientific_inference_service"]

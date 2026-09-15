@@ -136,6 +136,28 @@ services:
     volumes:
       - huggingface-cache:/data
 
+  scientific-inference:
+    profiles: ["scientific-inference"]
+    build:
+      context: .
+      dockerfile: Dockerfile.scientific-inference
+    image: scifact-rag-scientific-inference:deberta-v3-large
+    environment:
+      SCIENTIFIC_INFERENCE_MODEL: cross-encoder/nli-deberta-v3-large
+      SCIENTIFIC_INFERENCE_REVISION: bab4bc7178836f731dcfd18c06ca9def0a137712
+      SCIENTIFIC_INFERENCE_MAX_TOKENS: "512"
+      HF_HOME: /data
+    gpus: all
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:80/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 300
+    ports:
+      - "127.0.0.1:8085:80"
+    volumes:
+      - huggingface-cache:/data
+
   app:
     build: .
     depends_on:
@@ -150,6 +172,7 @@ services:
       LATE_INTERACTION_BASE_URL: http://late-interaction:80
       LATE_INTERACTION_MODEL: answerdotai/answerai-colbert-small-v1
       RANK_LLM_BASE_URL: http://rankllm:80
+      SCIENTIFIC_INFERENCE_BASE_URL: http://scientific-inference:80
       HF_HOME: /models/huggingface
     extra_hosts:
       - "host.docker.internal:host-gateway"
