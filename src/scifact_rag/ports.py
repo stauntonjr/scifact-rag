@@ -17,7 +17,11 @@ from .domain import (
 )
 
 if TYPE_CHECKING:
-    from .scientific_inference import InferenceRequest, InferenceResponse
+    from .scientific_inference import (
+        EvidenceBundle,
+        InferenceRequest,
+        InferenceResponse,
+    )
 
 
 class CorpusSource(Protocol):
@@ -110,6 +114,15 @@ class CandidateDiagnosticRetriever(Protocol):
     ) -> tuple[list[SearchHit], list[RetrievalCandidate]]: ...
 
 
+class CandidatePoolSource(Protocol):
+    def retrieve_pool(
+        self,
+        query: str,
+        *,
+        limit: int,
+    ) -> tuple[list[SearchHit], list[RetrievalCandidate]]: ...
+
+
 class Reranker(Protocol):
     def score(self, query: str, documents: Sequence[SearchHit]) -> list[float]: ...
 
@@ -198,3 +211,7 @@ class PairTokenBudget(Protocol):
 
 class ScientificInferenceClient(Protocol):
     def classify(self, request: InferenceRequest) -> InferenceResponse: ...
+
+
+class EvidenceBundleAssembler(Protocol):
+    def assemble(self, claim: str, document: EvidenceDocument) -> EvidenceBundle: ...

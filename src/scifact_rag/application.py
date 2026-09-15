@@ -9,6 +9,7 @@ from .domain import (
     ChannelCandidateMetrics,
     EvidenceDocument,
     IngestResult,
+    RetrievalCandidate,
     RetrievalMetrics,
     SearchHit,
 )
@@ -105,6 +106,20 @@ class RagApplication:
         if limit < 1:
             raise ValueError("limit must be positive")
         return self._retriever.search(query, limit)
+
+    def retrieve_pool(
+        self,
+        query: str,
+        *,
+        limit: int,
+    ) -> tuple[list[SearchHit], list[RetrievalCandidate]]:
+        if not query.strip():
+            raise ValueError("query must not be empty")
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        if not isinstance(self._retriever, CandidateDiagnosticRetriever):
+            raise TypeError("candidate-pool retrieval requires a pooled ranking strategy")
+        return self._retriever.search_with_candidates(query, limit)
 
     def ask(self, query: str, *, limit: int = 5) -> Answer:
         retrieved = tuple(self.search(query, limit=limit))

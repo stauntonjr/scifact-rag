@@ -4,9 +4,13 @@ from collections.abc import Mapping
 
 import httpx
 
-from ..scientific_inference import InferenceLogits, InferenceRequest, InferenceResponse
+from ..scientific_inference import (
+    InferenceLogits,
+    InferenceRequest,
+    InferenceResponse,
+    inference_request_payload,
+)
 
-_REQUEST_SCHEMA = "scientific-inference-request/v1"
 _RESPONSE_SCHEMA = "scientific-inference-response/v1"
 _RESPONSE_KEYS = {
     "schema_version",
@@ -39,13 +43,7 @@ class TransformersScientificInferenceClient:
         self._timeout_seconds = timeout_seconds
 
     def classify(self, request: InferenceRequest) -> InferenceResponse:
-        payload: dict[str, object] = {
-            "schema_version": _REQUEST_SCHEMA,
-            "attempt_id": request.attempt_id,
-            "premise": request.premise,
-            "hypothesis": request.hypothesis,
-            "expected_pair_tokens": request.expected_pair_tokens,
-        }
+        payload = inference_request_payload(request)
         response = httpx.post(
             self._endpoint,
             json=payload,
@@ -80,7 +78,9 @@ class TransformersScientificInferenceClient:
                 neutral=_numeric_logit(logits_body["neutral"]),
             )
         except (TypeError, ValueError) as error:
-            raise ScientificInferenceProtocolError("response logits must be finite numbers") from error
+            raise ScientificInferenceProtocolError(
+                "response logits must be finite numbers"
+            ) from error
         return InferenceResponse(
             attempt_id=request.attempt_id,
             model_revision=self._model_revision,

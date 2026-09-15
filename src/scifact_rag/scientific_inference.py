@@ -35,8 +35,7 @@ class InferenceLogits:
 
     def __post_init__(self) -> None:
         if not all(
-            math.isfinite(value)
-            for value in (self.entailment, self.contradiction, self.neutral)
+            math.isfinite(value) for value in (self.entailment, self.contradiction, self.neutral)
         ):
             raise ValueError("inference logits must be finite")
 
@@ -210,9 +209,7 @@ class ScientificEvidenceAssembler:
     @staticmethod
     def _validate_chunks(document_id: str, chunks: Sequence[EvidenceChunk]) -> None:
         if not chunks:
-            raise EvidenceAssemblyError(
-                "invalid_stored_evidence", "stored evidence is missing"
-            )
+            raise EvidenceAssemblyError("invalid_stored_evidence", "stored evidence is missing")
         ordinals: set[int] = set()
         for chunk in chunks:
             if (
@@ -288,6 +285,20 @@ def request_identity(
     )
 
 
+def inference_request_payload(request: InferenceRequest) -> dict[str, object]:
+    return {
+        "schema_version": "scientific-inference-request/v1",
+        "attempt_id": request.attempt_id,
+        "premise": request.premise,
+        "hypothesis": request.hypothesis,
+        "expected_pair_tokens": request.expected_pair_tokens,
+    }
+
+
+def canonical_payload_digest(value: object) -> str:
+    return _sha256_json(value)
+
+
 def _serialize_premise(
     title: str,
     admitted: Sequence[EvidenceChunkSelection],
@@ -326,7 +337,9 @@ def _sha256_json(value: object) -> str:
 
 
 def _canonical_json(value: object) -> str:
-    serializable: Any = asdict(value) if is_dataclass(value) and not isinstance(value, type) else value
+    serializable: Any = (
+        asdict(value) if is_dataclass(value) and not isinstance(value, type) else value
+    )
     return json.dumps(
         serializable,
         ensure_ascii=False,

@@ -32,9 +32,7 @@ class ClassificationBackend(Protocol):
     @property
     def id2label(self) -> Mapping[int, str]: ...
 
-    def classify_pair(
-        self, premise: str, hypothesis: str
-    ) -> tuple[Sequence[float], int]: ...
+    def classify_pair(self, premise: str, hypothesis: str) -> tuple[Sequence[float], int]: ...
 
 
 def classify_payload(
@@ -138,8 +136,10 @@ def _parse_request(payload: object) -> InferenceRequest:
     premise = payload["premise"]
     hypothesis = payload["hypothesis"]
     pair_tokens = payload["expected_pair_tokens"]
-    if not isinstance(attempt_id, str) or not isinstance(premise, str) or not isinstance(
-        hypothesis, str
+    if (
+        not isinstance(attempt_id, str)
+        or not isinstance(premise, str)
+        or not isinstance(hypothesis, str)
     ):
         raise TypeError("request identifiers and text fields must be strings")
     if isinstance(pair_tokens, bool) or not isinstance(pair_tokens, int):

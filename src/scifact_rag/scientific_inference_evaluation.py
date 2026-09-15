@@ -1,23 +1,40 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
 import re
+import time
+import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, fields
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .evaluation import ComponentRevision
+from .domain import RetrievalCandidate
+from .evaluation import (
+    ComponentRevision,
+    GenerationEvaluationCase,
+    GenerationEvaluationSet,
+    ScientificStance,
+)
+from .ports import CandidatePoolSource, EvidenceBundleAssembler, ScientificInferenceClient
 from .scientific_inference import (
     DEBERTA_MODEL,
     DEBERTA_REVISION,
+    EvidenceAssemblyError,
     EvidenceChunkRejection,
     EvidenceChunkSelection,
     InferenceLogits,
+    InferenceRequest,
     ScientificInferenceLabel,
+    bundle_identity,
+    candidate_identity,
+    canonical_payload_digest,
+    inference_request_payload,
+    request_identity,
 )
 from .strategies import COREF_NOMINAL_DP_MINILM, DEFAULT_RETRIEVAL_STRATEGY
 
@@ -381,6 +398,345 @@ class ScientificInferenceJournal:
             self.state.starts[event.candidate_id] = event
         else:
             self.state.results[event.candidate_id] = event
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificInferenceExecutionSummary:
+    expected_candidates: int
+    preexisting_terminal: int
+    scored_candidates: int
+    failed_candidates: int
+    outcome_unknown: int
+    complete: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _PlannedCandidate:
+    case: GenerationEvaluationCase
+    candidate: RetrievalCandidate
+    candidate_id: str
+    baseline_rank: int | None
+
+
+class ScientificInferenceEvaluator:
+    def __init__(
+        self,
+        assembler: EvidenceBundleAssembler,
+        client: ScientificInferenceClient,
+        *,
+        now: Callable[[], str] | None = None,
+        timer: Callable[[], float] = time.perf_counter,
+    ) -> None:
+        self._assembler = assembler
+        self._client = client
+        self._now = now or _utc_now
+        self._timer = timer
+
+    def evaluate_candidate(
+        self,
+        plan: _PlannedCandidate,
+        journal: ScientificInferenceJournal,
+    ) -> None:
+        case = plan.case
+        document = plan.candidate.document
+        common = self._common_result_values(plan, journal.run_id)
+        colbert_score: float | None = None
+        try:
+            colbert_score = _colbert_content_score(plan.candidate)
+            bundle = self._assembler.assemble(case.claim, document)
+        except Exception as error:  # noqa: BLE001 - each pool candidate needs a terminal row
+            journal.append(
+                ScientificInferenceResult(
+                    **common,
+                    bundle_digest=None,
+                    attempt_id=None,
+                    request_digest=None,
+                    premise_sha256=None,
+                    colbert_score=colbert_score,
+                    admitted=(),
+                    rejected=(),
+                    pair_token_count=None,
+                    model_revision=None,
+                    logits=None,
+                    predicted_label=None,
+                    evidence_margin=None,
+                    polarity_margin=None,
+                    evidence_coverage=_evidence_coverage(case, document.doc_id, ()),
+                    latency_ms=None,
+                    attempt_count=0,
+                    error_stage=(
+                        "assembly" if isinstance(error, EvidenceAssemblyError) else "candidate"
+                    ),
+                    error_code=(
+                        error.code
+                        if isinstance(error, EvidenceAssemblyError)
+                        else type(error).__name__
+                    ),
+                    error_message=_sanitized_error(error),
+                    completed_at=self._now(),
+                )
+            )
+            return
+
+        digest = bundle_identity(bundle)
+        request_intent = {
+            "schema_version": "scientific-inference-request/v1",
+            "premise": bundle.premise,
+            "hypothesis": case.claim,
+            "expected_pair_tokens": bundle.pair_token_count,
+        }
+        attempt_id = request_identity(plan.candidate_id, digest, request_intent)
+        request = InferenceRequest(
+            attempt_id,
+            bundle.premise,
+            case.claim,
+            bundle.pair_token_count,
+        )
+        request_digest = canonical_payload_digest(inference_request_payload(request))
+        started = ScientificInferenceAttemptStarted(
+            schema_version=_STARTED_SCHEMA,
+            run_id=journal.run_id,
+            candidate_id=plan.candidate_id,
+            bundle_digest=digest,
+            attempt_id=attempt_id,
+            request_digest=request_digest,
+            started_at=self._now(),
+        )
+        journal.append(started)
+        started_timer = self._timer()
+        try:
+            response = self._client.classify(request)
+            latency_ms = max(0.0, (self._timer() - started_timer) * 1000.0)
+            if (
+                response.attempt_id != attempt_id
+                or response.model_revision != DEBERTA_REVISION
+                or response.pair_token_count != bundle.pair_token_count
+            ):
+                raise ValueError("inference response provenance does not match the request")
+        except Exception as error:  # noqa: BLE001 - request failures are terminal evidence
+            latency_ms = max(0.0, (self._timer() - started_timer) * 1000.0)
+            journal.append(
+                ScientificInferenceResult(
+                    **common,
+                    bundle_digest=digest,
+                    attempt_id=attempt_id,
+                    request_digest=request_digest,
+                    premise_sha256=_text_digest(bundle.premise),
+                    colbert_score=colbert_score,
+                    admitted=bundle.admitted,
+                    rejected=bundle.rejected,
+                    pair_token_count=bundle.pair_token_count,
+                    model_revision=None,
+                    logits=None,
+                    predicted_label=None,
+                    evidence_margin=None,
+                    polarity_margin=None,
+                    evidence_coverage=_evidence_coverage(case, document.doc_id, bundle.admitted),
+                    latency_ms=latency_ms,
+                    attempt_count=1,
+                    error_stage="request",
+                    error_code=type(error).__name__,
+                    error_message=_sanitized_error(error, include_message=False),
+                    completed_at=self._now(),
+                )
+            )
+            return
+        journal.append(
+            ScientificInferenceResult(
+                **common,
+                bundle_digest=digest,
+                attempt_id=attempt_id,
+                request_digest=request_digest,
+                premise_sha256=_text_digest(bundle.premise),
+                colbert_score=colbert_score,
+                admitted=bundle.admitted,
+                rejected=bundle.rejected,
+                pair_token_count=bundle.pair_token_count,
+                model_revision=response.model_revision,
+                logits=response.logits,
+                predicted_label=response.logits.predicted_label,
+                evidence_margin=response.logits.evidence_margin,
+                polarity_margin=response.logits.polarity_margin,
+                evidence_coverage=_evidence_coverage(case, document.doc_id, bundle.admitted),
+                latency_ms=latency_ms,
+                attempt_count=1,
+                error_stage=None,
+                error_code=None,
+                error_message=None,
+                completed_at=self._now(),
+            )
+        )
+
+    def _common_result_values(self, plan: _PlannedCandidate, run_id: str) -> dict[str, Any]:
+        case = plan.case
+        document = plan.candidate.document
+        return {
+            "schema_version": _RESULT_SCHEMA,
+            "run_id": run_id,
+            "candidate_id": plan.candidate_id,
+            "query_id": case.query_id,
+            "document_id": document.doc_id,
+            "claim": case.claim,
+            "claim_sha256": _text_digest(case.claim),
+            "document_title": document.title,
+            "document_sha256": canonical_payload_digest(
+                {"text": document.text, "title": document.title}
+            ),
+            "baseline_rank": plan.baseline_rank,
+            "gold_label": _gold_label(case, document.doc_id),
+        }
+
+
+class ScientificInferenceEvaluationExecutor:
+    def __init__(
+        self,
+        pool_source: CandidatePoolSource,
+        evaluator: ScientificInferenceEvaluator,
+        *,
+        event_observer: Callable[[ScientificInferenceEvent], None] | None = None,
+    ) -> None:
+        self._pool_source = pool_source
+        self._evaluator = evaluator
+        self._event_observer = event_observer
+
+    def run(
+        self,
+        *,
+        run_id: str,
+        evaluation_set: GenerationEvaluationSet,
+        retrieval_limit: int,
+        output: Path,
+    ) -> ScientificInferenceExecutionSummary:
+        if retrieval_limit != 10:
+            raise ValueError("scientific inference retrieval_limit must be 10")
+        if any(case.source_split != "train-validation" for case in evaluation_set.cases):
+            raise ValueError("scientific inference requires the train-validation split")
+        journal = ScientificInferenceJournal.open(
+            output,
+            run_id,
+            event_observer=self._event_observer,
+        )
+        preexisting_terminal = len(journal.state.results)
+        planned = self._planned_candidates(run_id, evaluation_set, retrieval_limit)
+        planned_ids = {item.candidate_id for item in planned}
+        journal_ids = set(journal.state.starts).union(journal.state.results)
+        foreign = journal_ids.difference(planned_ids)
+        if foreign:
+            raise ValueError("journal contains candidates outside the regenerated pool")
+        for plan in planned:
+            if plan.candidate_id in journal.state.completed:
+                continue
+            if plan.candidate_id in journal.state.outcome_unknown:
+                continue
+            self._evaluator.evaluate_candidate(plan, journal)
+        results = [
+            result
+            for candidate_id, result in journal.state.results.items()
+            if candidate_id in planned_ids
+        ]
+        outcome_unknown = len(journal.state.outcome_unknown.intersection(planned_ids))
+        failed = sum(result.error_stage is not None for result in results)
+        scored = len(results) - failed
+        return ScientificInferenceExecutionSummary(
+            expected_candidates=len(planned),
+            preexisting_terminal=preexisting_terminal,
+            scored_candidates=scored,
+            failed_candidates=failed,
+            outcome_unknown=outcome_unknown,
+            complete=len(results) == len(planned) and failed == 0 and outcome_unknown == 0,
+        )
+
+    def _planned_candidates(
+        self,
+        run_id: str,
+        evaluation_set: GenerationEvaluationSet,
+        retrieval_limit: int,
+    ) -> list[_PlannedCandidate]:
+        planned: list[_PlannedCandidate] = []
+        for case in evaluation_set.cases:
+            ranked, candidates = self._pool_source.retrieve_pool(
+                case.claim,
+                limit=retrieval_limit,
+            )
+            baseline_ranks = {hit.doc_id: rank for rank, hit in enumerate(ranked, start=1)}
+            document_ids = [candidate.document.doc_id for candidate in candidates]
+            if len(document_ids) != len(set(document_ids)):
+                raise ValueError("candidate pool contains duplicate documents")
+            for candidate in sorted(candidates, key=lambda item: int(item.document.doc_id)):
+                planned.append(
+                    _PlannedCandidate(
+                        case=case,
+                        candidate=candidate,
+                        candidate_id=candidate_identity(
+                            run_id,
+                            case.query_id,
+                            case.claim,
+                            candidate.document,
+                        ),
+                        baseline_rank=baseline_ranks.get(candidate.document.doc_id),
+                    )
+                )
+        return planned
+
+
+def _colbert_content_score(candidate: RetrievalCandidate) -> float:
+    scores = [signal.score for signal in candidate.signals if signal.channel == "colbert-content"]
+    if len(scores) != 1 or not math.isfinite(scores[0]):
+        raise ValueError("candidate must contain exactly one finite colbert-content score")
+    return scores[0]
+
+
+def _gold_label(
+    case: GenerationEvaluationCase,
+    document_id: str,
+) -> ScientificInferenceLabel:
+    if document_id not in case.cited_document_ids:
+        return ScientificInferenceLabel.NEUTRAL
+    if case.expected_stance is ScientificStance.SUPPORT:
+        return ScientificInferenceLabel.ENTAILMENT
+    if case.expected_stance is ScientificStance.CONTRADICT:
+        return ScientificInferenceLabel.CONTRADICTION
+    return ScientificInferenceLabel.NEUTRAL
+
+
+def _evidence_coverage(
+    case: GenerationEvaluationCase,
+    document_id: str,
+    admitted: tuple[EvidenceChunkSelection, ...],
+) -> str:
+    rationales = [rationale for rationale in case.rationales if rationale.doc_id == document_id]
+    if not rationales:
+        return "not-annotated"
+    evidence = [_normalize_text(chunk.text) for chunk in admitted]
+    if any(
+        _normalize_text(sentence) in chunk
+        for rationale in rationales
+        for sentence in rationale.sentences
+        for chunk in evidence
+    ):
+        return "annotated-evidence-present"
+    return "annotated-evidence-absent"
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(unicodedata.normalize("NFKC", value).split()).casefold()
+
+
+def _text_digest(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _sanitized_error(error: Exception, *, include_message: bool = True) -> str:
+    name = type(error).__name__
+    if not include_message:
+        return f"{name}: request failed"
+    message = " ".join(str(error).split())
+    message = re.sub(r"https?://\S+", "<redacted-url>", message)
+    return f"{name}: {message[:240]}"
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _parse_event(serialized: str) -> ScientificInferenceEvent:

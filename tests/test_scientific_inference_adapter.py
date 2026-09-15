@@ -58,9 +58,9 @@ def test_client_sends_one_pair_and_preserves_labeled_logits(monkeypatch) -> None
         return FakeResponse(response_payload())
 
     monkeypatch.setattr(httpx, "post", fake_post)
-    response = TransformersScientificInferenceClient(
-        "http://nli:80", DEBERTA_REVISION
-    ).classify(InferenceRequest("a" * 64, "premise", "hypothesis", 17))
+    response = TransformersScientificInferenceClient("http://nli:80", DEBERTA_REVISION).classify(
+        InferenceRequest("a" * 64, "premise", "hypothesis", 17)
+    )
 
     assert calls == [
         (
@@ -87,9 +87,7 @@ def test_client_sends_one_pair_and_preserves_labeled_logits(monkeypatch) -> None
         response_payload(schema_version="unknown/v1"),
         response_payload(extra="field"),
         response_payload(logits={"entailment": 1.0, "contradiction": 0.0}),
-        response_payload(
-            logits={"entailment": 1.0, "contradiction": 0.0, "neutral": float("inf")}
-        ),
+        response_payload(logits={"entailment": 1.0, "contradiction": 0.0, "neutral": float("inf")}),
         ["not", "an", "object"],
     ),
 )

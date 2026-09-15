@@ -219,6 +219,37 @@ def test_ingest_batches_every_document() -> None:
     ]
 
 
+def test_application_exposes_complete_pooled_candidates_without_changing_search() -> None:
+    ranked = [SearchHit("2", "Second", "body", 0.9)]
+    candidates = [RetrievalCandidate(EvidenceDocument("1", "First", "body"), ())]
+
+    class RecordingCandidateRetriever:
+        generator_limit = 50
+        maximum_pool_size = 100
+
+        def search(self, query: str, limit: int) -> list[SearchHit]:
+            return ranked[:limit]
+
+        def search_with_candidates(
+            self, query: str, limit: int
+        ) -> tuple[list[SearchHit], list[RetrievalCandidate]]:
+            return ranked[:limit], candidates
+
+    application = RagApplication(
+        store=FakeStore(),
+        embedder=None,
+        generator=FakeGenerator(""),
+        strategy=FakeStrategy(),
+        retriever=RecordingCandidateRetriever(),
+    )
+
+    actual_ranked, actual_candidates = application.retrieve_pool("claim", limit=10)
+
+    assert actual_ranked == ranked
+    assert actual_candidates == candidates
+    assert application.search("claim", limit=10) == ranked
+
+
 def test_ingest_embeds_only_retrieval_chunks_and_preserves_score_only_alignment() -> None:
     class MixedStrategy:
         name = "mixed"

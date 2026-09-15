@@ -2,19 +2,39 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Sequence
 from dataclasses import replace
 
 import pytest
 
-from scifact_rag.evaluation import ComponentRevision
+from scifact_rag.domain import EvidenceDocument, RetrievalCandidate, RetrievalSignal, SearchHit
+from scifact_rag.evaluation import (
+    ComponentRevision,
+    GenerationEvaluationCase,
+    GenerationEvaluationSet,
+    GoldRationale,
+    ScientificStance,
+)
 from scifact_rag.scientific_inference import (
     DEBERTA_MODEL,
     DEBERTA_REVISION,
+    EvidenceAssemblyError,
+    EvidenceBundle,
+    EvidenceChunkSelection,
     InferenceLogits,
+    InferenceRequest,
+    InferenceResponse,
     ScientificInferenceLabel,
+    bundle_identity,
+    candidate_identity,
+    canonical_payload_digest,
+    inference_request_payload,
+    request_identity,
 )
 from scifact_rag.scientific_inference_evaluation import (
     ScientificInferenceAttemptStarted,
+    ScientificInferenceEvaluationExecutor,
+    ScientificInferenceEvaluator,
     ScientificInferenceJournal,
     ScientificInferenceResult,
     ScientificInferenceRunManifest,
@@ -222,3 +242,223 @@ def test_journal_fsyncs_before_observing_the_event(tmp_path, monkeypatch) -> Non
     journal.append(inference_attempt_started_fixture())
 
     assert observed == ["fsync", "scientific-inference-attempt-started/v1"]
+
+
+class FixedPoolSource:
+    def __init__(self, candidates: Sequence[RetrievalCandidate]) -> None:
+        self.candidates = list(candidates)
+        self.calls: list[tuple[str, int]] = []
+
+    def retrieve_pool(
+        self, query: str, *, limit: int
+    ) -> tuple[list[SearchHit], list[RetrievalCandidate]]:
+        self.calls.append((query, limit))
+        ranked = [
+            SearchHit(
+                candidate.document.doc_id, candidate.document.title, candidate.document.text, 1.0
+            )
+            for candidate in self.candidates[:limit]
+        ]
+        return ranked, list(self.candidates)
+
+
+class FixedAssembler:
+    def __init__(self, *, fail_document_id: str | None = None) -> None:
+        self.fail_document_id = fail_document_id
+
+    def assemble(self, claim: str, document: EvidenceDocument) -> EvidenceBundle:
+        if document.doc_id == self.fail_document_id:
+            raise EvidenceAssemblyError("missing_chunks", "stored evidence is missing")
+        text = f"evidence-{document.doc_id}"
+        admitted = EvidenceChunkSelection(
+            document.doc_id,
+            COREF_NOMINAL_DP_MINILM,
+            0,
+            text,
+            canonical_payload_digest(text),
+            0.8,
+        )
+        return EvidenceBundle(
+            document_id=document.doc_id,
+            title=document.title,
+            premise=f"[TITLE] {document.title}\n[EVIDENCE ordinal=0] {text}",
+            pair_token_count=17,
+            admitted=(admitted,),
+            rejected=(),
+            omitted_ranges=(),
+        )
+
+
+class RecordingClient:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.calls: list[InferenceRequest] = []
+
+    def classify(self, request: InferenceRequest) -> InferenceResponse:
+        self.events.append("http-request")
+        self.calls.append(request)
+        return InferenceResponse(
+            request.attempt_id,
+            DEBERTA_REVISION,
+            request.expected_pair_tokens,
+            InferenceLogits(2.0, -1.0, 0.5),
+        )
+
+
+class FailingClient(RecordingClient):
+    def classify(self, request: InferenceRequest) -> InferenceResponse:
+        self.events.append("http-request")
+        self.calls.append(request)
+        raise TimeoutError("endpoint detail must not leak")
+
+
+def single_case_fixture() -> GenerationEvaluationSet:
+    return GenerationEvaluationSet(
+        (
+            GenerationEvaluationCase(
+                schema_version="generation-evaluation-case/v1",
+                query_id="1",
+                claim="Aspirin helps.",
+                source_split="train-validation",
+                expected_stance=ScientificStance.SUPPORT,
+                cited_document_ids=("10",),
+                rationales=(GoldRationale("10", ScientificStance.SUPPORT, (0,), ("evidence-10",)),),
+            ),
+        )
+    )
+
+
+def candidate_fixture(doc_id: str) -> RetrievalCandidate:
+    return RetrievalCandidate(
+        EvidenceDocument(doc_id, f"Title {doc_id}", f"Abstract {doc_id}"),
+        (RetrievalSignal("colbert-content", COREF_NOMINAL_DP_MINILM, 0.8, 1, False),),
+    )
+
+
+def test_executor_persists_start_before_one_request_and_processes_the_full_pool(tmp_path) -> None:
+    events: list[str] = []
+    client = RecordingClient(events)
+    executor = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate_fixture("11"), candidate_fixture("10")]),
+        ScientificInferenceEvaluator(FixedAssembler(), client),
+        event_observer=lambda event: events.append(
+            "attempt-started"
+            if isinstance(event, ScientificInferenceAttemptStarted)
+            else "terminal-result"
+        ),
+    )
+
+    summary = executor.run(
+        run_id="run-1",
+        evaluation_set=single_case_fixture(),
+        retrieval_limit=10,
+        output=tmp_path / "results.jsonl",
+    )
+
+    assert events == [
+        "attempt-started",
+        "http-request",
+        "terminal-result",
+        "attempt-started",
+        "http-request",
+        "terminal-result",
+    ]
+    assert [request.premise.splitlines()[0] for request in client.calls] == [
+        "[TITLE] Title 10",
+        "[TITLE] Title 11",
+    ]
+    assert summary.expected_candidates == 2
+    assert summary.scored_candidates == 2
+
+
+def test_resume_does_not_resend_an_unmatched_start(tmp_path) -> None:
+    output = tmp_path / "results.jsonl"
+    case = single_case_fixture().cases[0]
+    candidate = candidate_fixture("10")
+    bundle = FixedAssembler().assemble(case.claim, candidate.document)
+    candidate_id = candidate_identity("run-1", case.query_id, case.claim, candidate.document)
+    bundle_digest = bundle_identity(bundle)
+    intent = {
+        "schema_version": "scientific-inference-request/v1",
+        "premise": bundle.premise,
+        "hypothesis": case.claim,
+        "expected_pair_tokens": bundle.pair_token_count,
+    }
+    attempt_id = request_identity(candidate_id, bundle_digest, intent)
+    request = InferenceRequest(attempt_id, bundle.premise, case.claim, bundle.pair_token_count)
+    ScientificInferenceJournal.open(output, run_id="run-1").append(
+        ScientificInferenceAttemptStarted(
+            _STARTED_SCHEMA_FOR_TEST,
+            "run-1",
+            candidate_id,
+            bundle_digest,
+            attempt_id,
+            canonical_payload_digest(inference_request_payload(request)),
+            "2026-09-15T14:01:00Z",
+        )
+    )
+    client = RecordingClient([])
+
+    summary = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate]),
+        ScientificInferenceEvaluator(FixedAssembler(), client),
+    ).run(
+        run_id="run-1",
+        evaluation_set=single_case_fixture(),
+        retrieval_limit=10,
+        output=output,
+    )
+
+    assert client.calls == []
+    assert summary.outcome_unknown == 1
+    assert summary.complete is False
+
+
+def test_assembly_failure_is_terminal_without_an_attempt(tmp_path) -> None:
+    output = tmp_path / "results.jsonl"
+    client = RecordingClient([])
+    executor = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate_fixture("10")]),
+        ScientificInferenceEvaluator(FixedAssembler(fail_document_id="10"), client),
+    )
+
+    summary = executor.run(
+        run_id="run-1",
+        evaluation_set=single_case_fixture(),
+        retrieval_limit=10,
+        output=output,
+    )
+    result = next(iter(ScientificInferenceJournal.open(output, "run-1").state.results.values()))
+
+    assert client.calls == []
+    assert summary.failed_candidates == 1
+    assert result.bundle_digest is None
+    assert result.attempt_id is None
+    assert result.attempt_count == 0
+
+
+def test_request_failure_is_terminal_after_exactly_one_attempt(tmp_path) -> None:
+    output = tmp_path / "results.jsonl"
+    client = FailingClient([])
+    executor = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate_fixture("10")]),
+        ScientificInferenceEvaluator(FixedAssembler(), client),
+    )
+
+    summary = executor.run(
+        run_id="run-1",
+        evaluation_set=single_case_fixture(),
+        retrieval_limit=10,
+        output=output,
+    )
+    result = next(iter(ScientificInferenceJournal.open(output, "run-1").state.results.values()))
+
+    assert len(client.calls) == 1
+    assert summary.failed_candidates == 1
+    assert result.attempt_id is not None
+    assert result.attempt_count == 1
+    assert result.error_stage == "request"
+    assert result.error_message == "TimeoutError: request failed"
+
+
+_STARTED_SCHEMA_FOR_TEST = "scientific-inference-attempt-started/v1"
