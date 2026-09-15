@@ -200,6 +200,27 @@ def test_paired_evaluator_parses_and_scores_an_explicit_scifact_verdict() -> Non
     assert result.citation_valid is True
 
 
+def test_paired_evaluator_reuses_one_generation_for_byte_identical_contexts() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    generator = RecordingGenerator(
+        {parent.text: "VERDICT: SUPPORT\nThe evidence supports the claim [1]"}
+    )
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=generator,
+    )
+
+    results = evaluator.evaluate(_case(), retrieval_limit=1)
+
+    assert len(generator.calls) == 1
+    assert len({result.raw_generated_text for result in results}) == 1
+    assert results[0].generation_reused_from is None
+    assert results[1].generation_reused_from == "whole-document"
+    assert results[2].generation_reused_from == "whole-document"
+
+
 def test_paired_evaluator_retains_policy_failure_and_continues_other_policies() -> None:
     parents = [SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)]
     failing = RecordingAssembler(error=ValueError("missing DP views"))

@@ -32,6 +32,7 @@ class GenerationEvaluationResult:
     retrieval_latency_ms: float
     context_assembly_latency_ms: float
     generator_latency_ms: float
+    generation_reused_from: str | None
     input_tokens: int | None
     generated_tokens: int | None
     retrieved_parent_ids: tuple[str, ...]
@@ -77,12 +78,17 @@ class GenerationEvaluationRecord:
             raise ValueError("generation evaluation record fields do not match the schema")
         raw_result = raw["result"]
         expected_result_fields = {field.name for field in fields(GenerationEvaluationResult)}
-        legacy_result_fields = expected_result_fields - {"predicted_stance", "stance_correct"}
+        version_two_result_fields = expected_result_fields - {"generation_reused_from"}
+        legacy_result_fields = version_two_result_fields - {"predicted_stance", "stance_correct"}
         if not isinstance(raw_result, dict) or (
             set(raw_result) != expected_result_fields
             and not (
                 raw_result.get("schema_version") == "generation-evaluation-result/v1"
                 and set(raw_result) == legacy_result_fields
+            )
+            and not (
+                raw_result.get("schema_version") == "generation-evaluation-result/v2"
+                and set(raw_result) == version_two_result_fields
             )
         ):
             raise ValueError("generation evaluation result fields do not match the schema")
@@ -90,6 +96,11 @@ class GenerationEvaluationRecord:
         if raw_result["schema_version"] == "generation-evaluation-result/v1":
             raw_result["predicted_stance"] = None
             raw_result["stance_correct"] = None
+        if raw_result["schema_version"] in {
+            "generation-evaluation-result/v1",
+            "generation-evaluation-result/v2",
+        }:
+            raw_result["generation_reused_from"] = None
         contexts = raw_result["supplied_contexts"]
         expected_context_fields = {field.name for field in fields(SearchHit)}
         if not isinstance(contexts, list) or any(
@@ -347,6 +358,10 @@ class PairedGenerationEvaluator:
         retrieved_gold_ids = tuple(
             doc_id for doc_id in case.cited_document_ids if doc_id in allowed
         )
+        generation_cache: dict[
+            tuple[str, tuple[SearchHit, ...]],
+            tuple[GenerationContextStrategyName, GeneratedAnswer, float],
+        ] = {}
 
         return tuple(
             self._evaluate_policy(
@@ -356,6 +371,7 @@ class PairedGenerationEvaluator:
                 retrieval_limit,
                 retrieval_latency_ms,
                 retrieved_gold_ids,
+                generation_cache,
             )
             for strategy in selected
         )
@@ -372,7 +388,7 @@ class PairedGenerationEvaluator:
         error: Exception | None,
     ) -> GenerationEvaluationResult:
         return GenerationEvaluationResult(
-            schema_version="generation-evaluation-result/v2",
+            schema_version="generation-evaluation-result/v3",
             query_id=case.query_id,
             source_split=case.source_split,
             expected_stance=case.expected_stance.value,
@@ -391,6 +407,7 @@ class PairedGenerationEvaluator:
             retrieval_latency_ms=retrieval_latency_ms,
             context_assembly_latency_ms=0.0,
             generator_latency_ms=0.0,
+            generation_reused_from=None,
             input_tokens=None,
             generated_tokens=None,
             retrieved_parent_ids=(),
@@ -419,12 +436,17 @@ class PairedGenerationEvaluator:
         retrieval_limit: int,
         retrieval_latency_ms: float,
         retrieved_gold_ids: tuple[str, ...],
+        generation_cache: dict[
+            tuple[str, tuple[SearchHit, ...]],
+            tuple[GenerationContextStrategyName, GeneratedAnswer, float],
+        ],
     ) -> GenerationEvaluationResult:
         contexts: tuple[SearchHit, ...] = ()
         context_assembly_latency_ms = 0.0
         generator_latency_ms = 0.0
         input_tokens = None
         generated_tokens = None
+        generation_reused_from = None
         try:
             assembly_started = self._clock()
             try:
@@ -434,19 +456,26 @@ class PairedGenerationEvaluator:
             allowed = {hit.doc_id for hit in retrieved}
             if not contexts or any(context.doc_id not in allowed for context in contexts):
                 raise ValueError("generation context must contain retrieved parent documents")
-            generation_started = self._clock()
-            try:
-                generated = (
-                    self._generator.generate_with_metrics(case.claim, contexts)
-                    if isinstance(self._generator, MeasuredAnswerGenerator)
-                    else GeneratedAnswer(
-                        self._generator.generate(case.claim, contexts),
-                        None,
-                        None,
+            cache_key = (case.claim, contexts)
+            cached = generation_cache.get(cache_key)
+            if cached is None:
+                generation_started = self._clock()
+                try:
+                    generated = (
+                        self._generator.generate_with_metrics(case.claim, contexts)
+                        if isinstance(self._generator, MeasuredAnswerGenerator)
+                        else GeneratedAnswer(
+                            self._generator.generate(case.claim, contexts),
+                            None,
+                            None,
+                        )
                     )
-                )
-            finally:
-                generator_latency_ms = (self._clock() - generation_started) * 1000.0
+                finally:
+                    generator_latency_ms = (self._clock() - generation_started) * 1000.0
+                generation_cache[cache_key] = (strategy, generated, generator_latency_ms)
+            else:
+                source_strategy, generated, generator_latency_ms = cached
+                generation_reused_from = source_strategy.value
             raw_generated = generated.text
             input_tokens = generated.input_tokens
             generated_tokens = generated.generated_tokens
@@ -470,6 +499,7 @@ class PairedGenerationEvaluator:
             citation_valid = None
             predicted_stance = None
             stance_correct = None
+            generation_reused_from = None
             error_type = type(exc).__name__
             error_message = str(exc)
         evidence_count, matched_count, evidence_recall = _evidence_sentence_recall(
@@ -479,7 +509,7 @@ class PairedGenerationEvaluator:
         )
         supplied_parent_ids = tuple(dict.fromkeys(context.doc_id for context in contexts))
         return GenerationEvaluationResult(
-            schema_version="generation-evaluation-result/v2",
+            schema_version="generation-evaluation-result/v3",
             query_id=case.query_id,
             source_split=case.source_split,
             expected_stance=case.expected_stance.value,
@@ -490,6 +520,7 @@ class PairedGenerationEvaluator:
             retrieval_latency_ms=retrieval_latency_ms,
             context_assembly_latency_ms=context_assembly_latency_ms,
             generator_latency_ms=generator_latency_ms,
+            generation_reused_from=generation_reused_from,
             input_tokens=input_tokens,
             generated_tokens=generated_tokens,
             retrieved_parent_ids=tuple(hit.doc_id for hit in retrieved),

@@ -79,6 +79,12 @@ and flushes one canonical JSONL record at a time. On restart it validates the ex
 runs only missing `(query_id, context_strategy)` pairs; duplicate, foreign-run, malformed, and
 out-of-set rows fail explicitly.
 
+Within one claim, byte-identical assembled contexts share one generator response. Every policy row
+is still retained, and `generation_reused_from` names the earlier canonical policy whose response
+was reused. The originating generator latency is copied to the equivalent row; this represents the
+same request, not another observed HTTP call. Failed requests are not cached, so one policy's
+generation failure does not suppress a later policy attempt.
+
 Evaluation generation uses a SciFact-only prompt profile and fixed request seed. It requires a
 leading `VERDICT: SUPPORT`, `VERDICT: CONTRADICT`, or `VERDICT: NOT_ENOUGH_INFO` line so public
 stance accuracy is scored without an LLM judge. The verdict line is removed before applying the
