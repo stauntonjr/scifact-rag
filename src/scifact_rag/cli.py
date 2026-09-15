@@ -9,6 +9,7 @@ import typer
 
 from .adapters.scifact import BeirSciFact, QrelsSplit
 from .composition import build_application
+from .evaluation import GenerationRunManifest
 from .generation import GenerationContextStrategyName
 from .strategies import RetrievalStrategyName
 
@@ -84,6 +85,27 @@ def ask(
             ).ask(query, limit=limit)
         )
     )
+
+
+@app.command("generation-eval-dry-run")
+def generation_eval_dry_run(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete generation-run-manifest/v1 JSON file.",
+        ),
+    ],
+) -> None:
+    """Validate and emit a generation run manifest without model or database calls."""
+    try:
+        validated = GenerationRunManifest.from_json(manifest.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
+    typer.echo(validated.to_json(), nl=False)
 
 
 @app.command("evaluate")
