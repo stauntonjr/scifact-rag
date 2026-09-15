@@ -81,11 +81,12 @@ Before a live generation comparison, validate its complete versioned run manifes
 the database or calling a model service:
 
 ```bash
+mkdir -p artifacts
 docker compose run --rm app generation-eval-dry-run \
-  --manifest data/evaluation/scifact-generation-context/manifest.json
+  --manifest artifacts/generation-validation/manifest.json
 docker compose run --rm app run-generation-eval \
-  --manifest data/evaluation/scifact-generation-context/manifest.json \
-  --evaluation-set data/evaluation/scifact-generation-context/validation-input.jsonl
+  --manifest artifacts/generation-validation/manifest.json \
+  --evaluation-set artifacts/scifact-generation-validation.jsonl
 ```
 
 The field contract and the prohibition on default selection from the already-inspected test qrels

@@ -155,6 +155,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
+      - ./artifacts:/app/artifacts
       - huggingface-cache:/models/huggingface
 
 volumes:

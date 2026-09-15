@@ -56,8 +56,9 @@ Validate and canonicalize a complete manifest without constructing the applicati
 PostgreSQL, or calling an embedding, reranking, or generation service:
 
 ```bash
+mkdir -p artifacts
 docker compose run --rm app generation-eval-dry-run \
-  --manifest data/evaluation/scifact-generation-context/manifest.json
+  --manifest artifacts/generation-validation/manifest.json
 ```
 
 The command writes the canonical manifest to standard output. It makes no output-file changes and
@@ -68,8 +69,8 @@ Run or resume the paired comparison with:
 
 ```bash
 docker compose run --rm app run-generation-eval \
-  --manifest data/evaluation/scifact-generation-context/manifest.json \
-  --evaluation-set data/evaluation/scifact-generation-context/validation-input.jsonl
+  --manifest artifacts/generation-validation/manifest.json \
+  --evaluation-set artifacts/scifact-generation-validation.jsonl
 ```
 
 The runner validates the input checksum and split against the run manifest, retrieves one parent
@@ -86,8 +87,9 @@ when a compatible endpoint omits its standard usage object; they are never estim
 MiniLM or ColBERT tokenizer. Retrieval, assembly, and generation exceptions remain explicit rows.
 
 After every invocation, the runner atomically refreshes an aggregate report next to the raw file.
-For a manifest whose `results_path` is `data/evaluation/example/results.jsonl`, the report is
-`data/evaluation/example/results.report.json`. It reports completion and failures before the
+For a manifest whose `results_path` is `artifacts/example/results.jsonl`, the report is
+`artifacts/example/results.report.json`. Create the host `artifacts/` directory as the project user
+before the first Compose run; Compose mounts it at `/app/artifacts`. The report records completion and failures before the
 per-policy retrieval, evidence-retention, citation, insufficiency, context-count, token, and
 latency summaries. The raw JSONL remains authoritative.
 
