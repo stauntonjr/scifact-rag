@@ -8,7 +8,13 @@ from dataclasses import replace
 
 import pytest
 
-from scifact_rag.domain import EvidenceDocument, RetrievalCandidate, RetrievalSignal, SearchHit
+from scifact_rag.domain import (
+    EvidenceChunk,
+    EvidenceDocument,
+    RetrievalCandidate,
+    RetrievalSignal,
+    SearchHit,
+)
 from scifact_rag.evaluation import (
     ComponentRevision,
     GenerationEvaluationCase,
@@ -83,11 +89,13 @@ def inference_manifest() -> ScientificInferenceRunManifest:
 
 
 def inference_attempt_started_fixture() -> ScientificInferenceAttemptStarted:
+    result = successful_inference_result_fixture()
+    assert result.bundle_digest is not None
     return ScientificInferenceAttemptStarted(
         schema_version="scientific-inference-attempt-started/v1",
         run_id="run-1",
         candidate_id="c" * 64,
-        bundle_digest="b" * 64,
+        bundle_digest=result.bundle_digest,
         attempt_id="a" * 64,
         request_digest="d" * 64,
         started_at="2026-09-15T14:01:00Z",
@@ -104,6 +112,16 @@ def successful_inference_result_fixture() -> ScientificInferenceResult:
         hashlib.sha256(b"evidence-10").hexdigest(),
         0.8,
     )
+    premise = "[TITLE] Study\n[EVIDENCE ordinal=0] evidence-10"
+    bundle = EvidenceBundle(
+        document_id="10",
+        title="Study",
+        premise=premise,
+        pair_token_count=17,
+        admitted=(evidence,),
+        rejected=(),
+        omitted_ranges=(),
+    )
     return ScientificInferenceResult(
         schema_version="scientific-inference-result/v1",
         run_id="run-1",
@@ -114,10 +132,10 @@ def successful_inference_result_fixture() -> ScientificInferenceResult:
         claim_sha256=hashlib.sha256(b"Aspirin helps.").hexdigest(),
         document_title="Study",
         document_sha256="2" * 64,
-        bundle_digest="b" * 64,
+        bundle_digest=bundle_identity(bundle),
         attempt_id="a" * 64,
         request_digest="d" * 64,
-        premise_sha256="3" * 64,
+        premise_sha256=hashlib.sha256(premise.encode("utf-8")).hexdigest(),
         baseline_rank=1,
         colbert_score=0.9,
         gold_label=ScientificInferenceLabel.ENTAILMENT,
@@ -209,11 +227,12 @@ def test_journal_accepts_terminal_failures_before_an_attempt_or_after_assembly(t
     path = tmp_path / "results.jsonl"
     journal = ScientificInferenceJournal.open(path, run_id="run-1")
     journal.append(preassembly_failure_fixture())
+    successful = successful_inference_result_fixture()
     postassembly = replace(
         preassembly_failure_fixture(),
         candidate_id="f" * 64,
-        bundle_digest="b" * 64,
-        premise_sha256="3" * 64,
+        bundle_digest=successful.bundle_digest,
+        premise_sha256=successful.premise_sha256,
         pair_token_count=17,
         admitted=(
             EvidenceChunkSelection(
@@ -302,6 +321,27 @@ class FixedPoolSource:
         return ranked, list(self.candidates)
 
 
+class FixedStoredChunkSource:
+    def __init__(self, overrides: dict[str, str] | None = None) -> None:
+        self.overrides = overrides or {}
+
+    def load_chunks(
+        self,
+        document_ids: Sequence[str],
+        representations: Sequence[str],
+    ) -> list[EvidenceChunk]:
+        assert tuple(representations) == (COREF_NOMINAL_DP_MINILM,)
+        return [
+            EvidenceChunk(
+                document_id,
+                0,
+                self.overrides.get(document_id, f"evidence-{document_id}"),
+                COREF_NOMINAL_DP_MINILM,
+            )
+            for document_id in document_ids
+        ]
+
+
 class FixedAssembler:
     def __init__(self, *, fail_document_id: str | None = None) -> None:
         self.fail_document_id = fail_document_id
@@ -381,6 +421,7 @@ def test_executor_persists_start_before_one_request_and_processes_the_full_pool(
     executor = ScientificInferenceEvaluationExecutor(
         FixedPoolSource([candidate_fixture("11"), candidate_fixture("10")]),
         ScientificInferenceEvaluator(FixedAssembler(), client),
+        FixedStoredChunkSource(),
         event_observer=lambda event: events.append(
             "attempt-started"
             if isinstance(event, ScientificInferenceAttemptStarted)
@@ -442,6 +483,7 @@ def test_resume_does_not_resend_an_unmatched_start(tmp_path) -> None:
     summary = ScientificInferenceEvaluationExecutor(
         FixedPoolSource([candidate]),
         ScientificInferenceEvaluator(FixedAssembler(), client),
+        FixedStoredChunkSource(),
     ).run(
         run_id="run-1",
         evaluation_set=single_case_fixture(),
@@ -460,6 +502,7 @@ def test_assembly_failure_is_terminal_without_an_attempt(tmp_path) -> None:
     executor = ScientificInferenceEvaluationExecutor(
         FixedPoolSource([candidate_fixture("10")]),
         ScientificInferenceEvaluator(FixedAssembler(fail_document_id="10"), client),
+        FixedStoredChunkSource(),
     )
 
     summary = executor.run(
@@ -483,6 +526,7 @@ def test_request_failure_is_terminal_after_exactly_one_attempt(tmp_path) -> None
     executor = ScientificInferenceEvaluationExecutor(
         FixedPoolSource([candidate_fixture("10")]),
         ScientificInferenceEvaluator(FixedAssembler(), client),
+        FixedStoredChunkSource(),
     )
 
     summary = executor.run(
@@ -506,6 +550,7 @@ def test_resume_rejects_a_semantically_corrupted_terminal_row(tmp_path) -> None:
     executor = ScientificInferenceEvaluationExecutor(
         FixedPoolSource([candidate_fixture("10")]),
         ScientificInferenceEvaluator(FixedAssembler(), RecordingClient([])),
+        FixedStoredChunkSource(),
     )
     executor.run(
         run_id="run-1",
@@ -513,15 +558,53 @@ def test_resume_rejects_a_semantically_corrupted_terminal_row(tmp_path) -> None:
         retrieval_limit=10,
         output=output,
     )
-    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
-    rows[-1]["gold_label"] = "neutral"
+    original_rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+
+    for field, value in (("gold_label", "neutral"), ("evidence_coverage", "not-annotated")):
+        rows = [dict(row) for row in original_rows]
+        rows[-1][field] = value
+        output.write_text(
+            "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="retained result"):
+            executor.run(
+                run_id="run-1",
+                evaluation_set=single_case_fixture(),
+                retrieval_limit=10,
+                output=output,
+            )
+
+    rows = [dict(row) for row in original_rows]
+    rows[-1] = dict(rows[-1])
+    rows[-1]["admitted"] = [dict(item) for item in rows[-1]["admitted"]]
+    rows[-1]["admitted"][0]["text"] = "altered evidence"
+    rows[-1]["admitted"][0]["text_sha256"] = hashlib.sha256(b"altered evidence").hexdigest()
     output.write_text(
         "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
         encoding="utf-8",
     )
-
-    with pytest.raises(ValueError, match="retained result"):
+    with pytest.raises(ValueError, match="premise_sha256"):
         executor.run(
+            run_id="run-1",
+            evaluation_set=single_case_fixture(),
+            retrieval_limit=10,
+            output=output,
+        )
+
+    output.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in original_rows
+        ),
+        encoding="utf-8",
+    )
+    drifted = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate_fixture("10")]),
+        ScientificInferenceEvaluator(FixedAssembler(), RecordingClient([])),
+        FixedStoredChunkSource({"10": "different stored evidence"}),
+    )
+    with pytest.raises(ValueError, match="stored DP evidence"):
+        drifted.run(
             run_id="run-1",
             evaluation_set=single_case_fixture(),
             retrieval_limit=10,
@@ -541,6 +624,26 @@ def scored_result(
     baseline_rank: int,
 ) -> ScientificInferenceResult:
     text = f"evidence-{document_id}"
+    admitted = (
+        EvidenceChunkSelection(
+            document_id,
+            COREF_NOMINAL_DP_MINILM,
+            0,
+            text,
+            hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            0.8,
+        ),
+    )
+    premise = f"[TITLE] Study\n[EVIDENCE ordinal=0] {text}"
+    bundle = EvidenceBundle(
+        document_id=document_id,
+        title="Study",
+        premise=premise,
+        pair_token_count=17,
+        admitted=admitted,
+        rejected=(),
+        omitted_ranges=(),
+    )
     return replace(
         successful_inference_result_fixture(),
         candidate_id=candidate_id,
@@ -548,16 +651,9 @@ def scored_result(
         document_sha256=candidate_id,
         baseline_rank=baseline_rank,
         gold_label=gold,
-        admitted=(
-            EvidenceChunkSelection(
-                document_id,
-                COREF_NOMINAL_DP_MINILM,
-                0,
-                text,
-                hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                0.8,
-            ),
-        ),
+        admitted=admitted,
+        premise_sha256=hashlib.sha256(premise.encode("utf-8")).hexdigest(),
+        bundle_digest=bundle_identity(bundle),
         logits=logits,
         predicted_label=logits.predicted_label,
         evidence_margin=logits.evidence_margin,
@@ -605,6 +701,7 @@ def test_report_derives_metrics_controls_and_ranking_from_raw_records() -> None:
             document_sha256="5" * 64,
             baseline_rank=5,
             gold_label=ScientificInferenceLabel.NEUTRAL,
+            evidence_coverage="not-annotated",
         ),
     )
 

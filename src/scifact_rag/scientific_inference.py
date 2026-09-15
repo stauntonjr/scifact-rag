@@ -183,7 +183,7 @@ class ScientificEvidenceAssembler:
         rejected: list[EvidenceChunkRejection] = []
         for selection in admission_order:
             tentative = sorted((*admitted, selection), key=lambda item: item.ordinal)
-            premise, _ = _serialize_premise(document.title, tentative, all_ordinals)
+            premise, _ = serialize_evidence_premise(document.title, tentative, all_ordinals)
             pair_tokens = self._token_budget.pair_token_count(premise, claim)
             if pair_tokens <= self._token_budget.maximum_pair_tokens:
                 admitted = tentative
@@ -195,7 +195,7 @@ class ScientificEvidenceAssembler:
                 "no_evidence_fit",
                 "no complete evidence chunk fits the pair token budget",
             )
-        premise, omitted_ranges = _serialize_premise(document.title, admitted, all_ordinals)
+        premise, omitted_ranges = serialize_evidence_premise(document.title, admitted, all_ordinals)
         pair_tokens = self._token_budget.pair_token_count(premise, claim)
         return EvidenceBundle(
             document_id=document.doc_id,
@@ -300,7 +300,7 @@ def canonical_payload_digest(value: object) -> str:
     return _sha256_json(value)
 
 
-def _serialize_premise(
+def serialize_evidence_premise(
     title: str,
     admitted: Sequence[EvidenceChunkSelection],
     all_ordinals: Sequence[int],

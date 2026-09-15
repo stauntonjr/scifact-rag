@@ -596,6 +596,7 @@ def build_scientific_inference_executor(
     return ScientificInferenceEvaluationExecutor(
         application,
         ScientificInferenceEvaluator(assembler, client),
+        store,
     )
 
 

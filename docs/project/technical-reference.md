@@ -489,6 +489,8 @@ Before composing services, the runner requires the manifest endpoint, DeBERTa mo
 context limit, and ColBERT model/revision to match the active settings. Terminal rows retain the
 model, tokenizer, scorer, evidence-assembly version, admitted and omitted chunk provenance, source
 ordering, and title inclusion. Resume and report generation reject rows whose claim, gold label,
-candidate document, rank, score, or chunk provenance does not match regenerated local evidence.
+candidate document, rank, score, derived coverage, premise digest, or bundle digest is inconsistent.
+Resume additionally requires the retained admitted chunk text and complete ordinal inventory to
+match the stored `coref-nominal-dp-minilm` evidence before treating a candidate as complete.
 The classifier counts the exact premise/hypothesis pair before GPU inference and rejects an
 over-limit or count-mismatched request without running the model.

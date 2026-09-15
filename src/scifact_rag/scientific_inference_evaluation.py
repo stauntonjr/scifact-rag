@@ -23,11 +23,17 @@ from .evaluation import (
     ScientificStance,
 )
 from .metrics import evaluate_rankings
-from .ports import CandidatePoolSource, EvidenceBundleAssembler, ScientificInferenceClient
+from .ports import (
+    CandidatePoolSource,
+    EvidenceBundleAssembler,
+    ScientificInferenceClient,
+    StoredChunkSource,
+)
 from .scientific_inference import (
     DEBERTA_MODEL,
     DEBERTA_REVISION,
     EvidenceAssemblyError,
+    EvidenceBundle,
     EvidenceChunkRejection,
     EvidenceChunkSelection,
     InferenceLogits,
@@ -38,6 +44,7 @@ from .scientific_inference import (
     canonical_payload_digest,
     inference_request_payload,
     request_identity,
+    serialize_evidence_premise,
 )
 from .strategies import COREF_NOMINAL_DP_MINILM, DEFAULT_RETRIEVAL_STRATEGY
 
@@ -350,6 +357,37 @@ class ScientificInferenceResult:
             not self.admitted or not self.source_order_restored or not self.title_included
         ):
             raise ValueError("a completed bundle requires complete assembly provenance")
+        if self.bundle_digest is not None:
+            assert self.pair_token_count is not None
+            all_ordinals = tuple(
+                sorted(
+                    {item.ordinal for item in self.admitted}.union(
+                        item.ordinal for item in self.rejected
+                    )
+                )
+            )
+            premise, omitted_ranges = serialize_evidence_premise(
+                self.document_title,
+                self.admitted,
+                all_ordinals,
+            )
+            if omitted_ranges != self.omitted_ranges:
+                raise ValueError("reconstructed premise omissions do not match")
+            if self.premise_sha256 != _text_digest(premise):
+                raise ValueError("premise_sha256 does not match reconstructed premise")
+            reconstructed = EvidenceBundle(
+                document_id=self.document_id,
+                title=self.document_title,
+                premise=premise,
+                pair_token_count=self.pair_token_count,
+                admitted=self.admitted,
+                rejected=self.rejected,
+                omitted_ranges=self.omitted_ranges,
+                source_order_restored=self.source_order_restored,
+                title_included=self.title_included,
+            )
+            if self.bundle_digest != bundle_identity(reconstructed):
+                raise ValueError("bundle_digest does not match reconstructed evidence bundle")
         scoring = (
             self.model_revision,
             self.logits,
@@ -767,11 +805,13 @@ class ScientificInferenceEvaluationExecutor:
         self,
         pool_source: CandidatePoolSource,
         evaluator: ScientificInferenceEvaluator,
+        chunk_source: StoredChunkSource,
         *,
         event_observer: Callable[[ScientificInferenceEvent], None] | None = None,
     ) -> None:
         self._pool_source = pool_source
         self._evaluator = evaluator
+        self._chunk_source = chunk_source
         self._event_observer = event_observer
 
     def run(
@@ -800,7 +840,11 @@ class ScientificInferenceEvaluationExecutor:
             raise ValueError("journal contains candidates outside the regenerated pool")
         plans_by_id = {item.candidate_id: item for item in planned}
         for candidate_id, result in journal.state.results.items():
-            _validate_retained_result(plans_by_id[candidate_id], result)
+            _validate_retained_result(
+                plans_by_id[candidate_id],
+                result,
+                self._chunk_source,
+            )
         for plan in planned:
             if plan.candidate_id in journal.state.completed:
                 continue
@@ -867,6 +911,7 @@ def _colbert_content_score(candidate: RetrievalCandidate) -> float:
 def _validate_retained_result(
     plan: _PlannedCandidate,
     result: ScientificInferenceResult,
+    chunk_source: StoredChunkSource,
 ) -> None:
     case = plan.case
     document = plan.candidate.document
@@ -890,6 +935,35 @@ def _validate_retained_result(
             "retained result does not match the regenerated candidate: "
             + ", ".join(sorted(mismatched))
         )
+    expected_coverage = _evidence_coverage(case, document.doc_id, result.admitted)
+    if result.evidence_coverage != expected_coverage:
+        raise ValueError("retained result evidence coverage does not match admitted evidence")
+    if result.bundle_digest is not None:
+        stored = chunk_source.load_chunks(
+            [document.doc_id],
+            [COREF_NOMINAL_DP_MINILM],
+        )
+        stored_by_ordinal = {item.ordinal: item for item in stored}
+        retained_ordinals = {item.ordinal for item in result.admitted}.union(
+            item.ordinal for item in result.rejected
+        )
+        if (
+            len(stored_by_ordinal) != len(stored)
+            or set(stored_by_ordinal) != retained_ordinals
+            or any(
+                item.doc_id != document.doc_id
+                or item.representation != COREF_NOMINAL_DP_MINILM
+                or not item.text.strip()
+                for item in stored
+            )
+        ):
+            raise ValueError("retained result does not match stored DP evidence inventory")
+        for item in result.admitted:
+            stored_item = stored_by_ordinal[item.ordinal]
+            if stored_item.text != item.text or _text_digest(stored_item.text) != item.text_sha256:
+                raise ValueError(
+                    "retained result admitted evidence differs from stored DP evidence"
+                )
 
 
 def _gold_label(
@@ -1195,6 +1269,10 @@ def _validate_report_records(
             raise ValueError("report record claim does not match the evaluation set")
         if record.gold_label is not _gold_label(case, record.document_id):
             raise ValueError("report record gold label does not match the evaluation set")
+        if record.evidence_coverage != _evidence_coverage(
+            case, record.document_id, record.admitted
+        ):
+            raise ValueError("report record evidence coverage does not match admitted evidence")
         if record.baseline_rank is not None:
             ranks = observed_ranks.setdefault(record.query_id, set())
             if record.baseline_rank in ranks:
