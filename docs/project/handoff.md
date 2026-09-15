@@ -133,6 +133,10 @@ context selection, adaptive exact-view policy, and parent-document citation boun
 ## Implementation state
 
 - Generated project intake is sufficient for bounded planning.
+- Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
+  `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
+  complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or
+  Qwen. Default-selection manifests cannot name the already-inspected test split.
 - Local scaffold baseline: `703c8e5`.
 - Dataclass domain/ports, application services, SciFact/MiniLM/Postgres/generator adapters, Typer
   CLI, Docker Compose, dependency contract, ADR, research note, and focused tests are authored.

@@ -77,6 +77,18 @@ selection. Parent retrieval order is preserved; selected chunks are restored to 
 within each parent, titles remain attached, and citations still name parent document IDs. These
 are implemented context policies, not measured generation-quality results.
 
+Before a live generation comparison, validate its complete versioned run manifest without opening
+the database or calling a model service:
+
+```bash
+docker compose run --rm app generation-eval-dry-run \
+  --manifest artifacts/generation-validation/manifest.json
+```
+
+The field contract and the prohibition on default selection from the already-inspected test qrels
+are documented in
+[`docs/project/generation-evaluation.md`](docs/project/generation-evaluation.md).
+
 ## Run with Docker Compose
 
 The generator is external to this Compose project. It must be reachable from the host at
