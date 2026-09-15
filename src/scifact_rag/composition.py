@@ -5,7 +5,11 @@ from dataclasses import dataclass
 
 from .adapters.coreference import FastCorefAnalyzer
 from .adapters.minilm import MiniLmEmbedder
-from .adapters.openai_compatible import OpenAiCompatibleGenerator
+from .adapters.openai_compatible import (
+    SCIFACT_EVALUATION_SEED,
+    GenerationPromptProfile,
+    OpenAiCompatibleGenerator,
+)
 from .adapters.postgres import PostgresEvidenceStore
 from .adapters.reranker import RankLlmReranker, TeiReranker, VllmColbertReranker
 from .adapters.tokenization import HuggingFaceTokenBudget
@@ -509,6 +513,8 @@ def build_generation_evaluator(
             base_url=resolved.generator_base_url,
             model=resolved.generator_model,
             api_key=resolved.generator_api_key,
+            prompt_profile=GenerationPromptProfile.SCIFACT_CLAIM_VERIFICATION,
+            seed=SCIFACT_EVALUATION_SEED,
         ),
     )
 

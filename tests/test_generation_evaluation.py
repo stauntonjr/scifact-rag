@@ -180,6 +180,26 @@ def test_paired_evaluator_records_raw_answer_citations_and_normalized_evidence_r
     assert result.error_message is None
 
 
+def test_paired_evaluator_parses_and_scores_an_explicit_scifact_verdict() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator(
+            {parent.text: "VERDICT: SUPPORT\nThe evidence supports the claim [1]"}
+        ),
+    )
+
+    result = evaluator.evaluate(_case(), retrieval_limit=1)[0]
+
+    assert result.raw_generated_text == "VERDICT: SUPPORT\nThe evidence supports the claim [1]"
+    assert result.answer_text == "The evidence supports the claim [1]"
+    assert result.predicted_stance == "SUPPORT"
+    assert result.stance_correct is True
+    assert result.citation_valid is True
+
+
 def test_paired_evaluator_retains_policy_failure_and_continues_other_policies() -> None:
     parents = [SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)]
     failing = RecordingAssembler(error=ValueError("missing DP views"))
@@ -473,6 +493,8 @@ def test_generation_evaluation_report_aggregates_each_policy_without_dropping_fa
     )
     whole, top_dp, adaptive = report.strategies
     assert whole.successful_rows == 1
+    assert whole.stance_scored_rows == 0
+    assert whole.stance_accuracy is None
     assert whole.median_input_tokens == 100
     assert whole.mean_conditional_evidence_recall == 1.0
     assert top_dp.insufficient_evidence_rate == 1.0
@@ -481,9 +503,36 @@ def test_generation_evaluation_report_aggregates_each_policy_without_dropping_fa
     assert adaptive.median_input_tokens is None
 
 
+def test_generation_evaluation_report_aggregates_only_parseable_stance_predictions() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator(
+            {parent.text: "VERDICT: SUPPORT\nThe evidence supports the claim [1]"}
+        ),
+    )
+    result = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=(GenerationContextStrategyName.WHOLE_DOCUMENT,),
+    )[0]
+
+    report = build_generation_evaluation_report(
+        (GenerationEvaluationRecord("development-1", result),),
+        run_id="development-1",
+        expected_rows=3,
+    )
+
+    whole = report.strategies[0]
+    assert whole.stance_scored_rows == 1
+    assert whole.stance_accuracy == 1.0
+
+
 def test_generation_evaluation_report_writes_canonical_json_atomically(tmp_path: Path) -> None:
     report = GenerationEvaluationReport(
-        schema_version="generation-evaluation-report/v1",
+        schema_version="generation-evaluation-report/v2",
         run_id="development-1",
         expected_rows=3,
         completed_rows=0,
@@ -496,7 +545,7 @@ def test_generation_evaluation_report_writes_canonical_json_atomically(tmp_path:
     write_generation_evaluation_report(report, destination)
 
     payload = json.loads(destination.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == "generation-evaluation-report/v1"
+    assert payload["schema_version"] == "generation-evaluation-report/v2"
     assert payload["run_id"] == "development-1"
     assert payload["complete"] is False
     assert destination.stat().st_mode & 0o777 == 0o644

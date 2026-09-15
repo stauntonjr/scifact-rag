@@ -7,6 +7,11 @@ from typing import Annotated
 
 import typer
 
+from .adapters.openai_compatible import (
+    SCIFACT_EVALUATION_PROMPT_ID,
+    SCIFACT_EVALUATION_PROMPT_SHA256,
+    SCIFACT_EVALUATION_SEED,
+)
 from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
 from .composition import build_application, build_generation_evaluator
 from .evaluation import (
@@ -202,6 +207,24 @@ def run_generation_eval(
             "generator settings must remain fixed at temperature 0.1, 512 tokens, thinking false",
             param_hint="--manifest",
         )
+    components = {component.component: component for component in run_manifest.components}
+    required_components = {
+        "generator-prompt": (
+            SCIFACT_EVALUATION_PROMPT_ID,
+            SCIFACT_EVALUATION_PROMPT_SHA256,
+        ),
+        "generator-seed": ("fixed-per-request", str(SCIFACT_EVALUATION_SEED)),
+    }
+    for component_name, (identifier, revision) in required_components.items():
+        component = components.get(component_name)
+        if component is None or (component.identifier, component.revision) != (
+            identifier,
+            revision,
+        ):
+            raise typer.BadParameter(
+                f"{component_name} must record {identifier} at revision {revision}",
+                param_hint="--manifest",
+            )
     try:
         retrieval_strategy = RetrievalStrategyName(run_manifest.retrieval_strategy)
     except ValueError as exc:

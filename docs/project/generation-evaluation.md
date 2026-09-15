@@ -73,14 +73,20 @@ docker compose run --rm app run-generation-eval \
   --evaluation-set artifacts/scifact-generation-validation.jsonl
 ```
 
-The runner validates the input checksum and split against the run manifest, retrieves one parent
-ranking per claim, and sends that same ordered ranking to all three context policies. It appends
+The runner validates the input checksum, split, fixed prompt digest, and fixed seed against the run
+manifest, retrieves one parent ranking per claim, and sends that same ordered ranking to all three context policies. It appends
 and flushes one canonical JSONL record at a time. On restart it validates the existing file and
 runs only missing `(query_id, context_strategy)` pairs; duplicate, foreign-run, malformed, and
 out-of-set rows fail explicitly.
 
-Each successful raw row preserves the generator's unmodified text, the answer after the same
-citation fallback used by `ask`, parsed citations, supplied context text and parent IDs, normalized
+Evaluation generation uses a SciFact-only prompt profile and fixed request seed. It requires a
+leading `VERDICT: SUPPORT`, `VERDICT: CONTRADICT`, or `VERDICT: NOT_ENOUGH_INFO` line so public
+stance accuracy is scored without an LLM judge. The verdict line is removed before applying the
+same product citation gate as `ask`; interactive `ask` retains its existing general RAG prompt and
+does not set a seed.
+
+Each successful raw row preserves the generator's unmodified text, parsed verdict and correctness,
+the answer after the citation fallback used by `ask`, parsed citations, supplied context text and parent IDs, normalized
 gold-sentence coverage, retrieval time, context-assembly time, generator HTTP time, and the
 Qwen-serving endpoint's `prompt_tokens` and `completion_tokens`. Token counts remain `null` only
 when a compatible endpoint omits its standard usage object; they are never estimated with the
@@ -90,8 +96,8 @@ After every invocation, the runner atomically refreshes an aggregate report next
 For a manifest whose `results_path` is `artifacts/example/results.jsonl`, the report is
 `artifacts/example/results.report.json`. Create the host `artifacts/` directory as the project user
 before the first Compose run; Compose mounts it at `/app/artifacts`. The report records completion and failures before the
-per-policy retrieval, evidence-retention, citation, insufficiency, context-count, token, and
-latency summaries. The raw JSONL remains authoritative.
+per-policy retrieval, evidence-retention, citation, insufficiency, stance-accuracy, context-count,
+token, and latency summaries. The raw JSONL remains authoritative.
 
 ## Fields
 
@@ -128,7 +134,9 @@ policy does not call it for every query:
 - pgvector, pg_tokenizer, and VectorChord-BM25 extensions;
 - MiniLM model and tokenizer;
 - ColBERT model, tokenizer, and serving runtime;
-- Qwen model and serving runtime.
+- Qwen model and serving runtime;
+- `generator-prompt` with identifier `scifact-claim-verification-v1` and the exact prompt SHA-256;
+- `generator-seed` with identifier `fixed-per-request` and revision `1729`.
 
 Each entry has this shape:
 
@@ -170,6 +178,16 @@ fact with `test_qrels_inspected: true`.
       "component": "generator-model",
       "identifier": "nvidia/Qwen3.6-35B-A3B-NVFP4",
       "revision": "operator-recorded-immutable-revision"
+    },
+    {
+      "component": "generator-prompt",
+      "identifier": "scifact-claim-verification-v1",
+      "revision": "operator-recorded-prompt-sha256"
+    },
+    {
+      "component": "generator-seed",
+      "identifier": "fixed-per-request",
+      "revision": "1729"
     }
   ],
   "context_strategy": "paired",

@@ -6,6 +6,10 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Made SciFact generation evaluation reproducible and directly scoreable without changing the
+  interactive RAG prompt. Evaluation requests now use a manifest-verified prompt profile, fixed
+  seed 1729, and a strict leading SUPPORT/CONTRADICT/NOT_ENOUGH_INFO verdict; raw text remains
+  retained while aggregate reports count only parseable stance predictions.
 - Retained the first fixed 160-claim, 480-row generation-context execution as diagnostic evidence.
   All rows completed, but `top-dp-chunks` and `adaptive` supplied identical context and unseeded
   temperature-0.1 sampling produced different answers. DP did not reduce median input tokens and

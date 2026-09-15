@@ -14,7 +14,7 @@ from typing import Any
 
 from .application import finalize_generated_answer
 from .domain import GeneratedAnswer, SearchHit
-from .evaluation import GenerationEvaluationCase, GenerationEvaluationSet
+from .evaluation import GenerationEvaluationCase, GenerationEvaluationSet, ScientificStance
 from .generation import GenerationContextStrategyName
 from .ports import AnswerGenerator, GenerationContextAssembler, MeasuredAnswerGenerator, Retriever
 
@@ -25,6 +25,8 @@ class GenerationEvaluationResult:
     query_id: str
     source_split: str
     expected_stance: str
+    predicted_stance: str | None
+    stance_correct: bool | None
     context_strategy: GenerationContextStrategyName
     retrieval_limit: int
     retrieval_latency_ms: float
@@ -75,8 +77,19 @@ class GenerationEvaluationRecord:
             raise ValueError("generation evaluation record fields do not match the schema")
         raw_result = raw["result"]
         expected_result_fields = {field.name for field in fields(GenerationEvaluationResult)}
-        if not isinstance(raw_result, dict) or set(raw_result) != expected_result_fields:
+        legacy_result_fields = expected_result_fields - {"predicted_stance", "stance_correct"}
+        if not isinstance(raw_result, dict) or (
+            set(raw_result) != expected_result_fields
+            and not (
+                raw_result.get("schema_version") == "generation-evaluation-result/v1"
+                and set(raw_result) == legacy_result_fields
+            )
+        ):
             raise ValueError("generation evaluation result fields do not match the schema")
+        raw_result = dict(raw_result)
+        if raw_result["schema_version"] == "generation-evaluation-result/v1":
+            raw_result["predicted_stance"] = None
+            raw_result["stance_correct"] = None
         contexts = raw_result["supplied_contexts"]
         expected_context_fields = {field.name for field in fields(SearchHit)}
         if not isinstance(contexts, list) or any(
@@ -125,6 +138,8 @@ class GenerationStrategySummary:
     mean_conditional_evidence_recall: float | None
     citation_valid_rate: float | None
     insufficient_evidence_rate: float | None
+    stance_scored_rows: int
+    stance_accuracy: float | None
     median_supplied_contexts: float | None
     median_input_tokens: float | None
     median_generated_tokens: float | None
@@ -162,6 +177,9 @@ def build_generation_evaluation_report(
             record.result for record in records if record.result.context_strategy is strategy
         ]
         successful = [result for result in results if result.error_type is None]
+        scored_stances = [
+            result.stance_correct for result in successful if result.stance_correct is not None
+        ]
         evidence_recalls = [
             result.gold_evidence_sentence_recall
             for result in results
@@ -191,6 +209,10 @@ def build_generation_evaluation_report(
                     if successful
                     else None
                 ),
+                stance_scored_rows=len(scored_stances),
+                stance_accuracy=(
+                    sum(scored_stances) / len(scored_stances) if scored_stances else None
+                ),
                 median_supplied_contexts=_median(
                     [result.supplied_context_count for result in results]
                 ),
@@ -213,7 +235,7 @@ def build_generation_evaluation_report(
             )
         )
     return GenerationEvaluationReport(
-        schema_version="generation-evaluation-report/v1",
+        schema_version="generation-evaluation-report/v2",
         run_id=run_id,
         expected_rows=expected_rows,
         completed_rows=len(records),
@@ -350,10 +372,20 @@ class PairedGenerationEvaluator:
         error: Exception | None,
     ) -> GenerationEvaluationResult:
         return GenerationEvaluationResult(
-            schema_version="generation-evaluation-result/v1",
+            schema_version="generation-evaluation-result/v2",
             query_id=case.query_id,
             source_split=case.source_split,
             expected_stance=case.expected_stance.value,
+            predicted_stance=(
+                ScientificStance.NOT_ENOUGH_INFO.value
+                if error is None and answer_text == "insufficient evidence"
+                else None
+            ),
+            stance_correct=(
+                case.expected_stance is ScientificStance.NOT_ENOUGH_INFO
+                if error is None and answer_text == "insufficient evidence"
+                else None
+            ),
             context_strategy=strategy,
             retrieval_limit=retrieval_limit,
             retrieval_latency_ms=retrieval_latency_ms,
@@ -418,9 +450,15 @@ class PairedGenerationEvaluator:
             raw_generated = generated.text
             input_tokens = generated.input_tokens
             generated_tokens = generated.generated_tokens
+            predicted_stance, answer_body = parse_scifact_generated_answer(raw_generated)
             answer_text, citations, citation_valid = finalize_generated_answer(
-                raw_generated,
+                answer_body,
                 allowed,
+            )
+            stance_correct = (
+                predicted_stance == case.expected_stance.value
+                if predicted_stance is not None
+                else None
             )
             error_type = None
             error_message = None
@@ -430,6 +468,8 @@ class PairedGenerationEvaluator:
             answer_text = None
             citations = ()
             citation_valid = None
+            predicted_stance = None
+            stance_correct = None
             error_type = type(exc).__name__
             error_message = str(exc)
         evidence_count, matched_count, evidence_recall = _evidence_sentence_recall(
@@ -439,10 +479,12 @@ class PairedGenerationEvaluator:
         )
         supplied_parent_ids = tuple(dict.fromkeys(context.doc_id for context in contexts))
         return GenerationEvaluationResult(
-            schema_version="generation-evaluation-result/v1",
+            schema_version="generation-evaluation-result/v2",
             query_id=case.query_id,
             source_split=case.source_split,
             expected_stance=case.expected_stance.value,
+            predicted_stance=predicted_stance,
+            stance_correct=stance_correct,
             context_strategy=strategy,
             retrieval_limit=retrieval_limit,
             retrieval_latency_ms=retrieval_latency_ms,
@@ -467,6 +509,18 @@ class PairedGenerationEvaluator:
             error_type=error_type,
             error_message=error_message,
         )
+
+
+_SCIFACT_VERDICT = re.compile(r"\AVERDICT: (SUPPORT|CONTRADICT|NOT_ENOUGH_INFO)(?:\r?\n|\Z)")
+
+
+def parse_scifact_generated_answer(generated: str) -> tuple[str | None, str]:
+    """Separate a strict leading SciFact verdict from the product-facing answer body."""
+    stripped = generated.strip()
+    match = _SCIFACT_VERDICT.match(stripped)
+    if match is None:
+        return None, stripped
+    return match.group(1), stripped[match.end() :].strip()
 
 
 def _evidence_sentence_recall(

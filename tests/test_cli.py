@@ -8,6 +8,11 @@ import pytest
 from typer.testing import CliRunner
 
 from scifact_rag import cli as cli_module
+from scifact_rag.adapters.openai_compatible import (
+    SCIFACT_EVALUATION_PROMPT_ID,
+    SCIFACT_EVALUATION_PROMPT_SHA256,
+    SCIFACT_EVALUATION_SEED,
+)
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
 from scifact_rag.composition import build_application
 from scifact_rag.evaluation import (
@@ -232,7 +237,19 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
         retrieval_strategy=RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT.value,
         context_strategy="paired",
         retrieval_limit=5,
-        components=(ComponentRevision("generator-model", "qwen", "revision"),),
+        components=(
+            ComponentRevision("generator-model", "qwen", "revision"),
+            ComponentRevision(
+                "generator-prompt",
+                SCIFACT_EVALUATION_PROMPT_ID,
+                SCIFACT_EVALUATION_PROMPT_SHA256,
+            ),
+            ComponentRevision(
+                "generator-seed",
+                "fixed-per-request",
+                str(SCIFACT_EVALUATION_SEED),
+            ),
+        ),
         generator=GeneratorSettings(0.1, 512, False),
         started_at="2026-09-14T12:00:00Z",
         completed_at=None,
@@ -258,7 +275,7 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
             return GenerationEvaluationExecutionSummary(3, 0, 3, 0)
 
     report = GenerationEvaluationReport(
-        "generation-evaluation-report/v1",
+        "generation-evaluation-report/v2",
         "development-1",
         3,
         3,
