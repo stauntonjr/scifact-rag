@@ -159,6 +159,10 @@ explicit failure record; the adapter has no hidden request retry loop. The servi
 attempt identifier and immutable model revision with three labeled raw logits. Echoing an attempt
 identifier is response correlation, not server-side idempotency.
 
+The request carries the assembler's expected pair-token count. The service computes the count with
+its loaded tokenizer and rejects a mismatch; a successful response echoes the observed count. This
+turns tokenizer parity into a per-request invariant instead of relying only on startup metadata.
+
 The internal endpoint is a model-serving boundary, not a user-facing SciFact application API, so
 it does not activate the inactive `http-api-interface` capability.
 
@@ -300,10 +304,10 @@ performs no database or model calls.
 DeBERTa runs as a separate explicit Docker Compose service using a digest-pinned GPU-capable
 PyTorch container, pinned Transformers dependencies, and the immutable checkpoint revision. The
 service tokenizes each premise as text and each claim as its paired hypothesis, rejects over-limit
-requests rather than truncating them, and returns the checkpoint's raw sequence-classification
-logits through a narrow project-owned HTTP contract. The application receives its endpoint through
-configuration. It must not start, stop, or reconfigure other DGX model services implicitly; the
-operator may free RAM before starting the new service.
+requests or client/service token-count mismatches rather than truncating them, and returns the
+checkpoint's raw sequence-classification logits through a narrow project-owned HTTP contract. The
+application receives its endpoint through configuration. It must not start, stop, or reconfigure
+other DGX model services implicitly; the operator may free RAM before starting the new service.
 
 Before model-quality evaluation, a runtime qualification must verify:
 
