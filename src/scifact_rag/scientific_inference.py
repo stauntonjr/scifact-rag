@@ -4,13 +4,19 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import StrEnum
 from typing import Any
 
-from .domain import EvidenceDocument
+from .domain import EvidenceChunk, EvidenceDocument, SearchHit
+from .ports import PairTokenBudget, Reranker, StoredChunkSource
+from .strategies import COREF_NOMINAL_DP_MINILM
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_TITLE_PREFIX = "[TITLE] "
+_CHUNK_PREFIX = "[EVIDENCE ordinal={ordinal}] "
+_GAP = "[OMITTED ordinals={start}-{end}]"
 
 
 class ScientificInferenceLabel(StrEnum):
@@ -81,6 +87,157 @@ class InferenceResponse:
         _validate_positive_count("pair_token_count", self.pair_token_count)
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceChunkSelection:
+    doc_id: str
+    representation: str
+    ordinal: int
+    text: str
+    text_sha256: str
+    colbert_score: float
+
+    def __post_init__(self) -> None:
+        _validate_text("doc_id", self.doc_id)
+        _validate_text("representation", self.representation)
+        if self.ordinal < 0:
+            raise ValueError("chunk ordinal must be non-negative")
+        _validate_text("chunk text", self.text)
+        _validate_digest("text_sha256", self.text_sha256)
+        if not math.isfinite(self.colbert_score):
+            raise ValueError("ColBERT score must be finite")
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceChunkRejection:
+    ordinal: int
+    reason: str
+
+    def __post_init__(self) -> None:
+        if self.ordinal < 0:
+            raise ValueError("rejected chunk ordinal must be non-negative")
+        _validate_text("rejection reason", self.reason)
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceBundle:
+    document_id: str
+    title: str
+    premise: str
+    pair_token_count: int
+    admitted: tuple[EvidenceChunkSelection, ...]
+    rejected: tuple[EvidenceChunkRejection, ...]
+    omitted_ranges: tuple[tuple[int, int], ...]
+    source_order_restored: bool = True
+    title_included: bool = True
+
+    def __post_init__(self) -> None:
+        _validate_text("document_id", self.document_id)
+        _validate_text("premise", self.premise)
+        _validate_positive_count("pair_token_count", self.pair_token_count)
+        if not self.admitted:
+            raise ValueError("evidence bundle must contain admitted evidence")
+
+
+class EvidenceAssemblyError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(f"{code}: {message}")
+
+
+class ScientificEvidenceAssembler:
+    """Select complete stored DP chunks under the classifier's exact pair budget."""
+
+    def __init__(
+        self,
+        chunk_source: StoredChunkSource,
+        reranker: Reranker,
+        token_budget: PairTokenBudget,
+    ) -> None:
+        self._chunk_source = chunk_source
+        self._reranker = reranker
+        self._token_budget = token_budget
+
+    def assemble(self, claim: str, document: EvidenceDocument) -> EvidenceBundle:
+        _validate_text("claim", claim)
+        chunks = self._chunk_source.load_chunks(
+            [document.doc_id],
+            [COREF_NOMINAL_DP_MINILM],
+        )
+        self._validate_chunks(document.doc_id, chunks)
+        scores = self._reranker.score(
+            claim,
+            [SearchHit(chunk.doc_id, "", chunk.text, 0.0) for chunk in chunks],
+        )
+        if len(scores) != len(chunks) or not all(math.isfinite(score) for score in scores):
+            raise EvidenceAssemblyError(
+                "invalid_chunk_scores",
+                "chunk scoring returned a non-finite or incorrectly sized result",
+            )
+
+        selections = [self._selection(chunk, score) for chunk, score in zip(chunks, scores)]
+        admission_order = sorted(selections, key=lambda item: (-item.colbert_score, item.ordinal))
+        admitted: list[EvidenceChunkSelection] = []
+        rejected: list[EvidenceChunkRejection] = []
+        for selection in admission_order:
+            tentative = sorted((*admitted, selection), key=lambda item: item.ordinal)
+            premise, _ = _serialize_premise(document.title, tentative)
+            pair_tokens = self._token_budget.pair_token_count(premise, claim)
+            if pair_tokens <= self._token_budget.maximum_pair_tokens:
+                admitted = tentative
+            else:
+                rejected.append(EvidenceChunkRejection(selection.ordinal, "token_budget"))
+
+        if not admitted:
+            raise EvidenceAssemblyError(
+                "no_evidence_fit",
+                "no complete evidence chunk fits the pair token budget",
+            )
+        premise, omitted_ranges = _serialize_premise(document.title, admitted)
+        pair_tokens = self._token_budget.pair_token_count(premise, claim)
+        return EvidenceBundle(
+            document_id=document.doc_id,
+            title=document.title,
+            premise=premise,
+            pair_token_count=pair_tokens,
+            admitted=tuple(admitted),
+            rejected=tuple(sorted(rejected, key=lambda item: item.ordinal)),
+            omitted_ranges=omitted_ranges,
+        )
+
+    @staticmethod
+    def _validate_chunks(document_id: str, chunks: Sequence[EvidenceChunk]) -> None:
+        if not chunks:
+            raise EvidenceAssemblyError(
+                "invalid_stored_evidence", "stored evidence is missing"
+            )
+        ordinals: set[int] = set()
+        for chunk in chunks:
+            if (
+                chunk.doc_id != document_id
+                or chunk.representation != COREF_NOMINAL_DP_MINILM
+                or not chunk.text.strip()
+                or chunk.ordinal < 0
+                or chunk.ordinal in ordinals
+            ):
+                raise EvidenceAssemblyError(
+                    "invalid_stored_evidence",
+                    "stored evidence has a foreign, malformed, or duplicate chunk",
+                )
+            ordinals.add(chunk.ordinal)
+
+    @staticmethod
+    def _selection(chunk: EvidenceChunk, score: float) -> EvidenceChunkSelection:
+        return EvidenceChunkSelection(
+            doc_id=chunk.doc_id,
+            representation=chunk.representation,
+            ordinal=chunk.ordinal,
+            text=chunk.text,
+            text_sha256=hashlib.sha256(chunk.text.encode("utf-8")).hexdigest(),
+            colbert_score=score,
+        )
+
+
 def candidate_identity(
     run_id: str,
     query_id: str,
@@ -127,6 +284,24 @@ def request_identity(
             "payload_digest": _sha256_json(payload),
         }
     )
+
+
+def _serialize_premise(
+    title: str,
+    admitted: Sequence[EvidenceChunkSelection],
+) -> tuple[str, tuple[tuple[int, int], ...]]:
+    ordered = sorted(admitted, key=lambda item: item.ordinal)
+    lines = [f"{_TITLE_PREFIX}{title}"]
+    omitted_ranges: list[tuple[int, int]] = []
+    previous: EvidenceChunkSelection | None = None
+    for selection in ordered:
+        if previous is not None and selection.ordinal > previous.ordinal + 1:
+            gap = (previous.ordinal + 1, selection.ordinal - 1)
+            omitted_ranges.append(gap)
+            lines.append(_GAP.format(start=gap[0], end=gap[1]))
+        lines.append(_CHUNK_PREFIX.format(ordinal=selection.ordinal) + selection.text)
+        previous = selection
+    return "\n".join(lines), tuple(omitted_ranges)
 
 
 def _validate_digest(name: str, value: str) -> None:

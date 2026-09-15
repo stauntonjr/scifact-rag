@@ -60,3 +60,39 @@ class HuggingFaceTokenBudget:
             truncation=False,
             verbose=False,
         )
+
+
+class HuggingFacePairTokenBudget:
+    """Count a complete premise/hypothesis pair with one pinned tokenizer."""
+
+    def __init__(
+        self,
+        model_name: str,
+        revision: str,
+        *,
+        maximum_pair_tokens: int = 512,
+    ) -> None:
+        if not model_name or not revision or maximum_pair_tokens < 1:
+            raise ValueError("pair token budget requires a model, revision, and positive limit")
+        from transformers import AutoTokenizer
+
+        self._tokenizer: Any = AutoTokenizer.from_pretrained(
+            model_name,
+            revision=revision,
+            use_fast=True,
+        )
+        self._maximum_pair_tokens = maximum_pair_tokens
+
+    @property
+    def maximum_pair_tokens(self) -> int:
+        return self._maximum_pair_tokens
+
+    def pair_token_count(self, premise: str, hypothesis: str) -> int:
+        encoded = self._tokenizer(
+            premise,
+            hypothesis,
+            add_special_tokens=True,
+            truncation=False,
+            verbose=False,
+        )
+        return len(encoded["input_ids"])
