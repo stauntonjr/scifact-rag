@@ -134,10 +134,10 @@ with an explicit canonical label mapping. It does not return an unlabeled positi
 
 The adapter calls the DGX-hosted classification endpoint, validates its response, and maps the
 checkpoint's labels to `entailment`, `contradiction`, and `neutral`. It performs exactly one HTTP
-request for each candidate result key. A timeout or transport failure becomes an explicit failure
-record; the adapter has no hidden request retry loop. vLLM's classification interface is documented
-at <https://docs.vllm.ai/en/v0.21.0/models/pooling_models/classify/>; compatibility is a runtime
-hypothesis until qualified in the project's pinned NVIDIA container.
+request for each attempt identifier. A timeout or transport failure becomes an explicit failure
+record; the adapter has no hidden request retry loop. vLLM's classification interface is
+documented at <https://docs.vllm.ai/en/v0.21.0/models/pooling_models/classify/>; compatibility is a
+runtime hypothesis until qualified in the project's pinned NVIDIA container.
 
 ### Scientific inference scorer
 
@@ -181,11 +181,36 @@ The evidence-bundle interface may later support a hierarchical selector, but the
 implementation performs one bundled document-level inference call and no separate per-chunk NLI
 calls.
 
+## Candidate and attempt identity
+
+Create a stable `candidate_id` before loading or scoring evidence. It is the SHA-256 of canonical
+JSON containing:
+
+- `run_id`;
+- `query_id`;
+- `document_id`;
+- the raw claim SHA-256;
+- the candidate document's title-and-content SHA-256.
+
+The immutable run manifest binds the candidate-pool, model, tokenizer, scorer, and assembly
+configuration. A content or configuration change therefore requires a new run rather than silently
+changing an existing candidate identity.
+
+`bundle_digest` is a separate nullable field. It remains null when chunk loading, chunk scoring, or
+assembly fails and becomes the SHA-256 of the exact canonical evidence bundle after successful
+assembly. Pre-assembly failure records are therefore identifiable and resumable without pretending
+that a bundle exists.
+
+After assembly, derive the only allowed `attempt_id` from canonical JSON containing the
+`candidate_id`, `bundle_digest`, serialized HTTP request SHA-256, and attempt ordinal `1`. Append
+and `fsync` a `scientific-inference-attempt-started/v1` event containing those identifiers before
+calling the service. This is an at-most-once client policy, not an exactly-once claim.
+
 ## Structured result contract
 
 One successful candidate result retains at least:
 
-- run, query, claim, and document identifiers;
+- run, query, claim, document, candidate, bundle, and attempt identifiers;
 - model identifier and immutable revision;
 - tokenizer identifier, immutable revision, and observed maximum length;
 - scorer and evidence-assembly configuration version;
@@ -208,19 +233,38 @@ support-versus-contradiction direction. A contradicting document therefore remai
 retrieval-relevant.
 
 A failed record retains the same identity and provenance available before failure plus a typed
-error stage, error code, sanitized message, attempt count, and null logits, label, and margins. A
-failure must never be serialized as `neutral`, zero, or a successful empty response.
+error stage, error code, sanitized message, attempt count, and null logits, label, and margins.
+`bundle_digest` and `attempt_id` are nullable independently. `bundle_digest` is null whenever no
+complete bundle exists, and `attempt_id` is null whenever no request attempt durably started. A
+post-assembly, pre-request failure may therefore retain a bundle digest without an attempt ID. A
+record has `attempt_count = 0` when `attempt_id` is null and `attempt_count = 1` otherwise. A failure
+must never be serialized as `neutral`, zero, or a successful empty response.
 
 ## Identity, persistence, and resume
 
-The result key is a deterministic digest over the raw claim, document identifier and content
-digest, exact serialized evidence bundle, model revision, tokenizer revision, and scorer
-configuration. Any change invalidates reuse.
+Raw evidence is an append-and-flush canonical JSONL event journal keyed by `candidate_id`. A
+pre-inference failure writes one terminal result event. An inference candidate first writes and
+`fsync`s its attempt-started event, then performs its one HTTP request, then writes and `fsync`s one
+terminal success or request-failure result event referencing the same `candidate_id` and
+`attempt_id`.
 
-Raw candidate records are append-and-flush canonical JSONL. Resume validates the complete existing
-file, rejects duplicate or foreign keys, and executes only missing candidate keys. Existing
-failure rows remain evidence; rerunning them requires a new run identity rather than rewriting the
-original result. The report is regenerated atomically from raw records.
+Resume validates the complete journal, rejects duplicate or foreign identifiers and impossible
+event transitions, and classifies each planned candidate as follows:
+
+- a terminal result event is complete and is not executed again;
+- no event means the candidate has not started and may be processed;
+- an attempt-started event without a terminal result means `outcome_unknown` and must not be sent
+  again in that run.
+
+The unmatched start may represent interruption before the send, during the request, or after the
+response but before durable result persistence. The client cannot distinguish those cases without
+server-side idempotency. `outcome_unknown` therefore has no logits or inferred label, counts as an
+incomplete candidate, and is surfaced by report derivation without rewriting the journal. Retrying
+it requires a new run identity. Existing explicit failure results likewise remain fixed evidence
+and require a new run identity for another attempt.
+
+The report is regenerated atomically from the journal. There is no cross-run inference-result
+cache in this first implementation.
 
 The run manifest records repository commit, validation input digest, candidate-pool strategy and
 depth, DP representation, ColBERT model/tokenizer revisions, ModernBERT model/tokenizer revisions,
@@ -290,7 +334,10 @@ the same fixed pool. No fusion parameter may be inferred from this first run.
   service contract stops before results are opened.
 - An individual request receives one attempt. A timeout, transport error, or invalid response then
   becomes an explicit candidate failure row.
+- An unmatched attempt-started event becomes `outcome_unknown` on resume and is never resubmitted
+  under the same run identity.
 - Candidate failures do not suppress other candidates, but the run remains visibly incomplete.
+- Any `outcome_unknown` candidate also makes the run incomplete.
 - A partial run cannot be represented as a complete leaderboard result or promoted.
 - Persistence failure, malformed prior records, duplicate keys, non-finite logits, or report/raw
   inconsistency stops the run.
@@ -312,7 +359,13 @@ suite:
 - canonical label mapping and response validation;
 - finite logits, predicted label, and both margin calculations;
 - failure records that cannot masquerade as neutral results;
-- deterministic cache keys and invalidation inputs;
+- stable pre-assembly candidate identity and separate nullable bundle and attempt identifiers;
+- journal transitions for pre-assembly failure, attempt start, terminal success, and terminal
+  request failure;
+- interruption before assembly, before durable attempt start, and after durable attempt start but
+  before result persistence;
+- resume that processes no-event candidates but never resubmits terminal or `outcome_unknown`
+  candidates;
 - canonical raw-record append, validation, resume, and report derivation;
 - stance metrics, label-prior control, coverage partitions, and failed-row accounting;
 - dry-run isolation from PostgreSQL, ColBERT, and ModernBERT.
