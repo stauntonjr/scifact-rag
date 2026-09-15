@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .domain import (
     CandidateFeatureMatrix,
@@ -15,6 +15,9 @@ from .domain import (
     SearchHit,
     SentenceSpan,
 )
+
+if TYPE_CHECKING:
+    from .scientific_inference import InferenceRequest, InferenceResponse
 
 
 class CorpusSource(Protocol):
@@ -184,3 +187,14 @@ class MeasuredAnswerGenerator(Protocol):
 
 class GenerationContextAssembler(Protocol):
     def assemble(self, query: str, evidence: Sequence[SearchHit]) -> list[SearchHit]: ...
+
+
+class PairTokenBudget(Protocol):
+    @property
+    def maximum_pair_tokens(self) -> int: ...
+
+    def pair_token_count(self, premise: str, hypothesis: str) -> int: ...
+
+
+class ScientificInferenceClient(Protocol):
+    def classify(self, request: InferenceRequest) -> InferenceResponse: ...
