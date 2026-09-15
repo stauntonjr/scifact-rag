@@ -8,9 +8,15 @@ from typing import Annotated
 import typer
 
 from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
-from .composition import build_application
-from .evaluation import GenerationRunManifest, write_generation_evaluation_set
+from .composition import build_application, build_generation_evaluator
+from .evaluation import (
+    GenerationEvaluationSet,
+    GenerationRunManifest,
+    GeneratorSettings,
+    write_generation_evaluation_set,
+)
 from .generation import GenerationContextStrategyName
+from .generation_evaluation import GenerationEvaluationExecutor
 from .strategies import RetrievalStrategyName
 
 app = typer.Typer(no_args_is_help=True, help="Grounded retrieval and generation over SciFact.")
@@ -141,6 +147,71 @@ def build_generation_eval_manifest(
     summary = asdict(write_generation_evaluation_set(evaluation_set, output))
     summary.update({"output": str(output), "source_split": split.value})
     _emit(summary)
+
+
+@app.command("run-generation-eval")
+def run_generation_eval(
+    manifest: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Complete paired generation-run-manifest/v1 JSON file.",
+        ),
+    ],
+    evaluation_set: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Canonical generation-evaluation-case/v1 JSONL input.",
+        ),
+    ],
+) -> None:
+    """Run or resume the three paired generation-context policies."""
+    try:
+        run_manifest = GenerationRunManifest.from_json(manifest.read_text(encoding="utf-8"))
+        cases = GenerationEvaluationSet.from_jsonl(evaluation_set.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if run_manifest.context_strategy != "paired":
+        raise typer.BadParameter("context_strategy must be paired", param_hint="--manifest")
+    if run_manifest.evaluation_manifest_sha256 != cases.sha256:
+        raise typer.BadParameter(
+            "evaluation manifest SHA-256 does not match the run manifest",
+            param_hint="--evaluation-set",
+        )
+    source_split = {case.source_split for case in cases.cases}
+    if source_split != {run_manifest.source_split}:
+        raise typer.BadParameter(
+            "evaluation source split does not match the run manifest",
+            param_hint="--evaluation-set",
+        )
+    required_generator = GeneratorSettings(0.1, 512, False)
+    if run_manifest.generator != required_generator:
+        raise typer.BadParameter(
+            "generator settings must remain fixed at temperature 0.1, 512 tokens, thinking false",
+            param_hint="--manifest",
+        )
+    try:
+        retrieval_strategy = RetrievalStrategyName(run_manifest.retrieval_strategy)
+    except ValueError as exc:
+        raise typer.BadParameter(
+            "retrieval_strategy is not implemented",
+            param_hint="--manifest",
+        ) from exc
+    evaluator = build_generation_evaluator(retrieval_strategy=retrieval_strategy)
+    summary = GenerationEvaluationExecutor(evaluator).run(
+        run_id=run_manifest.run_id,
+        evaluation_set=cases,
+        retrieval_limit=run_manifest.retrieval_limit,
+        output=Path(run_manifest.results_path),
+    )
+    _emit(asdict(summary))
 
 
 @app.command("evaluate")

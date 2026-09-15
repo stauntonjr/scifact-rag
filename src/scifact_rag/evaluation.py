@@ -16,6 +16,7 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SOURCE_SPLITS = {"train-development", "train-validation", "test"}
 _GENERATION_EVALUATION_SPLITS = {"train-development", "train-validation"}
+_GENERATION_CONTEXT_STRATEGIES = {"whole-document", "top-dp-chunks", "adaptive", "paired"}
 
 
 class EvaluationPurpose(StrEnum):
@@ -152,6 +153,62 @@ class GenerationEvaluationSet:
             for case in self.cases
         )
 
+    @classmethod
+    def from_jsonl(cls, serialized: str) -> GenerationEvaluationSet:
+        if not isinstance(serialized, str):
+            raise TypeError("generation evaluation set must be JSONL text")
+        lines = serialized.splitlines()
+        if any(not line.strip() for line in lines):
+            raise ValueError("generation evaluation set must not contain blank rows")
+        case_fields = {field.name for field in fields(GenerationEvaluationCase)}
+        rationale_fields = {field.name for field in fields(GoldRationale)}
+        cases: list[GenerationEvaluationCase] = []
+        for line_number, line in enumerate(lines, start=1):
+            try:
+                raw = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"generation evaluation row {line_number} is not valid JSON"
+                ) from exc
+            if not isinstance(raw, dict) or set(raw) != case_fields:
+                raise ValueError(
+                    f"generation evaluation row {line_number} fields do not match the schema"
+                )
+            raw_rationales = raw["rationales"]
+            if not isinstance(raw_rationales, list) or any(
+                not isinstance(rationale, dict) or set(rationale) != rationale_fields
+                for rationale in raw_rationales
+            ):
+                raise ValueError(
+                    f"generation evaluation row {line_number} rationale fields do not match"
+                )
+            try:
+                rationales = tuple(
+                    GoldRationale(
+                        doc_id=rationale["doc_id"],
+                        label=ScientificStance(rationale["label"]),
+                        sentence_indices=tuple(rationale["sentence_indices"]),
+                        sentences=tuple(rationale["sentences"]),
+                    )
+                    for rationale in raw_rationales
+                )
+                cases.append(
+                    GenerationEvaluationCase(
+                        schema_version=raw["schema_version"],
+                        query_id=raw["query_id"],
+                        claim=raw["claim"],
+                        source_split=raw["source_split"],
+                        expected_stance=ScientificStance(raw["expected_stance"]),
+                        cited_document_ids=tuple(raw["cited_document_ids"]),
+                        rationales=rationales,
+                    )
+                )
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"generation evaluation row {line_number} values are invalid: {exc}"
+                ) from exc
+        return cls(tuple(cases))
+
     @property
     def sha256(self) -> str:
         return hashlib.sha256(self.to_jsonl().encode()).hexdigest()
@@ -270,10 +327,14 @@ class GenerationRunManifest:
             raise TypeError("purpose must be a recognized evaluation purpose")
         if self.purpose is EvaluationPurpose.DEFAULT_SELECTION and self.source_split == "test":
             raise ValueError("default selection cannot use the inspected test qrels")
-        for field_name in ("retrieval_strategy", "context_strategy", "host"):
+        for field_name in ("retrieval_strategy", "host"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{field_name} must be non-empty")
+        if self.context_strategy not in _GENERATION_CONTEXT_STRATEGIES:
+            raise ValueError(
+                f"context_strategy must be one of {sorted(_GENERATION_CONTEXT_STRATEGIES)}"
+            )
         if (
             isinstance(self.retrieval_limit, bool)
             or not isinstance(self.retrieval_limit, int)

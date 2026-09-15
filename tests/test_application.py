@@ -420,6 +420,37 @@ def test_composition_defaults_to_whole_document_generation_context(
     assert isinstance(application._context_assembler, WholeDocumentContextAssembler)
 
 
+def test_composition_builds_all_three_paired_generation_context_policies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = FakeStore()
+    generator = FakeGenerator("")
+    monkeypatch.setattr(composition, "PostgresEvidenceStore", lambda database_url: store)
+    monkeypatch.setattr(composition, "MiniLmEmbedder", lambda model: FakeEmbedder())
+    monkeypatch.setattr(composition, "VllmColbertReranker", lambda *args: object())
+    monkeypatch.setattr(composition, "OpenAiCompatibleGenerator", lambda **kwargs: generator)
+
+    evaluator = composition.build_generation_evaluator()
+
+    assert isinstance(
+        evaluator._assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT],
+        WholeDocumentContextAssembler,
+    )
+    top_dp = cast(
+        DpChunkContextAssembler,
+        evaluator._assemblers[GenerationContextStrategyName.TOP_DP_CHUNKS],
+    )
+    adaptive = cast(
+        DpChunkContextAssembler,
+        evaluator._assemblers[GenerationContextStrategyName.ADAPTIVE],
+    )
+    assert top_dp._store is store
+    assert top_dp._adaptive is False
+    assert adaptive._store is store
+    assert adaptive._adaptive is True
+    assert evaluator._generator is generator
+
+
 def test_candidate_diagnostics_report_pool_oracle_channel_and_ranking_metrics() -> None:
     application = RagApplication(
         store=FakeStore(),

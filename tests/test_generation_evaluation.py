@@ -30,6 +30,11 @@ class RecordingRetriever:
         return self.hits[:limit]
 
 
+class FailingRetriever:
+    def search(self, query: str, limit: int) -> list[SearchHit]:
+        raise TimeoutError("retrieval timed out")
+
+
 class RecordingAssembler:
     def __init__(
         self,
@@ -323,3 +328,41 @@ def test_generation_evaluation_executor_rejects_results_from_another_run(
             retrieval_limit=1,
             output=output,
         )
+
+
+def test_paired_evaluator_retains_retrieval_failure_for_every_requested_policy() -> None:
+    assemblers = {strategy: RecordingAssembler() for strategy in GenerationContextStrategyName}
+    evaluator = PairedGenerationEvaluator(
+        retriever=FailingRetriever(),
+        assemblers=assemblers,
+        generator=RecordingGenerator({}),
+    )
+
+    results = evaluator.evaluate(_case(), retrieval_limit=5)
+
+    assert len(results) == 3
+    assert all(result.error_type == "TimeoutError" for result in results)
+    assert all(result.error_message == "retrieval timed out" for result in results)
+    assert all(result.retrieved_parent_ids == () for result in results)
+    assert all(result.supplied_contexts == () for result in results)
+    assert all(assembler.calls == [] for assembler in assemblers.values())
+
+
+def test_paired_evaluator_records_no_retrieval_as_valid_insufficient_evidence() -> None:
+    assemblers = {strategy: RecordingAssembler() for strategy in GenerationContextStrategyName}
+    generator = RecordingGenerator({})
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([]),
+        assemblers=assemblers,
+        generator=generator,
+    )
+
+    results = evaluator.evaluate(_case(), retrieval_limit=5)
+
+    assert len(results) == 3
+    assert all(result.raw_generated_text is None for result in results)
+    assert all(result.answer_text == "insufficient evidence" for result in results)
+    assert all(result.citation_valid is True for result in results)
+    assert all(result.error_type is None for result in results)
+    assert all(assembler.calls == [] for assembler in assemblers.values())
+    assert generator.calls == []

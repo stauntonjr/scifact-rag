@@ -4,11 +4,23 @@ import json
 from inspect import signature
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
+from scifact_rag import cli as cli_module
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
 from scifact_rag.composition import build_application
+from scifact_rag.evaluation import (
+    ComponentRevision,
+    EvaluationPurpose,
+    GenerationEvaluationCase,
+    GenerationEvaluationSet,
+    GenerationRunManifest,
+    GeneratorSettings,
+    ScientificStance,
+)
 from scifact_rag.generation import GenerationContextStrategyName
+from scifact_rag.generation_evaluation import GenerationEvaluationExecutionSummary
 from scifact_rag.strategies import RetrievalStrategyName
 
 
@@ -185,3 +197,87 @@ def test_ask_cli_exposes_all_generation_context_strategies() -> None:
     assert result.exit_code == 0
     for strategy in GenerationContextStrategyName:
         assert strategy.value in result.stdout
+
+
+def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evaluation_set = GenerationEvaluationSet(
+        (
+            GenerationEvaluationCase(
+                schema_version="generation-evaluation-case/v1",
+                query_id="7",
+                claim="Unresolved claim.",
+                source_split="train-development",
+                expected_stance=ScientificStance.NOT_ENOUGH_INFO,
+                cited_document_ids=("20",),
+                rationales=(),
+            ),
+        )
+    )
+    evaluation_path = tmp_path / "input.jsonl"
+    evaluation_path.write_text(evaluation_set.to_jsonl(), encoding="utf-8")
+    manifest = GenerationRunManifest(
+        schema_version="generation-run-manifest/v1",
+        run_id="development-1",
+        repository_commit="a" * 40,
+        corpus_sha256="b" * 64,
+        evaluation_manifest_sha256=evaluation_set.sha256,
+        source_split="train-development",
+        purpose=EvaluationPurpose.DEVELOPMENT,
+        retrieval_strategy=RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT.value,
+        context_strategy="paired",
+        retrieval_limit=5,
+        components=(ComponentRevision("generator-model", "qwen", "revision"),),
+        generator=GeneratorSettings(0.1, 512, False),
+        started_at="2026-09-14T12:00:00Z",
+        completed_at=None,
+        host="spark-3a8f",
+        results_path="artifacts/results.jsonl",
+        test_qrels_inspected=True,
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(manifest.to_json(), encoding="utf-8")
+    built: dict[str, object] = {}
+    evaluator = object()
+
+    def fake_build(*, retrieval_strategy):
+        built["retrieval_strategy"] = retrieval_strategy
+        return evaluator
+
+    class FakeExecutor:
+        def __init__(self, actual_evaluator) -> None:
+            assert actual_evaluator is evaluator
+
+        def run(self, **kwargs):
+            built.update(kwargs)
+            return GenerationEvaluationExecutionSummary(3, 0, 3, 0)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli_module, "build_generation_evaluator", fake_build)
+    monkeypatch.setattr(cli_module, "GenerationEvaluationExecutor", FakeExecutor)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-generation-eval",
+            "--manifest",
+            str(manifest_path),
+            "--evaluation-set",
+            str(evaluation_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {
+        "expected_rows": 3,
+        "failed_rows": 0,
+        "preexisting_rows": 0,
+        "written_rows": 3,
+    }
+    assert built["retrieval_strategy"] is RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT
+    assert built["run_id"] == "development-1"
+    assert built["evaluation_set"] == evaluation_set
+    assert built["retrieval_limit"] == 5
+    assert built["output"] == Path("artifacts/results.jsonl")

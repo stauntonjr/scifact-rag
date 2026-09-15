@@ -57,12 +57,26 @@ PostgreSQL, or calling an embedding, reranking, or generation service:
 
 ```bash
 docker compose run --rm app generation-eval-dry-run \
-  --manifest artifacts/generation-validation/manifest.json
+  --manifest data/evaluation/scifact-generation-context/manifest.json
 ```
 
 The command writes the canonical manifest to standard output. It makes no output-file changes and
 does not infer missing revision information from a live service. Redirect it only when a new
 artifact is intentionally being created.
+
+Run or resume the paired comparison with:
+
+```bash
+docker compose run --rm app run-generation-eval \
+  --manifest data/evaluation/scifact-generation-context/manifest.json \
+  --evaluation-set data/evaluation/scifact-generation-context/validation-input.jsonl
+```
+
+The runner validates the input checksum and split against the run manifest, retrieves one parent
+ranking per claim, and sends that same ordered ranking to all three context policies. It appends
+and flushes one canonical JSONL record at a time. On restart it validates the existing file and
+runs only missing `(query_id, context_strategy)` pairs; duplicate, foreign-run, malformed, and
+out-of-set rows fail explicitly.
 
 ## Fields
 
@@ -76,7 +90,7 @@ artifact is intentionally being created.
 | `source_split` | `train-development`, `train-validation`, or `test` |
 | `purpose` | `development`, `default-selection`, or `test-confirmation` |
 | `retrieval_strategy` | Exact CLI retrieval strategy name |
-| `context_strategy` | Exact generation-context strategy name |
+| `context_strategy` | One exact policy name, or `paired` for the fixed three-policy comparison |
 | `retrieval_limit` | Number of retrieved parent documents, from 1 through 100 |
 | `components` | Non-empty, uniquely named component identifiers and revisions |
 | `generator` | Temperature, maximum answer tokens, and thinking setting |
@@ -143,7 +157,7 @@ fact with `test_qrels_inspected: true`.
       "revision": "operator-recorded-immutable-revision"
     }
   ],
-  "context_strategy": "adaptive",
+  "context_strategy": "paired",
   "corpus_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "evaluation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "generator": {

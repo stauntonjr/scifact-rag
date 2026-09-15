@@ -140,8 +140,37 @@ class PairedGenerationEvaluator:
         if not selected:
             return ()
         retrieval_started = self._clock()
-        retrieved = tuple(self._retriever.search(case.claim, retrieval_limit))
+        try:
+            retrieved = tuple(self._retriever.search(case.claim, retrieval_limit))
+        # A paired run must retain every planned row even when retrieval itself fails.
+        except Exception as exc:  # noqa: BLE001
+            retrieval_latency_ms = (self._clock() - retrieval_started) * 1000.0
+            return tuple(
+                self._empty_result(
+                    case,
+                    strategy,
+                    retrieval_limit,
+                    retrieval_latency_ms,
+                    answer_text=None,
+                    citation_valid=None,
+                    error=exc,
+                )
+                for strategy in selected
+            )
         retrieval_latency_ms = (self._clock() - retrieval_started) * 1000.0
+        if not retrieved:
+            return tuple(
+                self._empty_result(
+                    case,
+                    strategy,
+                    retrieval_limit,
+                    retrieval_latency_ms,
+                    answer_text="insufficient evidence",
+                    citation_valid=True,
+                    error=None,
+                )
+                for strategy in selected
+            )
         retrieved_ids = tuple(hit.doc_id for hit in retrieved)
         if len(retrieved_ids) != len(set(retrieved_ids)):
             raise ValueError("generation evaluation requires unique retrieved parent identifiers")
@@ -160,6 +189,44 @@ class PairedGenerationEvaluator:
                 retrieved_gold_ids,
             )
             for strategy in selected
+        )
+
+    def _empty_result(
+        self,
+        case: GenerationEvaluationCase,
+        strategy: GenerationContextStrategyName,
+        retrieval_limit: int,
+        retrieval_latency_ms: float,
+        *,
+        answer_text: str | None,
+        citation_valid: bool | None,
+        error: Exception | None,
+    ) -> GenerationEvaluationResult:
+        return GenerationEvaluationResult(
+            schema_version="generation-evaluation-result/v1",
+            query_id=case.query_id,
+            source_split=case.source_split,
+            expected_stance=case.expected_stance.value,
+            context_strategy=strategy,
+            retrieval_limit=retrieval_limit,
+            retrieval_latency_ms=retrieval_latency_ms,
+            generation_latency_ms=0.0,
+            retrieved_parent_ids=(),
+            retrieved_gold_parent_ids=(),
+            relevant_parent_retrieved=False,
+            supplied_parent_ids=(),
+            supplied_context_count=0,
+            supplied_contexts=(),
+            gold_evidence_sentence_count=0,
+            matched_gold_evidence_sentence_count=0,
+            gold_evidence_sentence_recall=None,
+            raw_generated_text=None,
+            answer_text=answer_text,
+            citations=(),
+            citation_valid=citation_valid,
+            generator_model=self._generator.model,
+            error_type=type(error).__name__ if error is not None else None,
+            error_message=str(error) if error is not None else None,
         )
 
     def _evaluate_policy(

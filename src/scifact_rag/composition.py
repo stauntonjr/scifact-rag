@@ -15,6 +15,7 @@ from .generation import (
     GenerationContextStrategyName,
     WholeDocumentContextAssembler,
 )
+from .generation_evaluation import PairedGenerationEvaluator
 from .retrievers import (
     Bm25CandidateGenerator,
     Bm25CandidateScorer,
@@ -466,6 +467,49 @@ def build_application(
         strategy=strategy,
         retriever=retriever,
         context_assembler=context_assembler,
+    )
+
+
+class _ApplicationRetriever:
+    def __init__(self, application: RagApplication) -> None:
+        self._application = application
+
+    def search(self, query: str, limit: int):
+        return self._application.search(query, limit=limit)
+
+
+def build_generation_evaluator(
+    settings: Settings | None = None,
+    *,
+    retrieval_strategy: RetrievalStrategyName = RetrievalStrategyName.TITLE_TOKEN_WINDOW_RRF,
+) -> PairedGenerationEvaluator:
+    resolved = settings or Settings.from_environment()
+    retrieval_application = build_application(
+        resolved,
+        retrieval_strategy=retrieval_strategy,
+        generation_context_strategy=GenerationContextStrategyName.WHOLE_DOCUMENT,
+    )
+    store = PostgresEvidenceStore(resolved.database_url)
+    colbert = VllmColbertReranker(
+        resolved.late_interaction_base_url,
+        resolved.late_interaction_model,
+    )
+    return PairedGenerationEvaluator(
+        retriever=_ApplicationRetriever(retrieval_application),
+        assemblers={
+            GenerationContextStrategyName.WHOLE_DOCUMENT: WholeDocumentContextAssembler(),
+            GenerationContextStrategyName.TOP_DP_CHUNKS: DpChunkContextAssembler(store, colbert),
+            GenerationContextStrategyName.ADAPTIVE: DpChunkContextAssembler(
+                store,
+                colbert,
+                adaptive=True,
+            ),
+        },
+        generator=OpenAiCompatibleGenerator(
+            base_url=resolved.generator_base_url,
+            model=resolved.generator_model,
+            api_key=resolved.generator_api_key,
+        ),
     )
 
 

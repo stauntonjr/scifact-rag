@@ -131,6 +131,13 @@ def test_default_selection_cannot_use_the_inspected_test_qrels() -> None:
         _manifest(source_split="test")
 
 
+def test_generation_run_manifest_accepts_paired_context_and_rejects_unknown_context() -> None:
+    assert _manifest(context_strategy="paired").context_strategy == "paired"
+
+    with pytest.raises(ValueError, match="context_strategy"):
+        _manifest(context_strategy="invented-policy")
+
+
 def test_component_names_are_unique() -> None:
     with pytest.raises(ValueError, match="component names must be unique"):
         _manifest(
@@ -277,3 +284,24 @@ def test_generation_evaluation_set_rejects_duplicates_and_mixed_splits() -> None
     )
     with pytest.raises(ValueError, match="one source split"):
         GenerationEvaluationSet((_case(), development))
+
+
+def test_generation_evaluation_set_round_trips_canonical_jsonl() -> None:
+    original = GenerationEvaluationSet((_case(),))
+
+    restored = GenerationEvaluationSet.from_jsonl(original.to_jsonl())
+
+    assert restored == original
+
+
+@pytest.mark.parametrize(
+    "serialized",
+    (
+        "not-json\n",
+        "{}\n",
+        '{"schema_version":"generation-evaluation-case/v1","unknown":true}\n',
+    ),
+)
+def test_generation_evaluation_set_rejects_malformed_jsonl(serialized: str) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        GenerationEvaluationSet.from_jsonl(serialized)
