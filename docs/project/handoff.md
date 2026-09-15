@@ -65,12 +65,11 @@ UI, but only CLI is active now.
   and all abstract-derived packers exclude the title. Each packer also has fixed BM25 fusion and a separate
   one-at-a-time incremental pool strategy.
 - Generation uses `nvidia/Qwen3.6-35B-A3B-NVFP4` without tool calls.
-- Generation context is now an application port with three CLI-selectable policies.
-  `whole-document` remains the compatibility default. `top-dp-chunks` selects at most two hosted
-  ColBERT-scored raw DP chunks per retrieved parent; `adaptive` keeps exact one-view abstracts whole
-  and chunks longer parents. Both opt-in modes require existing `coref-nominal-dp-colbert` rows and
-  the ColBERT service. Citation validation remains against retrieved parent IDs, and returned
-  evidence is the actual supplied context. No live generation-quality comparison has run.
+- Generation context is an application port with two distinct policies. `whole-document` remains
+  the compatibility default; `adaptive` keeps exact one-view abstracts whole and ColBERT-selects at
+  most two raw DP chunks for longer parents. The accepted legacy name `top-dp-chunks` is now an
+  exact alias for `adaptive`, not a third evaluation arm. The corrected 160-claim automatic
+  comparison is retained; its blinded human groundedness review remains pending.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
 - `application-composition-root`, `cli-interface`, and the bounded
   `product-validation-challenges` corpus are active in `harness/capabilities.json`.
@@ -96,8 +95,8 @@ channel, fixed title-plus-token default, six-generator pool, completed practical
 and RankZephyr deferral.
 `docs/adr/0027-dual-dp-multiview-colbert.md` records raw dual-profile boundaries,
 exact ColBERT tokenizer revision, four-generator ownership, and title/max-content score fusion.
-`docs/adr/0028-generation-context-assembly.md` records the whole-document control, bounded top-DP
-context selection, adaptive exact-view policy, and parent-document citation boundary.
+`docs/adr/0028-generation-context-assembly.md` records the whole-document control, canonical
+adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citation boundary.
 
 ## Live environment observed 2026-08-27
 

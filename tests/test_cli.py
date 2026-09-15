@@ -272,13 +272,13 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
 
         def run(self, **kwargs):
             built.update(kwargs)
-            return GenerationEvaluationExecutionSummary(3, 0, 3, 0)
+            return GenerationEvaluationExecutionSummary(2, 0, 2, 0)
 
     report = GenerationEvaluationReport(
         "generation-evaluation-report/v2",
         "development-1",
-        3,
-        3,
+        2,
+        2,
         0,
         True,
         (),
@@ -323,11 +323,11 @@ def test_run_generation_evaluation_uses_manifest_boundary_and_results_path(
 
     assert result.exit_code == 0
     assert json.loads(result.stdout) == {
-        "expected_rows": 3,
+        "expected_rows": 2,
         "failed_rows": 0,
         "preexisting_rows": 0,
         "report_path": "artifacts/results.report.json",
-        "written_rows": 3,
+        "written_rows": 2,
     }
     assert built["retrieval_strategy"] is RetrievalStrategyName.POOLED_COREF_INTERVAL_COLBERT
     assert built["run_id"] == "development-1"

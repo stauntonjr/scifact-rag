@@ -24,6 +24,7 @@ from .generation import GenerationContextStrategyName
 from .generation_evaluation import (
     GenerationEvaluationExecutor,
     build_generation_evaluation_report,
+    generation_evaluation_expected_rows,
     read_generation_evaluation_records,
     write_generation_evaluation_report,
 )
@@ -241,10 +242,11 @@ def run_generation_eval(
         output=results_path,
     )
     report_path = results_path.with_suffix(".report.json")
+    records = read_generation_evaluation_records(results_path)
     report = build_generation_evaluation_report(
-        read_generation_evaluation_records(results_path),
+        records,
         run_id=run_manifest.run_id,
-        expected_rows=len(cases.cases) * len(GenerationContextStrategyName),
+        expected_rows=generation_evaluation_expected_rows(len(cases.cases), records),
     )
     write_generation_evaluation_report(report, report_path)
     response = asdict(summary)

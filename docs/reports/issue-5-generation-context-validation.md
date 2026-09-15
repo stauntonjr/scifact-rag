@@ -125,8 +125,9 @@ time; an agent must not invent that provenance.
 ## Disposition
 
 Keep whole-document as the simple generation default. Keep one chunk-aware strategy as an opt-in
-scalability path, but treat `top-dp-chunks` and `adaptive` as duplicate public behavior until a
-separate simplification decision removes or redefines one. Do not run another SciFact validation
+scalability path. `adaptive` is the canonical chunk-aware policy and `top-dp-chunks` remains an
+exact compatibility alias. New paired evaluations compare only whole-document and adaptive; the
+retained historical three-name records remain reportable. Do not run another SciFact validation
 comparison or tune the context policy from these results. Issue #5 remains open only for the frozen
 human review and its joined report; that review cannot retroactively promote a policy without the
 missing prospective margin.

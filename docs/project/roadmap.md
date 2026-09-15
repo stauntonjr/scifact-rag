@@ -48,7 +48,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Pointwise ranking | Whole-title-plus-abstract ColBERT reaches test nDCG 0.744417 and recall 0.852667 under a local protocol that is not identical to the published full-corpus protocol | ColBERT is the practical ranking leader, but the result does not authorize further test-set tuning |
 | Long-document ranking | Fixed-pool DP content-max ColBERT reaches development nDCG 0.755459 and recall 0.870853, close to the whole-document control at 0.759619 and 0.869055 | DP content views are a credible scalable representation even though the complete multiview fusion regressed |
 | Current retrieval default | Dedicated-title plus token-window equal RRF reaches only test nDCG 0.548652 and recall 0.705167; BM25 plus token windows reaches 0.669962 and 0.819222 | The compatibility default must be revisited through validation, not silently replaced from test evidence |
-| Generation | Whole-document, top-DP-chunks, and adaptive context policies are implemented; bounded live examples work | No fixed comparison has established generation correctness or selected a context default |
+| Generation | Corrected 160-claim automatic validation retains whole-document as default; adaptive is the one canonical chunk-aware policy and the frozen human review is pending | Do not rerun or tune on SciFact validation; complete the blinded review before closing Phase 1 |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Graph | Candidate/scorer provenance can accept another channel; proposition extraction and graph storage are not implemented | Graph scoring can be added without rewriting retrieval, but must be separately measured |
 | Interfaces | CLI is active; HTTP, MCP, and web UI are inactive | New interfaces remain out of the current product proof |
@@ -101,7 +101,7 @@ multi-step recovery that cannot remain clear in ordinary application services.
 | Order | Phase | Product result | Gate to proceed |
 |---:|---|---|---|
 | 0 | Establish the execution boundary | Reproducible manifests and canonical work items | Evaluation inputs and immutable settings recorded |
-| 1 | Evaluate generation context | Evidence-backed choice among whole-document, top-DP, and adaptive | Context strategy decision accepted in an ADR |
+| 1 | Evaluate generation context | Whole-document control versus canonical adaptive chunking | Automatic decision recorded; frozen human review completed |
 | 2 | Select the retrieval default | One defensible default plus retained opt-in experiments | Validation gate passed without test-set tuning |
 | 3 | Add scientific inference scoring | Support, contradiction, and insufficiency become explicit evidence | Fixed validation comparison demonstrates useful incremental signal |
 | 4 | Add proposition-graph scoring | Candidate-scoped graph evidence becomes a provenance-bearing ranking channel | Graph scorer improves a predeclared metric or closes a characterized failure set |
@@ -151,17 +151,20 @@ without adding product features.
 
 ### Question
 
-For a fixed retrieved parent ranking, should Qwen receive complete abstracts, the top ColBERT-scored
-DP chunks, or an adaptive mixture?
+For a fixed retrieved parent ranking, should Qwen receive complete abstracts or the adaptive
+ColBERT-selected DP context?
 
 ### Fixed comparison
 
-Compare exactly these existing policies:
+Compare exactly these distinct policies in future runs:
 
 - `whole-document`: title plus complete abstract for every retrieved parent;
-- `top-dp-chunks`: at most two raw `coref-nominal-dp-colbert` chunks per parent;
 - `adaptive`: complete abstract when its stored DP representation is one exact view, otherwise the
   same top-two selection.
+
+`top-dp-chunks` remains an accepted compatibility alias for `adaptive`. The retained validation
+report contains both historical names and proved their contexts and outputs identical on all 160
+claims; new paired runs do not create a redundant third row.
 
 Hold the following constant across paired runs:
 
@@ -217,12 +220,10 @@ automatic stance and citation scores remain outside that worksheet.
 
 ### Decision rule
 
-- Keep `whole-document` if neither chunk-aware policy preserves answer/stance correctness and
+- Keep `whole-document` if the chunk-aware policy does not preserve answer/stance correctness and
   citation validity while materially reducing context on cases that actually require chunking.
 - Promote `adaptive` only if it is non-inferior on the fixed quality measures and reduces median
   input tokens or truncation exposure on the long-document subset.
-- Promote `top-dp-chunks` only if it outperforms `adaptive`; lower token count alone is insufficient
-  when it omits required scientific qualifiers.
 - If the validation set is too small for a long-document conclusion, retain whole-document as the
   default and carry adaptive forward as the explicitly scalable opt-in policy.
 
@@ -231,7 +232,8 @@ opened. It may not be chosen after observing outcomes.
 
 ### Exit gate
 
-- One retained report compares all three policies on identical parent rankings.
+- The retained historical report compares all three recorded names on identical parent rankings;
+  future reports compare the two distinct policies.
 - Every aggregate number can be traced to a per-query record and run manifest.
 - Failures and missing annotations are reported explicitly.
 - ADR-0028 is confirmed or superseded with the selected default and its evidence boundary.
@@ -503,8 +505,10 @@ Create these Issues in order, splitting only when a reviewer could accept one re
 next:
 
 1. Freeze generation-evaluation manifest and run-artifact contract.
-2. Compare whole-document, top-DP, and adaptive generation contexts.
-3. Decide and document the generation-context default.
+2. Retain the completed whole-document versus adaptive automatic comparison and its historical
+   three-name evidence.
+3. Complete the frozen blinded human review and close the generation-context decision without
+   post-result tuning.
 4. Compare the three frozen retrieval-default candidates on validation.
 5. Decide and document the retrieval default.
 6. Add one fixed scientific stance/inference scorer.

@@ -69,13 +69,13 @@ The ordered delivery plan, phase gates, stop rules, and explicit deferrals are d
 [`docs/project/roadmap.md`](docs/project/roadmap.md).
 
 Generation context is separately selectable from retrieval. `whole-document` remains the
-compatibility default and sends each retrieved title and complete abstract. `top-dp-chunks` loads
-the existing raw 510-token `coref-nominal-dp-colbert` views, scores them with the hosted ColBERT
-service, and sends at most two chunks per retrieved parent. `adaptive` keeps a complete abstract
-when its DP representation is one exact matching view and otherwise uses the same top-two
-selection. Parent retrieval order is preserved; selected chunks are restored to source order
-within each parent, titles remain attached, and citations still name parent document IDs. These
-are implemented context policies, not measured generation-quality results.
+compatibility default and sends each retrieved title and complete abstract. `adaptive` keeps a
+complete abstract when its DP representation is one exact matching view; otherwise it scores the
+stored raw 510-token `coref-nominal-dp-colbert` views with hosted ColBERT and sends at most two
+chunks per retrieved parent. The legacy `top-dp-chunks` CLI value is retained as an exact alias for
+`adaptive`, not a third policy. Parent retrieval order is preserved; selected chunks are restored
+to source order within each parent, titles remain attached, and citations still name parent
+document IDs.
 
 Before a live generation comparison, validate its complete versioned run manifest without opening
 the database or calling a model service:
@@ -95,8 +95,8 @@ are documented in
 That document also records the pinned official SciFact sentence-level source and the
 `build-generation-eval-manifest` command. The deterministic validation input contains 160 cases and
 has SHA-256 `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105`.
-The paired runner retrieves parents once per claim, applies all three policies, flushes each raw
-result row durably, and resumes only missing claim-policy pairs. Its run manifest must declare
+The paired runner retrieves parents once per claim, applies the two distinct policies, flushes each
+raw result row durably, and resumes only missing claim-policy pairs. Its run manifest must declare
 `context_strategy` as `paired`; it does not change the interactive `ask` default. Server-reported
 Qwen prompt/completion tokens, a fixed per-request seed, a parseable SciFact verdict, separate
 assembly/generator timings, and a sibling
@@ -119,8 +119,9 @@ docker compose run --rm app ask "What evidence links immune signaling to disease
 docker compose run --rm app evaluate --cutoff 10
 ```
 
-The two chunk-aware generation modes require the existing DP rows and the healthy ColBERT service.
-They do not change retrieval and can be paired with any retrieval strategy:
+The chunk-aware generation policy requires the existing DP rows and the healthy ColBERT service.
+It does not change retrieval and can be paired with any retrieval strategy. The legacy command is
+shown only to document compatibility; both commands now select the same adaptive policy:
 
 ```bash
 docker compose run --rm app ingest --strategy pooled-coref-nominal-dp-colbert

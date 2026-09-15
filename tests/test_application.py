@@ -361,11 +361,11 @@ def test_ask_rejects_context_from_an_unretrieved_parent_before_generation() -> N
 @pytest.mark.parametrize(
     ("context_strategy", "adaptive"),
     (
-        (GenerationContextStrategyName.TOP_DP_CHUNKS, False),
+        (GenerationContextStrategyName.TOP_DP_CHUNKS, True),
         (GenerationContextStrategyName.ADAPTIVE, True),
     ),
 )
-def test_composition_wires_opt_in_dp_generation_context(
+def test_composition_wires_both_dp_names_to_the_adaptive_policy(
     monkeypatch: pytest.MonkeyPatch,
     context_strategy: GenerationContextStrategyName,
     adaptive: bool,
@@ -420,7 +420,7 @@ def test_composition_defaults_to_whole_document_generation_context(
     assert isinstance(application._context_assembler, WholeDocumentContextAssembler)
 
 
-def test_composition_builds_all_three_paired_generation_context_policies(
+def test_composition_builds_only_the_two_distinct_generation_context_policies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = FakeStore()
@@ -432,20 +432,18 @@ def test_composition_builds_all_three_paired_generation_context_policies(
 
     evaluator = composition.build_generation_evaluator()
 
+    assert set(evaluator._assemblers) == {
+        GenerationContextStrategyName.WHOLE_DOCUMENT,
+        GenerationContextStrategyName.ADAPTIVE,
+    }
     assert isinstance(
         evaluator._assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT],
         WholeDocumentContextAssembler,
-    )
-    top_dp = cast(
-        DpChunkContextAssembler,
-        evaluator._assemblers[GenerationContextStrategyName.TOP_DP_CHUNKS],
     )
     adaptive = cast(
         DpChunkContextAssembler,
         evaluator._assemblers[GenerationContextStrategyName.ADAPTIVE],
     )
-    assert top_dp._store is store
-    assert top_dp._adaptive is False
     assert adaptive._store is store
     assert adaptive._adaptive is True
     assert evaluator._generator is generator

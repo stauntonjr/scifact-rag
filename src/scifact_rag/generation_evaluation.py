@@ -16,7 +16,17 @@ from .application import finalize_generated_answer
 from .domain import GeneratedAnswer, SearchHit
 from .evaluation import GenerationEvaluationCase, GenerationEvaluationSet, ScientificStance
 from .generation import GenerationContextStrategyName
-from .ports import AnswerGenerator, GenerationContextAssembler, MeasuredAnswerGenerator, Retriever
+from .ports import (
+    AnswerGenerator,
+    GenerationContextAssembler,
+    MeasuredAnswerGenerator,
+    Retriever,
+)
+
+GENERATION_EVALUATION_STRATEGIES = (
+    GenerationContextStrategyName.WHOLE_DOCUMENT,
+    GenerationContextStrategyName.ADAPTIVE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +141,19 @@ class GenerationEvaluationRecord:
             raise ValueError(f"generation evaluation record values are invalid: {exc}") from exc
 
 
+def generation_evaluation_expected_rows(
+    case_count: int,
+    records: Sequence[GenerationEvaluationRecord] = (),
+) -> int:
+    strategy_count = len(GENERATION_EVALUATION_STRATEGIES)
+    if any(
+        record.result.context_strategy is GenerationContextStrategyName.TOP_DP_CHUNKS
+        for record in records
+    ):
+        strategy_count += 1
+    return case_count * strategy_count
+
+
 @dataclass(frozen=True, slots=True)
 class GenerationEvaluationExecutionSummary:
     expected_rows: int
@@ -182,8 +205,14 @@ def build_generation_evaluation_report(
     keys = {(record.result.query_id, record.result.context_strategy) for record in records}
     if len(keys) != len(records):
         raise ValueError("generation evaluation report records must be unique by query and policy")
+    present_strategies = {record.result.context_strategy for record in records}
+    report_strategies = tuple(
+        strategy
+        for strategy in GenerationContextStrategyName
+        if strategy in GENERATION_EVALUATION_STRATEGIES or strategy in present_strategies
+    )
     summaries: list[GenerationStrategySummary] = []
-    for strategy in GenerationContextStrategyName:
+    for strategy in report_strategies:
         results = [
             record.result for record in records if record.result.context_strategy is strategy
         ]
@@ -309,7 +338,7 @@ class PairedGenerationEvaluator:
         case: GenerationEvaluationCase,
         *,
         retrieval_limit: int,
-        strategies: Sequence[GenerationContextStrategyName] = tuple(GenerationContextStrategyName),
+        strategies: Sequence[GenerationContextStrategyName] = GENERATION_EVALUATION_STRATEGIES,
     ) -> tuple[GenerationEvaluationResult, ...]:
         if retrieval_limit < 1:
             raise ValueError("retrieval_limit must be positive")
@@ -614,7 +643,7 @@ class GenerationEvaluationExecutor:
         for case in evaluation_set.cases:
             missing = tuple(
                 strategy
-                for strategy in GenerationContextStrategyName
+                for strategy in GENERATION_EVALUATION_STRATEGIES
                 if (case.query_id, strategy) not in existing
             )
             if not missing:
@@ -636,7 +665,10 @@ class GenerationEvaluationExecutor:
 
         all_records = tuple(existing.values())
         return GenerationEvaluationExecutionSummary(
-            expected_rows=len(evaluation_set.cases) * len(GenerationContextStrategyName),
+            expected_rows=generation_evaluation_expected_rows(
+                len(evaluation_set.cases),
+                all_records,
+            ),
             preexisting_rows=len(records),
             written_rows=len(written),
             failed_rows=sum(record.result.error_type is not None for record in all_records),

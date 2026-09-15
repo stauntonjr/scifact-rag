@@ -457,7 +457,7 @@ def build_application(
                 resolved.late_interaction_base_url,
                 resolved.late_interaction_model,
             ),
-            adaptive=(generation_context_strategy is GenerationContextStrategyName.ADAPTIVE),
+            adaptive=True,
         )
     )
     return RagApplication(
@@ -502,7 +502,6 @@ def build_generation_evaluator(
         retriever=_ApplicationRetriever(retrieval_application),
         assemblers={
             GenerationContextStrategyName.WHOLE_DOCUMENT: WholeDocumentContextAssembler(),
-            GenerationContextStrategyName.TOP_DP_CHUNKS: DpChunkContextAssembler(store, colbert),
             GenerationContextStrategyName.ADAPTIVE: DpChunkContextAssembler(
                 store,
                 colbert,

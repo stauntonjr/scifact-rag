@@ -6,6 +6,10 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Simplified generation-context evaluation to the two distinct policies supported by the corrected
+  validation: `whole-document` and `adaptive`. The legacy `top-dp-chunks` CLI value remains a
+  compatibility alias for adaptive assembly, while new paired runs no longer spend a duplicate
+  row or model call on it. Aggregate reporting still recognizes retained three-policy artifacts.
 - Completed the corrected automatic 160-claim generation-context comparison with 480/480 retained
   rows, zero execution failures, 480 parseable verdicts, and exact response reuse for 249 duplicate
   prompts. Whole-document scores 0.8125 stance accuracy versus 0.8250 for the identical DP/adaptive

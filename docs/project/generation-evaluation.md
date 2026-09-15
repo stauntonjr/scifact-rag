@@ -74,7 +74,8 @@ docker compose run --rm app run-generation-eval \
 ```
 
 The runner validates the input checksum, split, fixed prompt digest, and fixed seed against the run
-manifest, retrieves one parent ranking per claim, and sends that same ordered ranking to all three context policies. It appends
+manifest, retrieves one parent ranking per claim, and sends that same ordered ranking to the two
+distinct context policies: `whole-document` and `adaptive`. It appends
 and flushes one canonical JSONL record at a time. On restart it validates the existing file and
 runs only missing `(query_id, context_strategy)` pairs; duplicate, foreign-run, malformed, and
 out-of-set rows fail explicitly.
@@ -117,7 +118,7 @@ token, and latency summaries. The raw JSONL remains authoritative.
 | `source_split` | `train-development`, `train-validation`, or `test` |
 | `purpose` | `development`, `default-selection`, or `test-confirmation` |
 | `retrieval_strategy` | Exact CLI retrieval strategy name |
-| `context_strategy` | One exact policy name, or `paired` for the fixed three-policy comparison |
+| `context_strategy` | One accepted policy name, or `paired` for the fixed two-policy comparison; `top-dp-chunks` is a legacy alias for `adaptive` |
 | `retrieval_limit` | Number of retrieved parent documents, from 1 through 100 |
 | `components` | Non-empty, uniquely named component identifiers and revisions |
 | `generator` | Temperature, maximum answer tokens, and thinking setting |

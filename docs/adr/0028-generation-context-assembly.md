@@ -24,15 +24,16 @@ and the ColBERT token boundary is not a Qwen prompt-token guarantee.
   context assembly owns only the evidence text supplied to generation.
 - Depend on a narrow `StoredChunkSource` port for context loading rather than the full evidence
   store contract; the PostgreSQL store satisfies both ports through its existing `load_chunks`.
-- Expose three `ask --context-strategy` values:
+- Expose two distinct generation policies while retaining three accepted
+  `ask --context-strategy` values:
   - `whole-document` preserves the retrieved title and complete abstract unchanged and remains the
     compatibility default.
-  - `top-dp-chunks` loads every stored raw `coref-nominal-dp-colbert` view for each retrieved
-    parent, scores chunk text without the title in one ColBERT request, and selects at most two per
-    parent. The title is restored only in the generator context, so it does not consume the
-    scorer's 510-token content budget or bias every chunk from that parent.
   - `adaptive` preserves a whole abstract only when its stored DP representation is exactly one
-    view equal to that abstract; otherwise it uses the same top-two chunk selection.
+    view equal to that abstract. Otherwise it loads every stored raw
+    `coref-nominal-dp-colbert` view for the parent, scores chunk text without the title in one
+    ColBERT request, and selects at most two. The title is restored only in generator context.
+  - `top-dp-chunks` remains accepted as a compatibility alias for `adaptive`; it is not separately
+    assembled or evaluated.
 - Preserve retrieved parent order so every document can contribute before a later document is
   considered. Within each parent, select by descending ColBERT score with lower ordinal as the
   deterministic tie-break, then restore source ordinal order for generator readability.
@@ -58,8 +59,8 @@ and the ColBERT token boundary is not a Qwen prompt-token guarantee.
 
 ### Negative
 
-- Both opt-in chunk modes require the stored DP representation and one additional ColBERT scoring
-  request after retrieval.
+- The opt-in chunk policy requires the stored DP representation and one additional ColBERT scoring
+  request after retrieval when the document has multiple stored views.
 - Two chunks from one parent repeat its title and document ID in the prompt and in returned
   evidence.
 - The fixed two-per-parent policy and lack of a global Qwen-token counter are implementation
@@ -105,7 +106,9 @@ accuracy were 0.8125 and 0.8250 overall and tied at 0.8387 on the 31 long/retrie
 not reduce median input tokens, increased the long-subset median, and reduced conditional gold
 evidence recall. Whole-document is retained as the default. The two chunk strategy names produced
 identical contexts and outcomes for all 160 claims, so their duplication is a simplification
-follow-up rather than evidence for either label. The blinded human review remains pending and no
+follow-up rather than evidence for either label. That follow-up now makes `adaptive` canonical,
+retains `top-dp-chunks` as an exact CLI alias, and limits future paired evaluation to
+`whole-document` and `adaptive`; retained three-policy records remain reportable. The blinded human review remains pending and no
 prospective non-inferiority margin exists; no promotion claim is made.
 
 ## Verification and revisit trigger
@@ -115,7 +118,7 @@ per-parent selection, deterministic ordering and ties, batch scorer alignment, m
 failure, composition and CLI exposure, actual-context handoff, and retrieved-parent citation
 validation. No live model result is required for implementation acceptance.
 
-Revisit after a fixed downstream comparison of whole-document, top-DP, and adaptive contexts using
+Revisit after downstream comparison of whole-document and adaptive contexts using
 answer or label correctness, evidence-sentence recall, citation correctness, groundedness, input
 tokens, and latency. Supersede this decision if longer documents require a global generator-token
 budget, neighboring evidence expansion, more than one representation, or a different passage

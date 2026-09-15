@@ -21,6 +21,7 @@ from scifact_rag.generation_evaluation import (
     GenerationEvaluationReport,
     PairedGenerationEvaluator,
     build_generation_evaluation_report,
+    generation_evaluation_expected_rows,
     write_generation_evaluation_report,
 )
 
@@ -137,14 +138,15 @@ def test_paired_evaluator_retrieves_once_and_preserves_parent_order_for_every_po
     assert retriever.calls == [("Drug A lowers marker B.", 2)]
     assert [result.context_strategy for result in results] == [
         GenerationContextStrategyName.WHOLE_DOCUMENT,
-        GenerationContextStrategyName.TOP_DP_CHUNKS,
         GenerationContextStrategyName.ADAPTIVE,
     ]
-    assert all(
-        call == [("Drug A lowers marker B.", parents)]
-        for assembler in assemblers.values()
-        for call in [assembler.calls]
-    )
+    assert assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT].calls == [
+        ("Drug A lowers marker B.", parents)
+    ]
+    assert assemblers[GenerationContextStrategyName.TOP_DP_CHUNKS].calls == []
+    assert assemblers[GenerationContextStrategyName.ADAPTIVE].calls == [
+        ("Drug A lowers marker B.", parents)
+    ]
     assert all(result.retrieved_parent_ids == ("2", "1") for result in results)
 
 
@@ -218,7 +220,6 @@ def test_paired_evaluator_reuses_one_generation_for_byte_identical_contexts() ->
     assert len({result.raw_generated_text for result in results}) == 1
     assert results[0].generation_reused_from is None
     assert results[1].generation_reused_from == "whole-document"
-    assert results[2].generation_reused_from == "whole-document"
 
 
 def test_paired_evaluator_retains_policy_failure_and_continues_other_policies() -> None:
@@ -235,7 +236,11 @@ def test_paired_evaluator_retains_policy_failure_and_continues_other_policies() 
         generator=RecordingGenerator({"Drug A lowers marker B.": "Supported [1]"}),
     )
 
-    results = evaluator.evaluate(_case(), retrieval_limit=1)
+    results = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=tuple(GenerationContextStrategyName),
+    )
 
     failed = results[1]
     assert failed.context_strategy is GenerationContextStrategyName.TOP_DP_CHUNKS
@@ -346,9 +351,9 @@ def test_generation_evaluation_executor_resumes_only_missing_policy_rows(
         output=output,
     )
 
-    assert summary.expected_rows == 3
+    assert summary.expected_rows == 2
     assert summary.preexisting_rows == 1
-    assert summary.written_rows == 2
+    assert summary.written_rows == 1
     assert summary.failed_rows == 0
     assert retriever.calls == [("Drug A lowers marker B.", 1)]
     assert assemblers[GenerationContextStrategyName.WHOLE_DOCUMENT].calls == []
@@ -358,7 +363,6 @@ def test_generation_evaluation_executor_resumes_only_missing_policy_rows(
     ]
     assert [(record.result.query_id, record.result.context_strategy) for record in records] == [
         ("17", GenerationContextStrategyName.WHOLE_DOCUMENT),
-        ("17", GenerationContextStrategyName.TOP_DP_CHUNKS),
         ("17", GenerationContextStrategyName.ADAPTIVE),
     ]
 
@@ -399,7 +403,7 @@ def test_paired_evaluator_retains_retrieval_failure_for_every_requested_policy()
 
     results = evaluator.evaluate(_case(), retrieval_limit=5)
 
-    assert len(results) == 3
+    assert len(results) == 2
     assert all(result.error_type == "TimeoutError" for result in results)
     assert all(result.error_message == "retrieval timed out" for result in results)
     assert all(result.retrieved_parent_ids == () for result in results)
@@ -418,7 +422,7 @@ def test_paired_evaluator_records_no_retrieval_as_valid_insufficient_evidence() 
 
     results = evaluator.evaluate(_case(), retrieval_limit=5)
 
-    assert len(results) == 3
+    assert len(results) == 2
     assert all(result.raw_generated_text is None for result in results)
     assert all(result.answer_text == "insufficient evidence" for result in results)
     assert all(result.citation_valid is True for result in results)
@@ -460,7 +464,11 @@ def test_generation_evaluation_report_aggregates_each_policy_without_dropping_fa
         assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
         generator=RecordingGenerator({parent.text: "Supported [1]"}),
     )
-    base = evaluator.evaluate(_case(), retrieval_limit=1)
+    base = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=tuple(GenerationContextStrategyName),
+    )
     records = (
         GenerationEvaluationRecord(
             "development-1",
@@ -524,6 +532,25 @@ def test_generation_evaluation_report_aggregates_each_policy_without_dropping_fa
     assert adaptive.median_input_tokens is None
 
 
+def test_generation_evaluation_expected_rows_recognizes_legacy_three_policy_records() -> None:
+    parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
+    assembler = RecordingAssembler([parent])
+    evaluator = PairedGenerationEvaluator(
+        retriever=RecordingRetriever([parent]),
+        assemblers={strategy: assembler for strategy in GenerationContextStrategyName},
+        generator=RecordingGenerator({parent.text: "Supported [1]"}),
+    )
+    results = evaluator.evaluate(
+        _case(),
+        retrieval_limit=1,
+        strategies=tuple(GenerationContextStrategyName),
+    )
+    records = tuple(GenerationEvaluationRecord("development-1", result) for result in results)
+
+    assert generation_evaluation_expected_rows(1, records[:1]) == 2
+    assert generation_evaluation_expected_rows(1, records) == 3
+
+
 def test_generation_evaluation_report_aggregates_only_parseable_stance_predictions() -> None:
     parent = SearchHit("1", "Study", "Drug A lowers marker B.", 1.0)
     assembler = RecordingAssembler([parent])
@@ -543,9 +570,13 @@ def test_generation_evaluation_report_aggregates_only_parseable_stance_predictio
     report = build_generation_evaluation_report(
         (GenerationEvaluationRecord("development-1", result),),
         run_id="development-1",
-        expected_rows=3,
+        expected_rows=2,
     )
 
+    assert [summary.context_strategy for summary in report.strategies] == [
+        GenerationContextStrategyName.WHOLE_DOCUMENT,
+        GenerationContextStrategyName.ADAPTIVE,
+    ]
     whole = report.strategies[0]
     assert whole.stance_scored_rows == 1
     assert whole.stance_accuracy == 1.0
