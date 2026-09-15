@@ -6,6 +6,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Retained the first fixed 160-claim, 480-row generation-context execution as diagnostic evidence.
+  All rows completed, but `top-dp-chunks` and `adaptive` supplied identical context and unseeded
+  temperature-0.1 sampling produced different answers. DP did not reduce median input tokens and
+  lost some gold evidence, so `whole-document` remains the default; no quality promotion is claimed
+  until deterministic stance output and fixed human review exist.
 - Added selectable generation-context assembly after retrieval. `whole-document` remains the
   compatibility default; `top-dp-chunks` ColBERT-scores the stored raw 510-token DP views and sends
   at most two per retrieved parent; `adaptive` preserves a whole abstract only when it is one exact

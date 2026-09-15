@@ -87,6 +87,16 @@ and the ColBERT token boundary is not a Qwen prompt-token guarantee.
 | Add adjacent-sentence or coreference expansion now | Plausible mitigation for missing local context | Needs a trigger, token budget, and downstream evaluation not yet selected |
 | Add a generator-tokenizer budget now | Would provide a stronger prompt-fit guarantee | Introduces a model-specific dependency and tuning boundary beyond this slice |
 
+## 2026-09-14 validation review
+
+The first fixed 160-claim execution is retained in
+`docs/reports/issue-5-generation-context-diagnostic.md`. It completed all 480 rows, but exposed that
+`top-dp-chunks` and `adaptive` are operationally identical for the current raw DP representation
+and that unseeded temperature-0.1 sampling confounds their answer differences. DP did not lower
+median input tokens overall or on the long/retrieved subset and omitted some gold evidence. The
+whole-document compatibility default is therefore retained. This is not a completed downstream
+quality comparison: deterministic stance output and the fixed human review are still missing.
+
 ## Verification and revisit trigger
 
 Focused tests must prove compatibility-default behavior, exact adaptive qualification, bounded
