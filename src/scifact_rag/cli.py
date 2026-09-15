@@ -7,9 +7,9 @@ from typing import Annotated
 
 import typer
 
-from .adapters.scifact import BeirSciFact, QrelsSplit
+from .adapters.scifact import BeirSciFact, QrelsSplit, SciFactGenerationEvaluationSource
 from .composition import build_application
-from .evaluation import GenerationRunManifest
+from .evaluation import GenerationRunManifest, write_generation_evaluation_set
 from .generation import GenerationContextStrategyName
 from .strategies import RetrievalStrategyName
 
@@ -106,6 +106,41 @@ def generation_eval_dry_run(
     except (OSError, TypeError, ValueError) as exc:
         raise typer.BadParameter(str(exc), param_hint="--manifest") from exc
     typer.echo(validated.to_json(), nl=False)
+
+
+@app.command("build-generation-eval-manifest")
+def build_generation_eval_manifest(
+    official_data_dir: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            readable=True,
+            help="Official SciFact release data directory with sentence arrays.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(help="Destination for canonical generation-evaluation-case/v1 JSONL."),
+    ],
+    data_dir: Annotated[Path, typer.Option(help="BEIR dataset parent directory.")] = Path("data"),
+    split: Annotated[
+        QrelsSplit,
+        typer.Option(help="Training-derived generation evaluation split."),
+    ] = QrelsSplit.TRAIN_VALIDATION,
+) -> None:
+    """Build a fixed generation-evaluation manifest without database or model calls."""
+    if split is QrelsSplit.TEST:
+        raise typer.BadParameter(
+            "generation evaluation construction cannot use the test split",
+            param_hint="--split",
+        )
+    corpus = BeirSciFact.ensure(data_dir, split)
+    evaluation_set = SciFactGenerationEvaluationSource(corpus, official_data_dir).cases()
+    summary = asdict(write_generation_evaluation_set(evaluation_set, output))
+    summary.update({"output": str(output), "source_split": split.value})
+    _emit(summary)
 
 
 @app.command("evaluate")

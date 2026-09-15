@@ -79,6 +79,84 @@ def test_generation_evaluation_dry_run_canonicalizes_a_complete_manifest(
     ]
 
 
+def test_build_generation_evaluation_manifest_writes_exact_official_evidence(
+    tmp_path: Path,
+) -> None:
+    data_dir = tmp_path / "datasets"
+    beir = data_dir / "scifact"
+    official = tmp_path / "official"
+    (beir / "qrels").mkdir(parents=True)
+    official.mkdir()
+    evidence = {"20": [{"sentences": [1], "label": "SUPPORT"}]}
+    (beir / "corpus.jsonl").write_text(
+        json.dumps({"_id": "20", "title": "Title", "text": "Background. Exact support."}) + "\n",
+        encoding="utf-8",
+    )
+    (beir / "queries.jsonl").write_text(
+        json.dumps({"_id": "7", "text": "Supported claim.", "metadata": evidence}) + "\n",
+        encoding="utf-8",
+    )
+    (beir / "qrels/train.tsv").write_text(
+        "query-id\tcorpus-id\tscore\n7\t20\t1\n",
+        encoding="utf-8",
+    )
+    (official / "claims_train.jsonl").write_text(
+        json.dumps(
+            {
+                "id": 7,
+                "claim": "Supported claim.",
+                "evidence": evidence,
+                "cited_doc_ids": [20],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (official / "corpus.jsonl").write_text(
+        json.dumps(
+            {
+                "doc_id": 20,
+                "title": "Title",
+                "abstract": ["Background.", "Exact support."],
+                "structured": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "artifacts" / "validation.jsonl"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "build-generation-eval-manifest",
+            "--data-dir",
+            str(data_dir),
+            "--official-data-dir",
+            str(official),
+            "--split",
+            "train-validation",
+            "--output",
+            str(output),
+        ],
+        env={
+            "DATABASE_URL": "invalid://must-not-be-opened",
+            "GENERATOR_BASE_URL": "http://must-not-be-called.invalid/v1",
+        },
+    )
+
+    assert result.exit_code == 0
+    summary = json.loads(result.stdout)
+    assert summary["cases"] == 1
+    assert summary["support"] == 1
+    assert summary["contradict"] == 0
+    assert summary["not_enough_info"] == 0
+    assert summary["source_split"] == "train-validation"
+    assert summary["output"] == str(output)
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["rationales"][0]["sentences"] == ["Exact support."]
+
+
 def test_cli_and_composition_default_to_equal_title_token_window_rrf() -> None:
     assert (
         signature(build_application).parameters["retrieval_strategy"].default

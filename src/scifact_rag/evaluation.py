@@ -6,7 +6,8 @@ import re
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from enum import StrEnum
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 _SCHEMA_VERSION = "generation-run-manifest/v1"
@@ -171,6 +172,30 @@ class GenerationEvaluationSet:
             evidence_sentences=sum(len(rationale.sentences) for rationale in rationales),
             sha256=self.sha256,
         )
+
+
+def write_generation_evaluation_set(
+    evaluation_set: GenerationEvaluationSet,
+    destination: Path,
+) -> GenerationEvaluationSummary:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staged_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as staged:
+            staged.write(evaluation_set.to_jsonl())
+            staged.flush()
+            staged_path = Path(staged.name)
+        staged_path.replace(destination)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+    return evaluation_set.summary()
 
 
 @dataclass(frozen=True, slots=True)
