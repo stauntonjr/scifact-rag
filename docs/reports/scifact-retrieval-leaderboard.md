@@ -96,10 +96,10 @@ document IDs and loses five in the top ten. Its 0.068975 absolute nDCG gain come
 times the median latency and a ColBERT GPU-service dependency. Content-max also dominates the
 whole-document ColBERT candidate on every reported effectiveness metric and is slightly faster.
 
-ADR-0029 therefore recommends `pooled-coref-interval-content-max-colbert` as the
-retrieval-effectiveness default and retains `bm25-token-window-rrf` as the fast/no-ColBERT
-alternative. This recommendation does not change the current runtime default. Exact provenance,
-artifact hashes, transition counts, and limitations are in
+ADR-0029 therefore selected `pooled-coref-interval-content-max-colbert` as the
+retrieval-effectiveness default and retained `bm25-token-window-rrf` as the fast/no-ColBERT
+alternative. The evaluation itself did not change runtime behavior; Issue #7 later applied the
+decision. Exact provenance, artifact hashes, transition counts, and limitations are in
 `docs/reports/issue-6-retrieval-default-validation.md`.
 
 ## Current title-separated test comparison
@@ -113,15 +113,15 @@ parameter, depth, model, prompt, or fusion value changed for this run.
 |---|---:|---:|---:|---:|---:|---:|
 | Six-generator pool ranked by AnswerAI ColBERT | **0.744417** | **0.703911** | **0.852667** | **0.095667** | **0.716210** | 165.07 s |
 | Six-generator pool ranked by MS MARCO | 0.688308 | 0.642681 | 0.812222 | 0.091333 | 0.657664 | 141.95 s |
-| Current BM25 plus abstract-token-window RRF | 0.669962 | 0.616602 | 0.819222 | 0.091667 | 0.629812 | 22.00 s |
+| BM25 plus abstract-token-window RRF baseline | 0.669962 | 0.616602 | 0.819222 | 0.091667 | 0.629812 | 22.00 s |
 | Dedicated-title plus abstract-token-window RRF | 0.548652 | 0.493130 | 0.705167 | 0.078667 | 0.509983 | 28.35 s |
 
 The six-generator pool averages 137.69 unique documents, reaches candidate recall 0.950333 and
 query-hit rate 0.953333, and has oracle nDCG@10 0.951169. ColBERT therefore recovers most of the
 available ranking quality while retaining materially more relevant top-ten documents than MS
-MARCO. It exceeds the current BM25-plus-abstract-token baseline by 0.074454 nDCG and 0.033444
-recall. The fixed title-plus-token RRF performs poorly enough that its current default status
-should be revisited rather than reinforced from this reused test set.
+MARCO. It exceeds the BM25-plus-abstract-token baseline by 0.074454 nDCG and 0.033444 recall. The
+fixed title-plus-token RRF performed poorly enough that its then-current default status warranted
+revisit; Issue #7 later applied the separately frozen content-max decision.
 
 AnswerAI reports SciFact nDCG@10 0.7477 for full-corpus ColBERT retrieval. The local result is
 0.003283 lower. That small difference is encouraging, but it is not a formal reproduction: the

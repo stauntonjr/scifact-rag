@@ -144,7 +144,7 @@ or starts that GPU workload. The MS MARCO, ColBERT, and RankZephyr experiments a
 services owned by this Compose project and exposed only on host loopback ports 8081 through 8084.
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres late-interaction
 docker compose build app
 docker compose run --rm app download
 docker compose run --rm app ingest
@@ -289,8 +289,8 @@ and graph retrieval are deferred.
 `pooled-colbert` uses the digest-pinned NVIDIA vLLM 26.06 ARM64 image and immutable AnswerAI model
 revision `c72aa89bc61afdd85373643f3a1a75b2aad6e0fe`. The live service resolves the model as
 `HF_ColBERT`, computes MaxSim on the GPU, and accepts at most 512 tokens per query or document.
-Start it explicitly with `docker compose up -d late-interaction`; other CLI strategies do not
-depend on or automatically start it.
+Start it explicitly with `docker compose up -d late-interaction`. Non-ColBERT CLI strategies do not
+depend on it, and no CLI command starts it automatically.
 
 `pooled-coref-interval-rankzephyr` uses `castorini/rank_zephyr_7b_v1_full` at immutable revision
 `aa11d9da444ec3490827656c3b961d5c5f3af0eb`. The model runs in the pinned NVIDIA vLLM image with

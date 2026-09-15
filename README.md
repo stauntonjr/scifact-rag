@@ -6,8 +6,9 @@ and late-interaction methods, then asks a locally hosted Qwen model for a cited 
 explicit `insufficient evidence` result.
 
 This project is deliberately more than a plausible RAG demo: retrieval and generation decisions
-are measured, failure cases remain visible, model and data revisions are pinned, and experimental
-strategies stay modular rather than accumulating in the production score.
+are measured, failure cases remain visible, evaluation component revisions are recorded, selected
+images and checkpoints are pinned, and experimental strategies stay modular rather than
+accumulating in the production score.
 
 ## Measured result
 
@@ -76,7 +77,7 @@ HTTP, MCP, and web adapters remain deferred until the CLI product proof is compl
 
 ## Try it
 
-Requirements are Docker Compose, access to an NVIDIA DGX Spark, and the pinned model assets. The
+Requirements are Docker Compose, access to an NVIDIA DGX Spark, and the required model assets. The
 ColBERT service is required by the selected retrieval default; `ask` also expects the configured
 Qwen OpenAI-compatible endpoint.
 

@@ -28,12 +28,13 @@ UI, but only CLI is active now.
   lifecycle implicitly.
 - Embeddings use `sentence-transformers/paraphrase-MiniLM-L6-v2` with `vector(384)`. Documents are
   represented by one dedicated title vector plus overlapping abstract-only 126-token windows with
-  32-token overlap; fixed equal RRF between those two channels is the default. The best score in
-  each channel is aggregated back to one document. Experimental strict proper-noun, broader
-  nominal, and max-fused coreference-sentence strategies are independently selectable and exclude
-  the title.
+  32-token overlap; fixed equal RRF between those two channels remains selectable as the former
+  default. The best score in each channel is aggregated back to one document. Experimental strict
+  proper-noun, broader nominal, and max-fused coreference-sentence strategies are independently
+  selectable and exclude the title.
 - PostgreSQL-native keyword, VectorChord-BM25, strict-dense-plus-keyword RRF, and seven fixed
-  BM25-plus-vector RRF pairings are selectable experiments. None replaces the default.
+  BM25-plus-vector RRF pairings are selectable. BM25/token-window RRF is the supported
+  fast/no-ColBERT fallback.
 - A pinned MS MARCO cross-encoder over the fixed pooled candidate union is a separately
   hosted TEI GPU experiment. It does not replace the default.
 - Feature-preserving pooled ranking retains generation and matching-passage provenance, completely
@@ -48,14 +49,15 @@ UI, but only CLI is active now.
   nominal-policy analysis derives rewritten sentence candidates plus raw 112/126 MiniLM-DP and raw
   510-token ColBERT-DP profiles. Exactly four generators form the pool; ColBERT separately scores
   titles and all large raw content views, keeps the content maximum, then equal-means the two
-  robust-normalized channels. It does not change the default.
+  robust-normalized channels. It does not define the default.
 - `pooled-coref-interval-multiview-colbert` is a fixed-pool ablation: it applies the same multiview
   scorer, normalizer, and equal-mean policy to the existing six-generator interval pool. It reuses
   stored representations, adds no scoring algorithm or parameter, and remains opt-in.
 - `pooled-coref-interval-content-max-colbert` and
   `pooled-coref-interval-raw-mean-colbert` are fixed-pool component ablations. The first ranks only
   max content; the second takes the equal mean of unscaled title and max-content scores through the
-  generic identity normalizer. Both remain opt-in and leave existing strategies unchanged.
+  generic identity normalizer. ADR-0029 later selected the first as the current default; the second
+  remains opt-in.
 - ADR-0029 selects `pooled-coref-interval-content-max-colbert` as the retrieval-effectiveness
   default after a fixed 160-query comparison, and retains `bm25-token-window-rrf` as the
   fast/no-ColBERT alternative. Issue #7 applies the decision through one shared default constant
@@ -97,14 +99,14 @@ cost, incremental pool comparisons, and idempotent document/BM25 persistence rep
 `docs/adr/0025-expanded-coreference-interval-pool-rerankers.md` records the independent fixed-scorer
 comparison over that latest pool.
 `docs/adr/0026-title-separated-pooling-and-listwise-reranking.md` records the dedicated title
-channel, fixed title-plus-token default, six-generator pool, completed practical scorer comparison,
-and RankZephyr deferral.
+channel, former fixed title-plus-token default, six-generator pool, completed practical scorer
+comparison, and RankZephyr deferral.
 `docs/adr/0027-dual-dp-multiview-colbert.md` records raw dual-profile boundaries,
 exact ColBERT tokenizer revision, four-generator ownership, and title/max-content score fusion.
 `docs/adr/0028-generation-context-assembly.md` records the whole-document control, canonical
 adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citation boundary.
-`docs/adr/0029-retrieval-default-selection.md` records the content-max ColBERT recommendation, BM25
-fallback, operational tradeoff, and unchanged-runtime boundary.
+`docs/adr/0029-retrieval-default-selection.md` records the content-max ColBERT selection, BM25
+fallback, operational tradeoff, and subsequent Issue #7 implementation.
 
 ## Live environment observed 2026-08-27
 
@@ -190,8 +192,8 @@ fallback, operational tradeoff, and unchanged-runtime boundary.
   windows, strict coreference, and nominal coreference through TEI. The single completed 300-query
   GPU run took 87.91 seconds and reports nDCG 0.686962, MAP 0.642502, recall 0.806556, precision
   0.090333, and leaderboard-leading MRR 0.658184. It ranks fourth by nDCG and lowers recall versus
-  standalone BM25 and every fixed BM25-vector fusion, so it remains experimental and token windows
-  remain the default.
+  standalone BM25 and every fixed BM25-vector fusion, so it remained experimental and token windows
+  remained the default at that stage, before Issue #7.
 - The public train qrels now have a deterministic 649-query development and 160-query validation
   partition. On validation, BM25 plus token windows leads nDCG at 0.707033 and recall at 0.809375.
   Complete four-channel pooling reaches nDCG 0.683622 and recall 0.806250; adding MS MARCO reaches
@@ -250,10 +252,10 @@ fallback, operational tradeoff, and unchanged-runtime boundary.
   couples title omission, chunking, max aggregation, and truncation, so it does not isolate max
   alone. Exactly two development diagnostics ran; no weight sweep, validation/test run, promotion,
   or further model evaluation followed.
-- The current BM25-plus-abstract-token RRF reaches test nDCG 0.669962 and recall 0.819222. The
-  owner-selected dedicated-title plus abstract-token equal-RRF default reaches only nDCG 0.548652
-  and recall 0.705167, so the default policy is a current revisit item. No automatic change was
-  made from reused test qrels.
+- In the then-current test comparison, BM25-plus-abstract-token RRF reached nDCG 0.669962 and recall
+  0.819222. The owner-selected dedicated-title plus abstract-token equal-RRF default reached only
+  nDCG 0.548652 and recall 0.705167, making that policy a revisit item. No automatic change was made
+  from reused test qrels; Issue #7 later applied the separately frozen ADR-0029 decision.
 - RankZephyr was not evaluated for effectiveness. Its live window throughput projected roughly 3.4
   hours for 160 queries, and the owner declined both that cost and its distilled-frontier-model
   approach. Its model and coordinator services are stopped; the opt-in implementation remains.
