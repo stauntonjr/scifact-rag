@@ -376,5 +376,6 @@ docker compose run --rm app diagnose-candidates --strategy pooled-coref-interval
 ```
 
 The leaderboard compares retrieval effectiveness, not intrinsic coreference accuracy. No winner is
-automatically promoted. The code still defaults to `title-token-window-rrf`, but the current test
-comparison makes that policy an explicit revisit item rather than a validated winner.
+automatically promoted. ADR-0029 and its fixed Issue #6 comparison separately selected
+`pooled-coref-interval-content-max-colbert`; Issue #7 applies it as the shared CLI and composition
+default. `title-token-window-rrf` remains selectable as the historical control.

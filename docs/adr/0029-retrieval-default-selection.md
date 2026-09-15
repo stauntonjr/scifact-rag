@@ -1,6 +1,6 @@
 # ADR-0029: Retrieval-default selection
 
-- Status: accepted recommendation; implementation pending owner authorization
+- Status: accepted and implemented by GitHub Issue #7
 - Date: 2026-09-15
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: GitHub Issue #6
@@ -36,9 +36,11 @@ Do not select `pooled-coref-interval-colbert` as the default. DP content-max was
 reported ranking metric and slightly faster in the same execution, so the whole-document scorer
 is dominated for this decision. It remains available as a short-document control and diagnostic.
 
-This ADR does not change runtime behavior. `title-token-window-rrf` remains the application default
-until a separate owner-authorized implementation updates CLI and composition defaults, tests, and
-operator documentation together. No test-qrels confirmation, parameter sweep, or new retrieval
+GitHub Issue #7 applies the decision through one shared `DEFAULT_RETRIEVAL_STRATEGY` constant used
+by the CLI and both composition builders. `ingest`, `search`, `ask`, `evaluate`,
+`build_application`, and `build_generation_evaluator` now default to content-max ColBERT. Every
+explicit strategy remains selectable, including `bm25-token-window-rrf` and the former
+`title-token-window-rrf` default. No test-qrels confirmation, parameter sweep, or new retrieval
 experiment follows from this decision.
 
 ## Consequences
@@ -76,7 +78,7 @@ experiment follows from this decision.
 
 | Alternative | Reason not selected |
 |---|---|
-| Keep `title-token-window-rrf` by inertia | Existing evidence identifies it as a weak compatibility default; retaining it is temporary implementation state, not the decision |
+| Keep `title-token-window-rrf` by inertia | Existing evidence identifies it as a weak compatibility default; it remains selectable but is no longer the default |
 | Select BM25 plus token-window RRF | Much faster and simpler, but the fixed quality gap is too large for the product's retrieval-effectiveness objective |
 | Select whole-document ColBERT | Dominated by DP content-max on all reported quality metrics and latency in the fixed run |
 | Fuse title and DP content scores | Earlier fixed ablations showed regression; reopening weights or normalization violates this decision boundary |

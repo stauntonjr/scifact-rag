@@ -1,6 +1,6 @@
 # ADR-0026: Title-separated retrieval and independent neural reranking
 
-- Status: accepted implementation; fixed test comparison complete; default policy requires revisit
+- Status: accepted implementation; default selection superseded by ADR-0029
 - Date: 2026-08-27
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: local retrieval-effectiveness decision; no GitHub repository or Issue exists
@@ -32,7 +32,9 @@ encoding stack.
   only.
 - Make `title-token-window-rrf` the CLI and composition default. It independently retrieves top 50
   title and abstract-token candidates and combines their ranks with fixed equal RRF `k=60`.
-  `token-window` remains selectable as an abstract-only diagnostic.
+  `token-window` remains selectable as an abstract-only diagnostic. ADR-0029 later supersedes only
+  this default choice; the strategy and title-separation architecture remain accepted and
+  selectable.
 - Expand the global-interval candidate pool to six fixed top-50 generators: BM25, title,
   abstract-token windows, proper-noun coreference sentences, nominal-coreference sentences, and
   global coreference-interval packing.

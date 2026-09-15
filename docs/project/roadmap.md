@@ -48,7 +48,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Candidate generation | The six-generator pool reaches 0.950333 candidate recall and 0.951169 oracle nDCG on the already-inspected 300-query test set | Candidate breadth is strong; final ordering is the measured bottleneck |
 | Pointwise ranking | Whole-title-plus-abstract ColBERT reaches test nDCG 0.744417 and recall 0.852667 under a local protocol that is not identical to the published full-corpus protocol | ColBERT is the practical ranking leader, but the result does not authorize further test-set tuning |
 | Long-document ranking | Fixed-pool DP content-max ColBERT reaches development nDCG 0.755459 and recall 0.870853, close to the whole-document control at 0.759619 and 0.869055 | DP content views are a credible scalable representation even though the complete multiview fusion regressed |
-| Current retrieval default | The compatibility default remains dedicated-title plus token-window RRF. ADR-0029 recommends DP content-max ColBERT after it reached validation nDCG 0.742493 and recall 0.806250 versus 0.673519 and 0.787500 for BM25 plus token windows | Applying the recommendation is a separate owner-authorized implementation; no retrieval retuning is planned |
+| Current retrieval default | DP content-max ColBERT is applied through one shared default constant after it reached validation nDCG 0.742493 and recall 0.806250 versus 0.673519 and 0.787500 for BM25 plus token windows | BM25/token-window remains the fast/no-ColBERT fallback; no retrieval retuning is planned |
 | Generation | Corrected 160-claim automatic validation retains whole-document as default; adaptive is the one canonical chunk-aware policy and the frozen human review is pending | Do not rerun or tune on SciFact validation; complete the blinded review before closing Phase 1 |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Graph | Candidate/scorer provenance can accept another channel; proposition extraction and graph storage are not implemented | Graph scoring can be added without rewriting retrieval, but must be separately measured |
@@ -241,8 +241,7 @@ opened. It may not be chosen after observing outcomes.
 
 ## Phase 2: select the retrieval default
 
-Status: fixed comparison and recommendation complete; runtime implementation awaits separate owner
-authorization.
+Status: fixed comparison, decision, and runtime-default implementation complete.
 
 ### Question
 
@@ -285,11 +284,9 @@ apply robust normalization unless a future separately approved hypothesis reopen
 
 ### Exit gate
 
-- One retrieval strategy is the documented recommendation; changing the runtime default is a
-  separately authorized implementation task.
+- One retrieval strategy is the documented and implemented default.
 - Other measured strategies remain named, opt-in experiments rather than deleted code.
-- README, ADRs, and reports distinguish the recommendation from the unchanged CLI and composition
-  defaults.
+- README, CLI help, composition defaults, ADRs, and tests agree.
 - The public test set is used at most once as confirmation after the decision is frozen, and the
   confirmation cannot trigger retuning.
 
@@ -299,9 +296,10 @@ Issue #6 completed 480/480 fixed validation rows without failures. DP content-ma
 reported effectiveness metric at nDCG@10 0.742493 and recall@10 0.806250. Its 638.94 ms median
 latency was about 8.1 times the 78.70 ms BM25/token-window baseline, but the 0.068975 absolute nDCG
 gain justified the existing ColBERT dependency for the retrieval-effectiveness objective.
-ADR-0029 recommends content-max and retains BM25/token-window as the fast/no-ColBERT alternative.
-The already-inspected evidence boundary prevents a clean generalization claim, and neither another
-test run nor a tuning cycle is authorized.
+ADR-0029 selects content-max and Issue #7 applies it through one shared CLI/composition default;
+BM25/token-window remains the fast/no-ColBERT alternative. The already-inspected evidence boundary
+prevents a clean generalization claim, and neither another test run nor a tuning cycle is
+authorized.
 
 ## Phase 3: add scientific inference and stance scoring
 

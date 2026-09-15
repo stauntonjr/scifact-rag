@@ -4,9 +4,9 @@
 
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
 comparison and the fixed retrieval-default comparison are complete. Phase 1 still has its frozen
-human review outstanding, while ADR-0029's retrieval-default recommendation awaits a separate
-owner-authorized implementation. Scientific inference is the next architecture phase; graph,
-adapters, and template evaluation remain downstream.
+human review outstanding, and Issue #7 has applied ADR-0029's selected retrieval default.
+Scientific inference is the next architecture phase; graph, adapters, and template evaluation
+remain downstream.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -56,10 +56,10 @@ UI, but only CLI is active now.
   `pooled-coref-interval-raw-mean-colbert` are fixed-pool component ablations. The first ranks only
   max content; the second takes the equal mean of unscaled title and max-content scores through the
   generic identity normalizer. Both remain opt-in and leave existing strategies unchanged.
-- ADR-0029 recommends `pooled-coref-interval-content-max-colbert` as the
-  retrieval-effectiveness default after a fixed 160-query comparison, and retains
-  `bm25-token-window-rrf` as the fast/no-ColBERT alternative. The runtime still defaults to
-  `title-token-window-rrf`; applying the recommendation requires separate owner authorization.
+- ADR-0029 selects `pooled-coref-interval-content-max-colbert` as the retrieval-effectiveness
+  default after a fixed 160-query comparison, and retains `bm25-token-window-rrf` as the
+  fast/no-ColBERT alternative. Issue #7 applies the decision through one shared default constant
+  used by CLI and composition entry points; explicit strategies remain selectable.
 - MS MARCO, ColBERT, and pinned RankZephyr/RankLLM scorers are independently selectable over the
   latest six-generator global coreference-interval pool: BM25, title, token windows, proper-noun
   coreference, nominal coreference, and interval packing. They do not combine scorer outputs or

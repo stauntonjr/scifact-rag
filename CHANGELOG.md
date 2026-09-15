@@ -11,12 +11,16 @@ All notable changes to the harness are recorded here. The harness version and a 
   operator-attested runtime-component inventory before composition, durably retains every
   per-query ranking or failure, and derives metrics plus
   BM25-to-ColBERT query transitions only from raw rows. This is internal comparative evidence; the
-  product retrieval default has not changed.
+  evaluation itself did not change the product retrieval default.
 - Completed that fixed 160-query comparison with all 480 rows successful. DP content-max ColBERT
   leads at nDCG@10 0.742493 and recall@10 0.806250 versus 0.673519 and 0.787500 for BM25 plus token
   windows, while median latency rises from 78.70 ms to 638.94 ms. ADR-0029 recommends content-max
-  for retrieval effectiveness and keeps BM25 as the fast/no-ColBERT alternative; applying the
-  recommendation remains a separate owner-authorized change.
+  for retrieval effectiveness and keeps BM25 as the fast/no-ColBERT alternative.
+- Applied ADR-0029 through one shared retrieval-default constant used by the CLI and composition
+  builders. Content-max ColBERT is now the default; BM25/token-window and the former title/window
+  default remain explicitly selectable. Replaced the long root README with an outcome-first
+  hiring-manager overview and preserved its full strategy, command, schema, provenance, and
+  operator material in `docs/project/technical-reference.md`.
 - Simplified generation-context evaluation to the two distinct policies supported by the corrected
   validation: `whole-document` and `adaptive`. The legacy `top-dp-chunks` CLI value remains a
   compatibility alias for adaptive assembly, while new paired runs no longer spend a duplicate
