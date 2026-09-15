@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Sequence
@@ -95,6 +96,14 @@ def inference_attempt_started_fixture() -> ScientificInferenceAttemptStarted:
 
 def successful_inference_result_fixture() -> ScientificInferenceResult:
     logits = InferenceLogits(2.0, -1.0, 0.5)
+    evidence = EvidenceChunkSelection(
+        "10",
+        COREF_NOMINAL_DP_MINILM,
+        0,
+        "evidence-10",
+        hashlib.sha256(b"evidence-10").hexdigest(),
+        0.8,
+    )
     return ScientificInferenceResult(
         schema_version="scientific-inference-result/v1",
         run_id="run-1",
@@ -102,7 +111,7 @@ def successful_inference_result_fixture() -> ScientificInferenceResult:
         query_id="1",
         document_id="10",
         claim="Aspirin helps.",
-        claim_sha256="1" * 64,
+        claim_sha256=hashlib.sha256(b"Aspirin helps.").hexdigest(),
         document_title="Study",
         document_sha256="2" * 64,
         bundle_digest="b" * 64,
@@ -112,10 +121,20 @@ def successful_inference_result_fixture() -> ScientificInferenceResult:
         baseline_rank=1,
         colbert_score=0.9,
         gold_label=ScientificInferenceLabel.ENTAILMENT,
-        admitted=(),
+        admitted=(evidence,),
         rejected=(),
         pair_token_count=17,
+        model=DEBERTA_MODEL,
         model_revision=DEBERTA_REVISION,
+        tokenizer=DEBERTA_MODEL,
+        tokenizer_revision=DEBERTA_REVISION,
+        tokenizer_maximum_length=512,
+        scorer="colbert-content",
+        scorer_revision="c72aa89bc61afdd85373643f3a1a75b2aad6e0fe",
+        evidence_assembly_version="scientific-evidence-bundle/v1",
+        omitted_ranges=(),
+        source_order_restored=True,
+        title_included=True,
         logits=logits,
         predicted_label=ScientificInferenceLabel.ENTAILMENT,
         evidence_margin=logits.evidence_margin,
@@ -138,7 +157,12 @@ def preassembly_failure_fixture() -> ScientificInferenceResult:
         request_digest=None,
         premise_sha256=None,
         pair_token_count=None,
+        admitted=(),
+        rejected=(),
         model_revision=None,
+        omitted_ranges=(),
+        source_order_restored=False,
+        title_included=False,
         logits=None,
         predicted_label=None,
         evidence_margin=None,
@@ -191,6 +215,18 @@ def test_journal_accepts_terminal_failures_before_an_attempt_or_after_assembly(t
         bundle_digest="b" * 64,
         premise_sha256="3" * 64,
         pair_token_count=17,
+        admitted=(
+            EvidenceChunkSelection(
+                "10",
+                COREF_NOMINAL_DP_MINILM,
+                0,
+                "evidence-10",
+                hashlib.sha256(b"evidence-10").hexdigest(),
+                0.8,
+            ),
+        ),
+        source_order_restored=True,
+        title_included=True,
         error_stage="request-preparation",
         error_code="payload_failure",
     )
@@ -279,7 +315,7 @@ class FixedAssembler:
             COREF_NOMINAL_DP_MINILM,
             0,
             text,
-            canonical_payload_digest(text),
+            hashlib.sha256(text.encode("utf-8")).hexdigest(),
             0.8,
         )
         return EvidenceBundle(
@@ -465,6 +501,34 @@ def test_request_failure_is_terminal_after_exactly_one_attempt(tmp_path) -> None
     assert result.error_message == "TimeoutError: request failed"
 
 
+def test_resume_rejects_a_semantically_corrupted_terminal_row(tmp_path) -> None:
+    output = tmp_path / "results.jsonl"
+    executor = ScientificInferenceEvaluationExecutor(
+        FixedPoolSource([candidate_fixture("10")]),
+        ScientificInferenceEvaluator(FixedAssembler(), RecordingClient([])),
+    )
+    executor.run(
+        run_id="run-1",
+        evaluation_set=single_case_fixture(),
+        retrieval_limit=10,
+        output=output,
+    )
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    rows[-1]["gold_label"] = "neutral"
+    output.write_text(
+        "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="retained result"):
+        executor.run(
+            run_id="run-1",
+            evaluation_set=single_case_fixture(),
+            retrieval_limit=10,
+            output=output,
+        )
+
+
 _STARTED_SCHEMA_FOR_TEST = "scientific-inference-attempt-started/v1"
 
 
@@ -476,6 +540,7 @@ def scored_result(
     *,
     baseline_rank: int,
 ) -> ScientificInferenceResult:
+    text = f"evidence-{document_id}"
     return replace(
         successful_inference_result_fixture(),
         candidate_id=candidate_id,
@@ -483,6 +548,16 @@ def scored_result(
         document_sha256=candidate_id,
         baseline_rank=baseline_rank,
         gold_label=gold,
+        admitted=(
+            EvidenceChunkSelection(
+                document_id,
+                COREF_NOMINAL_DP_MINILM,
+                0,
+                text,
+                hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                0.8,
+            ),
+        ),
         logits=logits,
         predicted_label=logits.predicted_label,
         evidence_margin=logits.evidence_margin,
@@ -505,7 +580,7 @@ def test_report_derives_metrics_controls_and_ranking_from_raw_records() -> None:
         scored_result(
             "2" * 64,
             "11",
-            ScientificInferenceLabel.CONTRADICTION,
+            ScientificInferenceLabel.NEUTRAL,
             InferenceLogits(0.0, 1.0, 2.0),
             baseline_rank=2,
         ),

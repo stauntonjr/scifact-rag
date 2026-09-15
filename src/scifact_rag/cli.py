@@ -492,7 +492,7 @@ def run_scientific_inference_eval(
             )
 
     results_path = Path(run_manifest.results_path)
-    summary = build_scientific_inference_executor().run(
+    summary = build_scientific_inference_executor(run_manifest).run(
         run_id=run_manifest.run_id,
         evaluation_set=cases,
         retrieval_limit=run_manifest.ranking_cutoff,

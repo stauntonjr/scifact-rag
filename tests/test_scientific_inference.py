@@ -143,22 +143,34 @@ def test_assembler_admits_by_relevance_then_serializes_in_source_order() -> None
     bundle = assembler.assemble("claim", EvidenceDocument("10", "Title", "whole"))
 
     assert [item.ordinal for item in bundle.admitted] == [1, 2]
+    assert bundle.omitted_ranges == ((0, 0),)
+    assert "[OMITTED ordinals=0-0]" in bundle.premise
     assert bundle.premise.index("second") < bundle.premise.index("third")
     assert bundle.rejected == (EvidenceChunkRejection(0, "token_budget"),)
 
 
 def test_assembler_continues_after_a_large_chunk_does_not_fit() -> None:
-    chunks = [chunk(0, "small"), chunk(1, "oversized")]
+    chunks = [chunk(0, "small"), chunk(1, "oversized"), chunk(2, "later")]
     assembler = ScientificEvidenceAssembler(
         FakeChunkStore(chunks),
-        FakeReranker({"small": 0.8, "oversized": 0.9}),
+        FakeReranker({"small": 0.8, "oversized": 0.9, "later": 0.7}),
         RejectTextPairBudget("oversized"),
     )
 
     bundle = assembler.assemble("claim", EvidenceDocument("10", "Title", "whole"))
 
-    assert [item.ordinal for item in bundle.admitted] == [0]
+    assert [item.ordinal for item in bundle.admitted] == [0, 2]
+    assert bundle.omitted_ranges == ((1, 1),)
+    assert "[OMITTED ordinals=1-1]" in bundle.premise
     assert bundle.rejected == (EvidenceChunkRejection(1, "token_budget"),)
+
+    trailing = ScientificEvidenceAssembler(
+        FakeChunkStore(chunks),
+        FakeReranker({"small": 0.9, "oversized": 0.8, "later": 0.7}),
+        RejectTextPairBudget("later"),
+    ).assemble("claim", EvidenceDocument("10", "Title", "whole"))
+    assert trailing.omitted_ranges == ((2, 2),)
+    assert trailing.premise.endswith("[OMITTED ordinals=2-2]")
 
 
 def test_assembler_counts_title_claim_markers_separators_and_special_tokens() -> None:

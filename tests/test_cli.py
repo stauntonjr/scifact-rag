@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from inspect import signature
 from pathlib import Path
 
@@ -16,8 +17,10 @@ from scifact_rag.adapters.openai_compatible import (
 from scifact_rag.adapters.scifact import QrelsSplit
 from scifact_rag.cli import app, ask, evaluate_retrieval, ingest, search
 from scifact_rag.composition import (
+    Settings,
     build_application,
     build_generation_evaluator,
+    build_scientific_inference_executor,
 )
 from scifact_rag.evaluation import (
     ComponentRevision,
@@ -160,8 +163,12 @@ def test_run_scientific_inference_preflights_then_passes_the_frozen_boundary(
             observed.update(kwargs)
             return ScientificInferenceExecutionSummary(160, 0, 160, 0, 0, True)
 
+    def fake_builder(actual_manifest: ScientificInferenceRunManifest) -> FakeExecutor:
+        observed["manifest"] = actual_manifest
+        return FakeExecutor()
+
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli_module, "build_scientific_inference_executor", FakeExecutor)
+    monkeypatch.setattr(cli_module, "build_scientific_inference_executor", fake_builder)
 
     result = CliRunner().invoke(
         app,
@@ -176,6 +183,7 @@ def test_run_scientific_inference_preflights_then_passes_the_frozen_boundary(
 
     assert result.exit_code == 0
     assert observed == {
+        "manifest": manifest,
         "run_id": "scientific-inference-1",
         "evaluation_set": cases,
         "retrieval_limit": 10,
@@ -184,6 +192,17 @@ def test_run_scientific_inference_preflights_then_passes_the_frozen_boundary(
     emitted = json.loads(result.stdout)
     assert emitted["report_path"].endswith("results.report.json")
     assert emitted["failures_path"].endswith("results.failures.jsonl")
+
+
+def test_scientific_inference_runtime_must_match_the_manifest() -> None:
+    manifest = _scientific_inference_manifest()
+    settings = replace(
+        Settings.from_environment(),
+        scientific_inference_base_url="http://different-inference-service:80",
+    )
+
+    with pytest.raises(ValueError, match="endpoint"):
+        build_scientific_inference_executor(manifest, settings)
 
 
 def test_generation_evaluation_dry_run_canonicalizes_a_complete_manifest(

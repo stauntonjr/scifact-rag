@@ -48,6 +48,7 @@ from .scientific_inference import (
 from .scientific_inference_evaluation import (
     ScientificInferenceEvaluationExecutor,
     ScientificInferenceEvaluator,
+    ScientificInferenceRunManifest,
 )
 from .strategies import (
     COREF_NOMINAL_DP_COLBERT,
@@ -544,15 +545,34 @@ def build_generation_evaluator(
 
 
 def build_scientific_inference_executor(
+    run_manifest: ScientificInferenceRunManifest,
     settings: Settings | None = None,
 ) -> ScientificInferenceEvaluationExecutor:
     resolved = settings or Settings.from_environment()
-    if (
-        resolved.scientific_inference_model != DEBERTA_MODEL
-        or resolved.scientific_inference_revision != DEBERTA_REVISION
-        or resolved.scientific_inference_max_tokens != 512
-    ):
-        raise ValueError("scientific inference settings must match the frozen model boundary")
+    runtime_boundary = {
+        "endpoint": resolved.scientific_inference_base_url,
+        "model": resolved.scientific_inference_model,
+        "model_revision": resolved.scientific_inference_revision,
+        "context_limit": resolved.scientific_inference_max_tokens,
+        "colbert_model": resolved.late_interaction_model,
+        "colbert_revision": _COLBERT_REVISION,
+    }
+    manifest_boundary = {
+        "endpoint": run_manifest.endpoint,
+        "model": run_manifest.model,
+        "model_revision": run_manifest.model_revision,
+        "context_limit": run_manifest.context_limit,
+        "colbert_model": run_manifest.colbert_model,
+        "colbert_revision": run_manifest.colbert_revision,
+    }
+    mismatched = [
+        name for name, value in runtime_boundary.items() if value != manifest_boundary[name]
+    ]
+    if mismatched:
+        raise ValueError(
+            "scientific inference runtime does not match the run manifest: "
+            + ", ".join(sorted(mismatched))
+        )
     application = build_application(
         resolved,
         retrieval_strategy=DEFAULT_RETRIEVAL_STRATEGY,

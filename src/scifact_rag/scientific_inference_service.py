@@ -4,7 +4,7 @@ import json
 import os
 from collections.abc import Mapping, Sequence
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Protocol
+from typing import Any, Protocol
 
 from .scientific_inference import (
     DEBERTA_MODEL,
@@ -32,7 +32,9 @@ class ClassificationBackend(Protocol):
     @property
     def id2label(self) -> Mapping[int, str]: ...
 
-    def classify_pair(self, premise: str, hypothesis: str) -> tuple[Sequence[float], int]: ...
+    def pair_token_count(self, premise: str, hypothesis: str) -> int: ...
+
+    def classify_pair(self, premise: str, hypothesis: str) -> Sequence[float]: ...
 
 
 def classify_payload(
@@ -48,13 +50,14 @@ def classify_payload(
         raise ValueError("configured model revision does not match the immutable revision")
     label_index = _canonical_label_index(backend.id2label)
     request = _parse_request(payload)
-    raw_logits, pair_token_count = backend.classify_pair(request.premise, request.hypothesis)
+    pair_token_count = backend.pair_token_count(request.premise, request.hypothesis)
     if isinstance(pair_token_count, bool) or not isinstance(pair_token_count, int):
         raise TypeError("backend pair token count must be an integer")
     if pair_token_count > maximum_pair_tokens:
         raise ValueError("premise and hypothesis exceed the model token limit")
     if pair_token_count != request.expected_pair_tokens:
         raise ValueError("computed pair token count differs from the expected count")
+    raw_logits = backend.classify_pair(request.premise, request.hypothesis)
     if len(raw_logits) != 3:
         raise ValueError("backend must return exactly three logits")
     try:
@@ -112,19 +115,25 @@ class TransformersClassificationBackend:
     def id2label(self) -> Mapping[int, str]:
         return self._id2label
 
-    def classify_pair(self, premise: str, hypothesis: str) -> tuple[Sequence[float], int]:
-        encoded = self._tokenizer(
+    def _encode_pair(self, premise: str, hypothesis: str) -> Mapping[str, Any]:
+        return self._tokenizer(
             premise,
             hypothesis,
             add_special_tokens=True,
             truncation=False,
             return_tensors="pt",
         )
-        pair_token_count = int(encoded["input_ids"].shape[-1])
+
+    def pair_token_count(self, premise: str, hypothesis: str) -> int:
+        encoded = self._encode_pair(premise, hypothesis)
+        return int(encoded["input_ids"].shape[-1])
+
+    def classify_pair(self, premise: str, hypothesis: str) -> Sequence[float]:
+        encoded = self._encode_pair(premise, hypothesis)
         encoded = {name: value.to("cuda") for name, value in encoded.items()}
         with self._torch.inference_mode():
             raw_logits = self._model(**encoded).logits[0].detach().float().cpu().tolist()
-        return raw_logits, pair_token_count
+        return raw_logits
 
 
 def _parse_request(payload: object) -> InferenceRequest:

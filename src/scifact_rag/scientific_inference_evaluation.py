@@ -211,7 +211,17 @@ class ScientificInferenceResult:
     admitted: tuple[EvidenceChunkSelection, ...]
     rejected: tuple[EvidenceChunkRejection, ...]
     pair_token_count: int | None
+    model: str
     model_revision: str | None
+    tokenizer: str
+    tokenizer_revision: str
+    tokenizer_maximum_length: int
+    scorer: str
+    scorer_revision: str
+    evidence_assembly_version: str
+    omitted_ranges: tuple[tuple[int, int], ...]
+    source_order_restored: bool
+    title_included: bool
     logits: InferenceLogits | None
     predicted_label: ScientificInferenceLabel | None
     evidence_margin: float | None
@@ -233,6 +243,8 @@ class ScientificInferenceResult:
             _validate_text(field_name, getattr(self, field_name))
         for field_name in ("claim_sha256", "document_sha256"):
             _validate_digest(field_name, getattr(self, field_name))
+        if self.claim_sha256 != _text_digest(self.claim):
+            raise ValueError("claim_sha256 does not match claim")
         for field_name in ("bundle_digest", "attempt_id", "request_digest", "premise_sha256"):
             value = getattr(self, field_name)
             if value is not None:
@@ -246,6 +258,27 @@ class ScientificInferenceResult:
         if any(not isinstance(item, EvidenceChunkRejection) for item in self.rejected):
             raise TypeError("rejected must contain EvidenceChunkRejection values")
         _validate_optional_positive("pair_token_count", self.pair_token_count)
+        fixed_provenance = {
+            "model": (self.model, DEBERTA_MODEL),
+            "tokenizer": (self.tokenizer, DEBERTA_MODEL),
+            "tokenizer_revision": (self.tokenizer_revision, DEBERTA_REVISION),
+            "scorer": (self.scorer, "colbert-content"),
+            "scorer_revision": (self.scorer_revision, _COLBERT_REVISION),
+            "evidence_assembly_version": (
+                self.evidence_assembly_version,
+                "scientific-evidence-bundle/v1",
+            ),
+        }
+        for field_name, (actual, expected) in fixed_provenance.items():
+            if actual != expected:
+                raise ValueError(f"{field_name} must be {expected}")
+        if self.tokenizer_maximum_length != 512:
+            raise ValueError("tokenizer_maximum_length must be 512")
+        if not isinstance(self.source_order_restored, bool) or not isinstance(
+            self.title_included, bool
+        ):
+            raise TypeError("source_order_restored and title_included must be booleans")
+        self._validate_evidence_provenance()
         if self.evidence_coverage not in _EVIDENCE_COVERAGE:
             raise ValueError("evidence_coverage is unsupported")
         _validate_optional_nonnegative("latency_ms", self.latency_ms)
@@ -253,6 +286,35 @@ class ScientificInferenceResult:
             raise ValueError("attempt_count must be zero or one")
         _parse_utc("completed_at", self.completed_at)
         self._validate_outcome()
+
+    def _validate_evidence_provenance(self) -> None:
+        if not isinstance(self.omitted_ranges, tuple) or any(
+            not isinstance(item, tuple)
+            or len(item) != 2
+            or any(isinstance(value, bool) or not isinstance(value, int) for value in item)
+            or item[0] < 0
+            or item[1] < item[0]
+            for item in self.omitted_ranges
+        ):
+            raise TypeError("omitted_ranges must contain valid ordinal range tuples")
+        admitted_ordinals: list[int] = []
+        for item in self.admitted:
+            if item.doc_id != self.document_id:
+                raise ValueError("admitted evidence belongs to a foreign document")
+            if item.representation != COREF_NOMINAL_DP_MINILM:
+                raise ValueError("admitted evidence uses the wrong representation")
+            if item.text_sha256 != _text_digest(item.text):
+                raise ValueError("admitted evidence text digest does not match")
+            admitted_ordinals.append(item.ordinal)
+        if admitted_ordinals != sorted(set(admitted_ordinals)):
+            raise ValueError("admitted evidence ordinals must be unique and source ordered")
+        rejected_ordinals = [item.ordinal for item in self.rejected]
+        if len(rejected_ordinals) != len(set(rejected_ordinals)):
+            raise ValueError("rejected evidence ordinals must be unique")
+        if set(admitted_ordinals).intersection(rejected_ordinals):
+            raise ValueError("admitted and rejected evidence ordinals must be disjoint")
+        if self.omitted_ranges != _ordinal_ranges(sorted(rejected_ordinals)):
+            raise ValueError("omitted ranges do not match rejected evidence ordinals")
 
     def _validate_outcome(self) -> None:
         error_fields = (self.error_stage, self.error_code, self.error_message)
@@ -272,10 +334,22 @@ class ScientificInferenceResult:
             for value in (self.premise_sha256, self.pair_token_count, self.request_digest)
         ):
             raise ValueError("pre-assembly results cannot contain bundle provenance")
+        if self.bundle_digest is None and (
+            self.admitted
+            or self.rejected
+            or self.omitted_ranges
+            or self.source_order_restored
+            or self.title_included
+        ):
+            raise ValueError("pre-assembly results cannot contain evidence provenance")
         if self.bundle_digest is not None and (
             self.premise_sha256 is None or self.pair_token_count is None
         ):
             raise ValueError("a completed bundle requires premise and token provenance")
+        if self.bundle_digest is not None and (
+            not self.admitted or not self.source_order_restored or not self.title_included
+        ):
+            raise ValueError("a completed bundle requires complete assembly provenance")
         scoring = (
             self.model_revision,
             self.logits,
@@ -541,6 +615,9 @@ class ScientificInferenceEvaluator:
                     admitted=(),
                     rejected=(),
                     pair_token_count=None,
+                    omitted_ranges=(),
+                    source_order_restored=False,
+                    title_included=False,
                     model_revision=None,
                     logits=None,
                     predicted_label=None,
@@ -611,6 +688,9 @@ class ScientificInferenceEvaluator:
                     admitted=bundle.admitted,
                     rejected=bundle.rejected,
                     pair_token_count=bundle.pair_token_count,
+                    omitted_ranges=bundle.omitted_ranges,
+                    source_order_restored=bundle.source_order_restored,
+                    title_included=bundle.title_included,
                     model_revision=None,
                     logits=None,
                     predicted_label=None,
@@ -637,6 +717,9 @@ class ScientificInferenceEvaluator:
                 admitted=bundle.admitted,
                 rejected=bundle.rejected,
                 pair_token_count=bundle.pair_token_count,
+                omitted_ranges=bundle.omitted_ranges,
+                source_order_restored=bundle.source_order_restored,
+                title_included=bundle.title_included,
                 model_revision=response.model_revision,
                 logits=response.logits,
                 predicted_label=response.logits.predicted_label,
@@ -669,6 +752,13 @@ class ScientificInferenceEvaluator:
             ),
             "baseline_rank": plan.baseline_rank,
             "gold_label": _gold_label(case, document.doc_id),
+            "model": DEBERTA_MODEL,
+            "tokenizer": DEBERTA_MODEL,
+            "tokenizer_revision": DEBERTA_REVISION,
+            "tokenizer_maximum_length": 512,
+            "scorer": "colbert-content",
+            "scorer_revision": _COLBERT_REVISION,
+            "evidence_assembly_version": "scientific-evidence-bundle/v1",
         }
 
 
@@ -708,6 +798,9 @@ class ScientificInferenceEvaluationExecutor:
         foreign = journal_ids.difference(planned_ids)
         if foreign:
             raise ValueError("journal contains candidates outside the regenerated pool")
+        plans_by_id = {item.candidate_id: item for item in planned}
+        for candidate_id, result in journal.state.results.items():
+            _validate_retained_result(plans_by_id[candidate_id], result)
         for plan in planned:
             if plan.candidate_id in journal.state.completed:
                 continue
@@ -769,6 +862,34 @@ def _colbert_content_score(candidate: RetrievalCandidate) -> float:
     if len(scores) != 1 or not math.isfinite(scores[0]):
         raise ValueError("candidate must contain exactly one finite colbert-content score")
     return scores[0]
+
+
+def _validate_retained_result(
+    plan: _PlannedCandidate,
+    result: ScientificInferenceResult,
+) -> None:
+    case = plan.case
+    document = plan.candidate.document
+    expected = {
+        "candidate_id": plan.candidate_id,
+        "query_id": case.query_id,
+        "document_id": document.doc_id,
+        "claim": case.claim,
+        "claim_sha256": _text_digest(case.claim),
+        "document_title": document.title,
+        "document_sha256": canonical_payload_digest(
+            {"text": document.text, "title": document.title}
+        ),
+        "baseline_rank": plan.baseline_rank,
+        "colbert_score": _colbert_content_score(plan.candidate),
+        "gold_label": _gold_label(case, document.doc_id),
+    }
+    mismatched = [name for name, value in expected.items() if getattr(result, name) != value]
+    if mismatched:
+        raise ValueError(
+            "retained result does not match the regenerated candidate: "
+            + ", ".join(sorted(mismatched))
+        )
 
 
 def _gold_label(
@@ -841,6 +962,7 @@ def build_scientific_inference_report(
     candidate_ids = [record.candidate_id for record in records]
     if len(candidate_ids) != len(set(candidate_ids)):
         raise ValueError("report records must have unique candidate IDs")
+    _validate_report_records(records, evaluation_set)
     scored = tuple(record for record in records if record.error_stage is None)
     failed = len(records) - len(scored)
     skipped = expected_candidates - len(records) - outcome_unknown_candidates
@@ -1059,6 +1181,27 @@ def _baseline_rankings(
     }
 
 
+def _validate_report_records(
+    records: tuple[ScientificInferenceResult, ...],
+    evaluation_set: GenerationEvaluationSet,
+) -> None:
+    cases = {case.query_id: case for case in evaluation_set.cases}
+    observed_ranks: dict[str, set[int]] = {}
+    for record in records:
+        case = cases.get(record.query_id)
+        if case is None:
+            raise ValueError("report record query is absent from the evaluation set")
+        if record.claim != case.claim or record.claim_sha256 != _text_digest(case.claim):
+            raise ValueError("report record claim does not match the evaluation set")
+        if record.gold_label is not _gold_label(case, record.document_id):
+            raise ValueError("report record gold label does not match the evaluation set")
+        if record.baseline_rank is not None:
+            ranks = observed_ranks.setdefault(record.query_id, set())
+            if record.baseline_rank in ranks:
+                raise ValueError("report baseline ranks must be unique per query")
+            ranks.add(record.baseline_rank)
+
+
 def _numeric_summary(values: list[float]) -> NumericSummary | None:
     if not values:
         return None
@@ -1164,6 +1307,12 @@ def _parse_result(raw: dict[str, Any]) -> ScientificInferenceResult:
     values["rejected"] = tuple(
         _parse_nested(item, EvidenceChunkRejection, "rejected chunk") for item in rejected
     )
+    omitted_ranges = values["omitted_ranges"]
+    if not isinstance(omitted_ranges, list) or any(
+        not isinstance(item, list) or len(item) != 2 for item in omitted_ranges
+    ):
+        raise TypeError("omitted_ranges must be an array of two-item arrays")
+    values["omitted_ranges"] = tuple(tuple(item) for item in omitted_ranges)
     return ScientificInferenceResult(**values)
 
 
@@ -1220,6 +1369,20 @@ def _validate_optional_nonnegative(name: str, value: float | None) -> None:
     _validate_optional_finite(name, value)
     if value is not None and value < 0:
         raise ValueError(f"{name} must be non-negative or null")
+
+
+def _ordinal_ranges(ordinals: list[int]) -> tuple[tuple[int, int], ...]:
+    if not ordinals:
+        return ()
+    ranges: list[tuple[int, int]] = []
+    start = previous = ordinals[0]
+    for ordinal in ordinals[1:]:
+        if ordinal != previous + 1:
+            ranges.append((start, previous))
+            start = ordinal
+        previous = ordinal
+    ranges.append((start, previous))
+    return tuple(ranges)
 
 
 def _parse_utc(name: str, value: str) -> datetime:

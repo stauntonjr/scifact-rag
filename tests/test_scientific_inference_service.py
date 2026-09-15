@@ -21,11 +21,16 @@ class RecordingBackend:
         self.logits = logits
         self.pair_tokens = pair_tokens
         self.model_revision = model_revision
-        self.pairs: list[tuple[str, str]] = []
+        self.counted_pairs: list[tuple[str, str]] = []
+        self.inferred_pairs: list[tuple[str, str]] = []
 
-    def classify_pair(self, premise: str, hypothesis: str) -> tuple[tuple[float, ...], int]:
-        self.pairs.append((premise, hypothesis))
-        return self.logits, self.pair_tokens
+    def pair_token_count(self, premise: str, hypothesis: str) -> int:
+        self.counted_pairs.append((premise, hypothesis))
+        return self.pair_tokens
+
+    def classify_pair(self, premise: str, hypothesis: str) -> tuple[float, ...]:
+        self.inferred_pairs.append((premise, hypothesis))
+        return self.logits
 
 
 def request_payload(**updates: object) -> dict[str, object]:
@@ -56,7 +61,8 @@ def test_classify_payload_preserves_pair_order_and_maps_checkpoint_labels() -> N
 
     response = classify_payload(request_payload(), backend, maximum_pair_tokens=512)
 
-    assert backend.pairs == [("premise", "hypothesis")]
+    assert backend.counted_pairs == [("premise", "hypothesis")]
+    assert backend.inferred_pairs == [("premise", "hypothesis")]
     assert response["logits"] == {
         "entailment": 3.0,
         "contradiction": -2.0,
@@ -83,3 +89,6 @@ def test_classify_payload_rejects_contract_violations(
 ) -> None:
     with pytest.raises(ValueError):
         classify_payload(payload, backend, maximum_pair_tokens=512)
+
+    if backend.pair_tokens > 512 or backend.pair_tokens != payload.get("expected_pair_tokens"):
+        assert backend.inferred_pairs == []

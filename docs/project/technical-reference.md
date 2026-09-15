@@ -484,3 +484,11 @@ The run journal is the canonical artifact. Each candidate has a stable identity 
 assembly; a request attempt is appended and synced before its sole HTTP request. An unmatched
 attempt start is `outcome_unknown` and is never resent under the same run ID. A terminal failure
 also requires a new run ID for any retry. An incomplete journal is not a leaderboard result.
+
+Before composing services, the runner requires the manifest endpoint, DeBERTa model/revision and
+context limit, and ColBERT model/revision to match the active settings. Terminal rows retain the
+model, tokenizer, scorer, evidence-assembly version, admitted and omitted chunk provenance, source
+ordering, and title inclusion. Resume and report generation reject rows whose claim, gold label,
+candidate document, rank, score, or chunk provenance does not match regenerated local evidence.
+The classifier counts the exact premise/hypothesis pair before GPU inference and rejects an
+over-limit or count-mismatched request without running the model.

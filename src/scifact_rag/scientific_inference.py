@@ -177,12 +177,13 @@ class ScientificEvidenceAssembler:
             )
 
         selections = [self._selection(chunk, score) for chunk, score in zip(chunks, scores)]
+        all_ordinals = tuple(sorted(item.ordinal for item in selections))
         admission_order = sorted(selections, key=lambda item: (-item.colbert_score, item.ordinal))
         admitted: list[EvidenceChunkSelection] = []
         rejected: list[EvidenceChunkRejection] = []
         for selection in admission_order:
             tentative = sorted((*admitted, selection), key=lambda item: item.ordinal)
-            premise, _ = _serialize_premise(document.title, tentative)
+            premise, _ = _serialize_premise(document.title, tentative, all_ordinals)
             pair_tokens = self._token_budget.pair_token_count(premise, claim)
             if pair_tokens <= self._token_budget.maximum_pair_tokens:
                 admitted = tentative
@@ -194,7 +195,7 @@ class ScientificEvidenceAssembler:
                 "no_evidence_fit",
                 "no complete evidence chunk fits the pair token budget",
             )
-        premise, omitted_ranges = _serialize_premise(document.title, admitted)
+        premise, omitted_ranges = _serialize_premise(document.title, admitted, all_ordinals)
         pair_tokens = self._token_budget.pair_token_count(premise, claim)
         return EvidenceBundle(
             document_id=document.doc_id,
@@ -302,19 +303,36 @@ def canonical_payload_digest(value: object) -> str:
 def _serialize_premise(
     title: str,
     admitted: Sequence[EvidenceChunkSelection],
+    all_ordinals: Sequence[int],
 ) -> tuple[str, tuple[tuple[int, int], ...]]:
     ordered = sorted(admitted, key=lambda item: item.ordinal)
+    admitted_by_ordinal = {item.ordinal: item for item in ordered}
+    omitted = sorted(set(all_ordinals).difference(admitted_by_ordinal))
+    omitted_ranges = _contiguous_ranges(omitted)
     lines = [f"{_TITLE_PREFIX}{title}"]
-    omitted_ranges: list[tuple[int, int]] = []
-    previous: EvidenceChunkSelection | None = None
-    for selection in ordered:
-        if previous is not None and selection.ordinal > previous.ordinal + 1:
-            gap = (previous.ordinal + 1, selection.ordinal - 1)
-            omitted_ranges.append(gap)
+    ranges_by_start = {start: (start, end) for start, end in omitted_ranges}
+    for ordinal in sorted(set(all_ordinals)):
+        gap = ranges_by_start.get(ordinal)
+        if gap is not None:
             lines.append(_GAP.format(start=gap[0], end=gap[1]))
-        lines.append(_CHUNK_PREFIX.format(ordinal=selection.ordinal) + selection.text)
-        previous = selection
-    return "\n".join(lines), tuple(omitted_ranges)
+        selection = admitted_by_ordinal.get(ordinal)
+        if selection is not None:
+            lines.append(_CHUNK_PREFIX.format(ordinal=selection.ordinal) + selection.text)
+    return "\n".join(lines), omitted_ranges
+
+
+def _contiguous_ranges(ordinals: Sequence[int]) -> tuple[tuple[int, int], ...]:
+    if not ordinals:
+        return ()
+    ranges: list[tuple[int, int]] = []
+    start = previous = ordinals[0]
+    for ordinal in ordinals[1:]:
+        if ordinal != previous + 1:
+            ranges.append((start, previous))
+            start = ordinal
+        previous = ordinal
+    ranges.append((start, previous))
+    return tuple(ranges)
 
 
 def _validate_digest(name: str, value: str) -> None:
