@@ -7,8 +7,12 @@ import pytest
 from scifact_rag.evaluation import (
     ComponentRevision,
     EvaluationPurpose,
+    GenerationEvaluationCase,
+    GenerationEvaluationSet,
     GenerationRunManifest,
     GeneratorSettings,
+    GoldRationale,
+    ScientificStance,
 )
 
 
@@ -153,3 +157,123 @@ def test_generator_settings_reject_wrong_python_types(settings: dict[str, object
 def test_manifest_json_rejects_a_non_object_document() -> None:
     with pytest.raises(TypeError, match="JSON object"):
         GenerationRunManifest.from_json("[]")
+
+
+def _case(
+    query_id: str = "2",
+    *,
+    stance: ScientificStance = ScientificStance.CONTRADICT,
+    rationales: tuple[GoldRationale, ...] = (
+        GoldRationale(
+            doc_id="13734012",
+            label=ScientificStance.CONTRADICT,
+            sentence_indices=(4,),
+            sentences=("The measured prevalence was different.",),
+        ),
+    ),
+) -> GenerationEvaluationCase:
+    return GenerationEvaluationCase(
+        schema_version="generation-evaluation-case/v1",
+        query_id=query_id,
+        claim="1 in 5 million in UK have abnormal PrP positivity.",
+        source_split="train-validation",
+        expected_stance=stance,
+        cited_document_ids=("13734012",),
+        rationales=rationales,
+    )
+
+
+def test_generation_evaluation_set_emits_sorted_canonical_jsonl_and_summary() -> None:
+    support = GenerationEvaluationCase(
+        schema_version="generation-evaluation-case/v1",
+        query_id="9",
+        claim="A supported claim.",
+        source_split="train-validation",
+        expected_stance=ScientificStance.SUPPORT,
+        cited_document_ids=("20", "10"),
+        rationales=(
+            GoldRationale(
+                doc_id="20",
+                label=ScientificStance.SUPPORT,
+                sentence_indices=(2, 3),
+                sentences=("First evidence.", "Second evidence."),
+            ),
+        ),
+    )
+    no_evidence = _case(
+        "0",
+        stance=ScientificStance.NOT_ENOUGH_INFO,
+        rationales=(),
+    )
+
+    evaluation_set = GenerationEvaluationSet((support, no_evidence))
+
+    rows = [json.loads(line) for line in evaluation_set.to_jsonl().splitlines()]
+    assert [row["query_id"] for row in rows] == ["0", "9"]
+    assert rows[1]["cited_document_ids"] == ["10", "20"]
+    assert rows[1]["rationales"][0]["sentence_indices"] == [2, 3]
+    summary = evaluation_set.summary()
+    assert summary.cases == 2
+    assert summary.support == 1
+    assert summary.contradict == 0
+    assert summary.not_enough_info == 1
+    assert summary.annotated_cases == 1
+    assert summary.rationale_sets == 1
+    assert summary.evidence_sentences == 2
+    assert summary.sha256 == evaluation_set.sha256
+
+
+def test_generation_evaluation_case_enforces_stance_and_rationale_consistency() -> None:
+    with pytest.raises(ValueError, match="requires at least one rationale"):
+        _case(rationales=())
+
+    with pytest.raises(ValueError, match="must not have rationales"):
+        _case(stance=ScientificStance.NOT_ENOUGH_INFO)
+
+    with pytest.raises(ValueError, match="rationale label must match"):
+        _case(
+            stance=ScientificStance.SUPPORT,
+            rationales=(
+                GoldRationale(
+                    doc_id="13734012",
+                    label=ScientificStance.CONTRADICT,
+                    sentence_indices=(4,),
+                    sentences=("Evidence.",),
+                ),
+            ),
+        )
+
+
+def test_gold_rationale_rejects_invalid_sentence_alignment() -> None:
+    with pytest.raises(ValueError, match="same non-zero length"):
+        GoldRationale(
+            doc_id="1",
+            label=ScientificStance.SUPPORT,
+            sentence_indices=(0,),
+            sentences=(),
+        )
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        GoldRationale(
+            doc_id="1",
+            label=ScientificStance.SUPPORT,
+            sentence_indices=(1, 1),
+            sentences=("One.", "One again."),
+        )
+
+
+def test_generation_evaluation_set_rejects_duplicates_and_mixed_splits() -> None:
+    with pytest.raises(ValueError, match="query IDs must be unique"):
+        GenerationEvaluationSet((_case(), _case()))
+
+    development = GenerationEvaluationCase(
+        schema_version="generation-evaluation-case/v1",
+        query_id="3",
+        claim="Development claim.",
+        source_split="train-development",
+        expected_stance=ScientificStance.NOT_ENOUGH_INFO,
+        cited_document_ids=("1",),
+        rationales=(),
+    )
+    with pytest.raises(ValueError, match="one source split"):
+        GenerationEvaluationSet((_case(), development))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, fields
@@ -13,12 +14,163 @@ _HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SOURCE_SPLITS = {"train-development", "train-validation", "test"}
+_GENERATION_EVALUATION_SPLITS = {"train-development", "train-validation"}
 
 
 class EvaluationPurpose(StrEnum):
     DEVELOPMENT = "development"
     DEFAULT_SELECTION = "default-selection"
     TEST_CONFIRMATION = "test-confirmation"
+
+
+class ScientificStance(StrEnum):
+    SUPPORT = "SUPPORT"
+    CONTRADICT = "CONTRADICT"
+    NOT_ENOUGH_INFO = "NOT_ENOUGH_INFO"
+
+
+@dataclass(frozen=True, slots=True)
+class GoldRationale:
+    doc_id: str
+    label: ScientificStance
+    sentence_indices: tuple[int, ...]
+    sentences: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.doc_id, str) or not self.doc_id.isdigit():
+            raise ValueError("rationale doc_id must be a numeric string")
+        if not isinstance(self.label, ScientificStance):
+            raise TypeError("rationale label must be a ScientificStance")
+        if self.label is ScientificStance.NOT_ENOUGH_INFO:
+            raise ValueError("a gold rationale cannot have a NOT_ENOUGH_INFO label")
+        if not self.sentence_indices or len(self.sentence_indices) != len(self.sentences):
+            raise ValueError("sentence indices and texts must have the same non-zero length")
+        if any(
+            isinstance(index, bool) or not isinstance(index, int) or index < 0
+            for index in self.sentence_indices
+        ):
+            raise ValueError("sentence indices must be non-negative integers")
+        if tuple(sorted(set(self.sentence_indices))) != self.sentence_indices:
+            raise ValueError("sentence indices must be unique and strictly increasing")
+        if any(
+            not isinstance(sentence, str) or not sentence.strip() for sentence in self.sentences
+        ):
+            raise ValueError("rationale sentences must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationCase:
+    schema_version: str
+    query_id: str
+    claim: str
+    source_split: str
+    expected_stance: ScientificStance
+    cited_document_ids: tuple[str, ...]
+    rationales: tuple[GoldRationale, ...]
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "generation-evaluation-case/v1":
+            raise ValueError("schema_version must be generation-evaluation-case/v1")
+        if not isinstance(self.query_id, str) or not self.query_id.isdigit():
+            raise ValueError("query_id must be a numeric string")
+        if not isinstance(self.claim, str) or not self.claim.strip():
+            raise ValueError("claim must be non-empty")
+        if self.source_split not in _GENERATION_EVALUATION_SPLITS:
+            raise ValueError(f"source_split must be one of {sorted(_GENERATION_EVALUATION_SPLITS)}")
+        if not isinstance(self.expected_stance, ScientificStance):
+            raise TypeError("expected_stance must be a ScientificStance")
+        if not self.cited_document_ids:
+            raise ValueError("cited_document_ids must not be empty")
+        if any(
+            not isinstance(doc_id, str) or not doc_id.isdigit()
+            for doc_id in self.cited_document_ids
+        ):
+            raise ValueError("cited document IDs must be numeric strings")
+        if len(self.cited_document_ids) != len(set(self.cited_document_ids)):
+            raise ValueError("cited document IDs must be unique")
+        object.__setattr__(self, "cited_document_ids", tuple(sorted(self.cited_document_ids)))
+        if self.expected_stance is ScientificStance.NOT_ENOUGH_INFO:
+            if self.rationales:
+                raise ValueError("NOT_ENOUGH_INFO cases must not have rationales")
+        elif not self.rationales:
+            raise ValueError("a SUPPORT or CONTRADICT case requires at least one rationale")
+        cited = set(self.cited_document_ids)
+        for rationale in self.rationales:
+            if rationale.label is not self.expected_stance:
+                raise ValueError("rationale label must match the case expected stance")
+            if rationale.doc_id not in cited:
+                raise ValueError("rationale document must be present in cited_document_ids")
+        if len(self.rationales) != len(set(self.rationales)):
+            raise ValueError("rationales must be unique")
+        object.__setattr__(
+            self,
+            "rationales",
+            tuple(
+                sorted(
+                    self.rationales,
+                    key=lambda rationale: (rationale.doc_id, rationale.sentence_indices),
+                )
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationSummary:
+    cases: int
+    support: int
+    contradict: int
+    not_enough_info: int
+    annotated_cases: int
+    rationale_sets: int
+    evidence_sentences: int
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationSet:
+    cases: tuple[GenerationEvaluationCase, ...]
+
+    def __post_init__(self) -> None:
+        if not self.cases:
+            raise ValueError("generation evaluation set must not be empty")
+        query_ids = [case.query_id for case in self.cases]
+        if len(query_ids) != len(set(query_ids)):
+            raise ValueError("generation evaluation query IDs must be unique")
+        splits = {case.source_split for case in self.cases}
+        if len(splits) != 1:
+            raise ValueError("generation evaluation cases must use one source split")
+        object.__setattr__(
+            self,
+            "cases",
+            tuple(sorted(self.cases, key=lambda case: int(case.query_id))),
+        )
+
+    def to_jsonl(self) -> str:
+        return "".join(
+            json.dumps(asdict(case), sort_keys=True, separators=(",", ":")) + "\n"
+            for case in self.cases
+        )
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.to_jsonl().encode()).hexdigest()
+
+    def summary(self) -> GenerationEvaluationSummary:
+        counts = {
+            stance: sum(case.expected_stance is stance for case in self.cases)
+            for stance in ScientificStance
+        }
+        rationales = tuple(rationale for case in self.cases for rationale in case.rationales)
+        return GenerationEvaluationSummary(
+            cases=len(self.cases),
+            support=counts[ScientificStance.SUPPORT],
+            contradict=counts[ScientificStance.CONTRADICT],
+            not_enough_info=counts[ScientificStance.NOT_ENOUGH_INFO],
+            annotated_cases=sum(bool(case.rationales) for case in self.cases),
+            rationale_sets=len(rationales),
+            evidence_sentences=sum(len(rationale.sentences) for rationale in rationales),
+            sha256=self.sha256,
+        )
 
 
 @dataclass(frozen=True, slots=True)
