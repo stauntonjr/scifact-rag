@@ -52,6 +52,7 @@
       "MiniLM and Qwen NVFP4 model checkpoints: Apache-2.0",
       "MS MARCO MiniLM L6 cross-encoder checkpoint: Apache-2.0",
       "AnswerAI ColBERT small checkpoint: Apache-2.0",
+      "DeBERTa v3 large NLI checkpoint: Apache-2.0; published training sources are SNLI and MultiNLI",
       "RankLLM at pinned source revision: Apache-2.0",
       "RankZephyr 7B V1 Full checkpoint: MIT",
       "Hugging Face Text Embeddings Inference: Apache-2.0",
