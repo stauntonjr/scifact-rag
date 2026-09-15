@@ -5,13 +5,17 @@ import json
 import math
 import os
 import re
+import statistics
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path, PurePosixPath
+from tempfile import NamedTemporaryFile
 
+from .domain import RetrievalMetrics
 from .evaluation import ComponentRevision
+from .metrics import evaluate_rankings
 from .ports import Retriever
 from .strategies import RetrievalStrategyName
 
@@ -175,6 +179,49 @@ class RetrievalEvaluationExecutionSummary:
     failed_rows: int
 
 
+@dataclass(frozen=True, slots=True)
+class RetrievalStrategySummary:
+    strategy: RetrievalStrategyName
+    planned_rows: int
+    completed_rows: int
+    successful_rows: int
+    failed_rows: int
+    empty_result_rows: int
+    mean_latency_ms: float | None
+    median_latency_ms: float | None
+    metrics: RetrievalMetrics
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalQueryTransition:
+    query_id: str
+    relevant_document_ids_gained: tuple[str, ...]
+    relevant_document_ids_lost: tuple[str, ...]
+    top_document_changed: bool
+    ndcg_delta: float
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalStrategyComparison:
+    baseline: RetrievalStrategyName
+    comparator: RetrievalStrategyName
+    improved_queries: int
+    regressed_queries: int
+    tied_queries: int
+    transitions: tuple[RetrievalQueryTransition, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievalEvaluationReport:
+    schema_version: str
+    run_id: str
+    cutoff: int
+    query_count: int
+    complete: bool
+    strategies: tuple[RetrievalStrategySummary, ...]
+    comparisons: tuple[RetrievalStrategyComparison, ...]
+
+
 def read_retrieval_evaluation_records(path: Path) -> tuple[RetrievalEvaluationRecord, ...]:
     if not path.exists():
         return ()
@@ -319,6 +366,184 @@ class RetrievalEvaluationExecutor:
             error_type=None,
             error_message=None,
         )
+
+
+def build_retrieval_evaluation_report(
+    records: Sequence[RetrievalEvaluationRecord],
+    *,
+    run_id: str,
+    queries: Mapping[str, str],
+    qrels: Mapping[str, Mapping[str, int]],
+    strategies: Sequence[RetrievalStrategyName],
+    cutoff: int,
+) -> RetrievalEvaluationReport:
+    if not isinstance(run_id, str) or not _SAFE_NAME.fullmatch(run_id):
+        raise ValueError("run_id must be a safe non-empty name")
+    if not isinstance(queries, Mapping) or not queries:
+        raise ValueError("queries must be a non-empty mapping")
+    if any(
+        not isinstance(query_id, str)
+        or not query_id.isdigit()
+        or not isinstance(query, str)
+        or not query.strip()
+        for query_id, query in queries.items()
+    ):
+        raise ValueError("queries require numeric string IDs and non-empty text")
+    canonical_qrels_sha256(qrels)
+    if set(queries) != set(qrels):
+        raise ValueError("queries and qrels must contain exactly the same query IDs")
+    selected = tuple(strategies)
+    if selected != RETRIEVAL_DEFAULT_STRATEGIES:
+        raise ValueError("strategies must match the frozen retrieval-default candidates")
+    if isinstance(cutoff, bool) or not isinstance(cutoff, int) or cutoff < 1:
+        raise ValueError("cutoff must be a positive integer")
+
+    by_key: dict[tuple[str, RetrievalStrategyName], RetrievalEvaluationRecord] = {}
+    for record in records:
+        result = record.result
+        if record.run_id != run_id:
+            raise ValueError("retrieval report contains a row from another run")
+        if result.query_id not in queries:
+            raise ValueError("retrieval report contains an unknown query")
+        if result.strategy not in selected:
+            raise ValueError("retrieval report contains an unplanned strategy")
+        if result.cutoff != cutoff:
+            raise ValueError("retrieval report contains a mismatched cutoff")
+        key = (result.query_id, result.strategy)
+        if key in by_key:
+            raise ValueError("retrieval report contains a duplicate query-strategy pair")
+        by_key[key] = record
+
+    query_ids = tuple(sorted(queries, key=int))
+    summaries: list[RetrievalStrategySummary] = []
+    rankings_by_strategy: dict[RetrievalStrategyName, dict[str, list[str]]] = {}
+    for strategy in selected:
+        strategy_records = tuple(
+            by_key[(query_id, strategy)]
+            for query_id in query_ids
+            if (query_id, strategy) in by_key
+        )
+        successful = tuple(
+            record for record in strategy_records if record.result.error_type is None
+        )
+        rankings = {
+            query_id: [
+                hit.doc_id
+                for hit in by_key[(query_id, strategy)].result.hits
+            ]
+            if (query_id, strategy) in by_key
+            and by_key[(query_id, strategy)].result.error_type is None
+            else []
+            for query_id in query_ids
+        }
+        rankings_by_strategy[strategy] = rankings
+        latencies = [record.result.latency_ms for record in strategy_records]
+        summaries.append(
+            RetrievalStrategySummary(
+                strategy=strategy,
+                planned_rows=len(query_ids),
+                completed_rows=len(strategy_records),
+                successful_rows=len(successful),
+                failed_rows=len(strategy_records) - len(successful),
+                empty_result_rows=sum(not record.result.hits for record in successful),
+                mean_latency_ms=statistics.fmean(latencies) if latencies else None,
+                median_latency_ms=statistics.median(latencies) if latencies else None,
+                metrics=evaluate_rankings(qrels, rankings, cutoff),
+            )
+        )
+
+    baseline = selected[0]
+    comparisons: list[RetrievalStrategyComparison] = []
+    for comparator in selected[1:]:
+        transitions: list[RetrievalQueryTransition] = []
+        improved = 0
+        regressed = 0
+        tied = 0
+        for query_id in query_ids:
+            baseline_ranking = rankings_by_strategy[baseline][query_id]
+            comparator_ranking = rankings_by_strategy[comparator][query_id]
+            relevant = {doc_id for doc_id, grade in qrels[query_id].items() if grade > 0}
+            baseline_relevant = relevant.intersection(baseline_ranking[:cutoff])
+            comparator_relevant = relevant.intersection(comparator_ranking[:cutoff])
+            baseline_ndcg = evaluate_rankings(
+                {query_id: qrels[query_id]},
+                {query_id: baseline_ranking},
+                cutoff,
+            ).ndcg
+            comparator_ndcg = evaluate_rankings(
+                {query_id: qrels[query_id]},
+                {query_id: comparator_ranking},
+                cutoff,
+            ).ndcg
+            delta = comparator_ndcg - baseline_ndcg
+            if math.isclose(delta, 0.0, rel_tol=0.0, abs_tol=1e-12):
+                tied += 1
+            elif delta > 0:
+                improved += 1
+            else:
+                regressed += 1
+            transitions.append(
+                RetrievalQueryTransition(
+                    query_id=query_id,
+                    relevant_document_ids_gained=tuple(
+                        sorted(comparator_relevant - baseline_relevant, key=int)
+                    ),
+                    relevant_document_ids_lost=tuple(
+                        sorted(baseline_relevant - comparator_relevant, key=int)
+                    ),
+                    top_document_changed=(
+                        (baseline_ranking[0] if baseline_ranking else None)
+                        != (comparator_ranking[0] if comparator_ranking else None)
+                    ),
+                    ndcg_delta=delta,
+                )
+            )
+        comparisons.append(
+            RetrievalStrategyComparison(
+                baseline=baseline,
+                comparator=comparator,
+                improved_queries=improved,
+                regressed_queries=regressed,
+                tied_queries=tied,
+                transitions=tuple(transitions),
+            )
+        )
+
+    return RetrievalEvaluationReport(
+        schema_version="retrieval-evaluation-report/v1",
+        run_id=run_id,
+        cutoff=cutoff,
+        query_count=len(query_ids),
+        complete=len(by_key) == len(query_ids) * len(selected),
+        strategies=tuple(summaries),
+        comparisons=tuple(comparisons),
+    )
+
+
+def write_retrieval_evaluation_report(
+    report: RetrievalEvaluationReport,
+    destination: Path,
+) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staged_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as staged:
+            json.dump(asdict(report), staged, indent=2, sort_keys=True)
+            staged.write("\n")
+            staged.flush()
+            os.fsync(staged.fileno())
+            staged_path = Path(staged.name)
+        os.chmod(staged_path, 0o644)
+        staged_path.replace(destination)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
 
 
 def _parse_utc_timestamp(value: object, field_name: str) -> datetime:

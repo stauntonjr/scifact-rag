@@ -9,6 +9,7 @@ import pytest
 
 from scifact_rag.domain import SearchHit
 from scifact_rag.evaluation import ComponentRevision
+from scifact_rag.metrics import evaluate_rankings
 from scifact_rag.retrieval_evaluation import (
     RETRIEVAL_DEFAULT_STRATEGIES,
     RankedRetrievalHit,
@@ -16,9 +17,11 @@ from scifact_rag.retrieval_evaluation import (
     RetrievalEvaluationRecord,
     RetrievalEvaluationResult,
     RetrievalRunManifest,
+    build_retrieval_evaluation_report,
     canonical_qrels_sha256,
     read_retrieval_evaluation_records,
     sha256_file,
+    write_retrieval_evaluation_report,
 )
 from scifact_rag.strategies import RetrievalStrategyName
 
@@ -410,3 +413,215 @@ def test_retrieval_executor_rejects_invalid_existing_file_before_search(
         )
 
     assert all(not retriever.calls for retriever in retrievers.values())
+
+
+def _record(
+    query_id: str,
+    strategy: RetrievalStrategyName,
+    hits: tuple[RankedRetrievalHit, ...] = (),
+    *,
+    latency_ms: float = 10.0,
+    error: Exception | None = None,
+    run_id: str = "retrieval-validation-1",
+    cutoff: int = 2,
+) -> RetrievalEvaluationRecord:
+    return RetrievalEvaluationRecord(
+        run_id,
+        RetrievalEvaluationResult(
+            schema_version="retrieval-evaluation-result/v1",
+            query_id=query_id,
+            strategy=strategy,
+            cutoff=cutoff,
+            latency_ms=latency_ms,
+            hits=hits if error is None else (),
+            error_type=type(error).__name__ if error is not None else None,
+            error_message=str(error) if error is not None else None,
+        ),
+    )
+
+
+def _report_records() -> tuple[RetrievalEvaluationRecord, ...]:
+    baseline, colbert, content_max = RETRIEVAL_DEFAULT_STRATEGIES
+    return (
+        _record(
+            "1",
+            baseline,
+            (RankedRetrievalHit("10", 0.9), RankedRetrievalHit("99", 0.8)),
+            latency_ms=10.0,
+        ),
+        _record("2", baseline, latency_ms=30.0, error=TimeoutError("timed out")),
+        _record(
+            "1",
+            colbert,
+            (RankedRetrievalHit("99", 0.9), RankedRetrievalHit("10", 0.8)),
+            latency_ms=20.0,
+        ),
+        _record("2", colbert, (RankedRetrievalHit("20", 0.7),), latency_ms=40.0),
+        _record("1", content_max, (RankedRetrievalHit("10", 0.7),), latency_ms=50.0),
+    )
+
+
+def test_retrieval_report_penalizes_failed_and_missing_rows_as_empty_rankings() -> None:
+    qrels = {"1": {"10": 1}, "2": {"20": 1}}
+
+    report = build_retrieval_evaluation_report(
+        _report_records(),
+        run_id="retrieval-validation-1",
+        queries={"1": "first", "2": "second"},
+        qrels=qrels,
+        strategies=RETRIEVAL_DEFAULT_STRATEGIES,
+        cutoff=2,
+    )
+
+    baseline = report.strategies[0]
+    assert baseline.metrics == evaluate_rankings(
+        qrels,
+        {"1": ["10", "99"], "2": []},
+        cutoff=2,
+    )
+    assert (
+        baseline.planned_rows,
+        baseline.completed_rows,
+        baseline.successful_rows,
+        baseline.failed_rows,
+        baseline.empty_result_rows,
+    ) == (2, 2, 1, 1, 0)
+    assert baseline.mean_latency_ms == 20.0
+    assert baseline.median_latency_ms == 20.0
+
+    content_max = report.strategies[2]
+    assert content_max.metrics == evaluate_rankings(
+        qrels,
+        {"1": ["10"], "2": []},
+        cutoff=2,
+    )
+    assert content_max.completed_rows == 1
+    assert content_max.successful_rows == 1
+    assert content_max.failed_rows == 0
+    assert report.complete is False
+
+
+def test_retrieval_report_marks_complete_when_every_planned_row_exists() -> None:
+    records = _report_records() + (
+        _record("2", RETRIEVAL_DEFAULT_STRATEGIES[2]),
+    )
+
+    report = build_retrieval_evaluation_report(
+        records,
+        run_id="retrieval-validation-1",
+        queries={"1": "first", "2": "second"},
+        qrels={"1": {"10": 1}, "2": {"20": 1}},
+        strategies=RETRIEVAL_DEFAULT_STRATEGIES,
+        cutoff=2,
+    )
+
+    assert report.complete is True
+    assert report.strategies[2].empty_result_rows == 1
+
+
+def test_write_retrieval_report_emits_canonical_json(tmp_path: Path) -> None:
+    report = build_retrieval_evaluation_report(
+        _report_records(),
+        run_id="retrieval-validation-1",
+        queries={"1": "first", "2": "second"},
+        qrels={"1": {"10": 1}, "2": {"20": 1}},
+        strategies=RETRIEVAL_DEFAULT_STRATEGIES,
+        cutoff=2,
+    )
+    destination = tmp_path / "report.json"
+
+    write_retrieval_evaluation_report(report, destination)
+
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "retrieval-evaluation-report/v1"
+    assert payload["run_id"] == "retrieval-validation-1"
+    assert destination.read_text(encoding="utf-8").endswith("\n")
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["foreign-run", "duplicate", "qrels-mismatch", "cutoff", "unplanned"],
+)
+def test_retrieval_report_rejects_inconsistent_raw_evidence(mutation: str) -> None:
+    records = list(_report_records())
+    queries = {"1": "first", "2": "second"}
+    qrels = {"1": {"10": 1}, "2": {"20": 1}}
+    if mutation == "foreign-run":
+        records[0] = _record(
+            "1", RETRIEVAL_DEFAULT_STRATEGIES[0], run_id="another-run"
+        )
+    elif mutation == "duplicate":
+        records.append(records[0])
+    elif mutation == "qrels-mismatch":
+        qrels = {"1": {"10": 1}}
+    elif mutation == "cutoff":
+        records[0] = _record("1", RETRIEVAL_DEFAULT_STRATEGIES[0], cutoff=3)
+    elif mutation == "unplanned":
+        records[0] = _record("1", RetrievalStrategyName.BM25)
+
+    with pytest.raises(ValueError):
+        build_retrieval_evaluation_report(
+            records,
+            run_id="retrieval-validation-1",
+            queries=queries,
+            qrels=qrels,
+            strategies=RETRIEVAL_DEFAULT_STRATEGIES,
+            cutoff=2,
+        )
+
+
+def test_retrieval_report_describes_baseline_transitions_for_each_comparator() -> None:
+    baseline, colbert, content_max = RETRIEVAL_DEFAULT_STRATEGIES
+    qrels = {"1": {"10": 1}, "2": {"20": 1}, "3": {"30": 1}}
+    rankings = {
+        baseline: {"1": ("99",), "2": ("20",), "3": ("30",)},
+        colbert: {"1": ("10",), "2": ("99",), "3": ("30",)},
+        content_max: {"1": ("99",), "2": ("20",), "3": ("30",)},
+    }
+    records = tuple(
+        _record(
+            query_id,
+            strategy,
+            tuple(RankedRetrievalHit(doc_id, 1.0) for doc_id in rankings[strategy][query_id]),
+        )
+        for strategy in RETRIEVAL_DEFAULT_STRATEGIES
+        for query_id in ("1", "2", "3")
+    )
+
+    report = build_retrieval_evaluation_report(
+        records,
+        run_id="retrieval-validation-1",
+        queries={"1": "first", "2": "second", "3": "third"},
+        qrels=qrels,
+        strategies=RETRIEVAL_DEFAULT_STRATEGIES,
+        cutoff=2,
+    )
+
+    assert [comparison.comparator for comparison in report.comparisons] == [
+        colbert,
+        content_max,
+    ]
+    comparison = report.comparisons[0]
+    assert comparison.baseline is baseline
+    assert comparison.comparator is colbert
+    assert (
+        comparison.improved_queries,
+        comparison.regressed_queries,
+        comparison.tied_queries,
+    ) == (1, 1, 1)
+    assert [transition.query_id for transition in comparison.transitions] == ["1", "2", "3"]
+    assert comparison.transitions[0].relevant_document_ids_gained == ("10",)
+    assert comparison.transitions[0].relevant_document_ids_lost == ()
+    assert comparison.transitions[0].top_document_changed is True
+    assert comparison.transitions[0].ndcg_delta == 1.0
+    assert comparison.transitions[1].relevant_document_ids_gained == ()
+    assert comparison.transitions[1].relevant_document_ids_lost == ("20",)
+    assert comparison.transitions[1].top_document_changed is True
+    assert comparison.transitions[1].ndcg_delta == -1.0
+    assert comparison.transitions[2].top_document_changed is False
+    assert comparison.transitions[2].ndcg_delta == 0.0
+    assert (
+        report.comparisons[1].improved_queries,
+        report.comparisons[1].regressed_queries,
+        report.comparisons[1].tied_queries,
+    ) == (0, 0, 3)
