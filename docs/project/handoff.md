@@ -2,9 +2,11 @@
 
 ## Current objective
 
-The governing delivery sequence is `docs/project/roadmap.md`. The active gate is Phase 0 followed
-by the fixed generation-context comparison in Phase 1; inference, graph, adapters, and template
-evaluation remain downstream.
+The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
+comparison and the fixed retrieval-default comparison are complete. Phase 1 still has its frozen
+human review outstanding, while ADR-0029's retrieval-default recommendation awaits a separate
+owner-authorized implementation. Scientific inference is the next architecture phase; graph,
+adapters, and template evaluation remain downstream.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -54,6 +56,10 @@ UI, but only CLI is active now.
   `pooled-coref-interval-raw-mean-colbert` are fixed-pool component ablations. The first ranks only
   max content; the second takes the equal mean of unscaled title and max-content scores through the
   generic identity normalizer. Both remain opt-in and leave existing strategies unchanged.
+- ADR-0029 recommends `pooled-coref-interval-content-max-colbert` as the
+  retrieval-effectiveness default after a fixed 160-query comparison, and retains
+  `bm25-token-window-rrf` as the fast/no-ColBERT alternative. The runtime still defaults to
+  `title-token-window-rrf`; applying the recommendation requires separate owner authorization.
 - MS MARCO, ColBERT, and pinned RankZephyr/RankLLM scorers are independently selectable over the
   latest six-generator global coreference-interval pool: BM25, title, token windows, proper-noun
   coreference, nominal coreference, and interval packing. They do not combine scorer outputs or
@@ -97,6 +103,8 @@ and RankZephyr deferral.
 exact ColBERT tokenizer revision, four-generator ownership, and title/max-content score fusion.
 `docs/adr/0028-generation-context-assembly.md` records the whole-document control, canonical
 adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citation boundary.
+`docs/adr/0029-retrieval-default-selection.md` records the content-max ColBERT recommendation, BM25
+fallback, operational tradeoff, and unchanged-runtime boundary.
 
 ## Live environment observed 2026-08-27
 
@@ -140,6 +148,10 @@ adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citatio
   the official SciFact sentence arrays, preserves exact SUPPORT/CONTRADICT rationales, and declares
   empty official evidence as NOT_ENOUGH_INFO. The reproduced validation input contains 160 cases
   and has SHA-256 `34084490c48515f0c788da0960d7f426c0e64e4dcf9431b8721d824ba0349105`.
+- Issue #6 completed its one frozen retrieval comparison with 480/480 successful rows and no empty
+  rankings. DP content-max ColBERT reached nDCG@10 0.742493, recall@10 0.806250, and 638.94 ms
+  median latency; BM25 plus token windows reached 0.673519, 0.787500, and 78.70 ms. The result is
+  internal comparative evidence because the validation split was already inspected.
 - Local scaffold baseline: `703c8e5`.
 - Dataclass domain/ports, application services, SciFact/MiniLM/Postgres/generator adapters, Typer
   CLI, Docker Compose, dependency contract, ADR, research note, and focused tests are authored.
@@ -291,7 +303,8 @@ adaptive DP selection, legacy `top-dp-chunks` alias, and parent-document citatio
 - Qwen initially used its 512-token answer budget for reasoning and returned null final content.
   The adapter now passes the checkpoint's supported `enable_thinking=false` chat-template option;
   an adapter regression test covers that request contract.
-- No GitHub repository, Issue, Project item, image publication, or deployment has been created.
+- The public GitHub repository and bounded Issues exist. No dedicated roadmap Project, image
+  publication, or deployment has been created.
 - The owner selected MIT for the application. `LICENSE`, package metadata, intake, project
   contract, charter, and README are reconciled. pg_tokenizer remains Apache-2.0 and
   VectorChord-BM25 remains separately dual-licensed under AGPLv3 or Elastic License v2; the custom

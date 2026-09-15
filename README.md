@@ -13,6 +13,13 @@ and maximum-score fusion across both. Coreference is resolved over each abstract
 splitting. No abstract-derived embedding channel contains the title; every channel aggregates its
 best representation score back to one document result, preserving document IDs for citations.
 
+ADR-0029 now recommends `pooled-coref-interval-content-max-colbert` as the
+retrieval-effectiveness default and `bm25-token-window-rrf` as the fast/no-ColBERT alternative.
+The fixed internal comparison reached nDCG@10 0.742493 versus 0.673519, with median latency 638.94
+ms versus 78.70 ms. The recommendation has not been applied: the runtime default described above
+is unchanged until a separate owner-authorized implementation updates behavior and contracts
+together.
+
 Three semantic-chunking experiments are independently selectable. `sentence-pack` preserves original
 sentence boundaries and splits before a proposed multi-sentence group exceeds 112 content tokens,
 with a hard 126-token MiniLM limit for indivisible sentences. `coref-aware-pack` uses original
@@ -117,8 +124,11 @@ docker compose run --rm app run-retrieval-eval \
 
 The complete manifest, digest, component, resume, and no-repair contract is in
 [`docs/project/retrieval-evaluation.md`](docs/project/retrieval-evaluation.md). This comparison is
-internal evidence because the split has already been inspected; implementing or running it does
-not itself change the retrieval default.
+internal evidence because the split has already been inspected. All 480 rows completed without a
+failure or empty ranking; the retained report and recommendation are in
+[`docs/reports/issue-6-retrieval-default-validation.md`](docs/reports/issue-6-retrieval-default-validation.md)
+and [`docs/adr/0029-retrieval-default-selection.md`](docs/adr/0029-retrieval-default-selection.md).
+Running the evaluator did not itself change the retrieval default.
 
 ## Run with Docker Compose
 
