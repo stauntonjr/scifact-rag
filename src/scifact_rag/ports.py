@@ -17,6 +17,8 @@ from .domain import (
 )
 
 if TYPE_CHECKING:
+    from .proposition import GroundedProposition
+    from .proposition_evaluation import PropositionSource
     from .scientific_inference import (
         EvidenceBundle,
         InferenceRequest,
@@ -211,6 +213,10 @@ class PairTokenBudget(Protocol):
 
 class ScientificInferenceClient(Protocol):
     def classify(self, request: InferenceRequest) -> InferenceResponse: ...
+
+
+class PropositionExtractor(Protocol):
+    def extract(self, source: PropositionSource) -> tuple[GroundedProposition, ...]: ...
 
 
 class EvidenceBundleAssembler(Protocol):
