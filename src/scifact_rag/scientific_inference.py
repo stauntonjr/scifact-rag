@@ -14,6 +14,8 @@ from .ports import PairTokenBudget, Reranker, StoredChunkSource
 from .strategies import COREF_NOMINAL_DP_MINILM
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+DEBERTA_MODEL = "cross-encoder/nli-deberta-v3-large"
+DEBERTA_REVISION = "bab4bc7178836f731dcfd18c06ca9def0a137712"
 _TITLE_PREFIX = "[TITLE] "
 _CHUNK_PREFIX = "[EVIDENCE ordinal={ordinal}] "
 _GAP = "[OMITTED ordinals={start}-{end}]"
