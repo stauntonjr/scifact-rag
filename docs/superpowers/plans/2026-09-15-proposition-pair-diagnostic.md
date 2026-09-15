@@ -71,6 +71,8 @@ than inventing zero evidence.
 
 Test 3 verifies the frozen coverage gate: 100% usable claims, decisive documents, and audit
 documents; at least 99% schema-valid terminal sources; and at least 95% usable candidate documents.
+The fixed decisive-versus-false-positive comparison additionally requires 100% usable documents so
+the canonical metrics cannot silently omit candidates.
 Boundary values pass; each one-step violation stops with a named failed condition.
 
 - [ ] **Step 2: Run the tests and confirm contract failures**

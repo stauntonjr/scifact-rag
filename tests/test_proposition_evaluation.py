@@ -10,6 +10,8 @@ from scifact_rag.proposition import (
     GroundedProposition,
     GroundedSpan,
     PropositionPolarity,
+    PropositionQualifier,
+    QualifierRole,
     SourceKind,
     source_digest,
 )
@@ -19,12 +21,15 @@ from scifact_rag.proposition_evaluation import (
     PropositionEvaluationExecutor,
     PropositionExtractionJournal,
     PropositionExtractionResult,
+    PropositionQualificationReport,
     build_error_audit,
     build_pair_records,
     build_proposition_report,
     build_source_manifest,
     document_digest,
+    qualify_proposition_extractor,
     score_binary_separation,
+    validate_qualification_report,
 )
 
 _RUNTIME = {
@@ -35,6 +40,11 @@ _RUNTIME = {
     "seed": 1729,
     "embedding_model": "minilm-test",
 }
+
+
+def _span(source: str, text: str) -> GroundedSpan:
+    start = source.index(text)
+    return GroundedSpan(start, start + len(text), text)
 
 
 def _candidate(
@@ -336,9 +346,19 @@ def test_extraction_journal_is_terminal_resumable_and_binary_metrics_are_exact(t
             "pair-run",
             pairs,
             coverage,
-            extraction_sha256="c" * 64,
-            pairs_sha256="d" * 64,
+            artifact_sha256={
+                name: "c" * 64
+                for name in (
+                    "manifest",
+                    "audit",
+                    "audit_review",
+                    "qualification",
+                    "extraction",
+                    "pairs",
+                )
+            },
             audit_complete=False,
+            extractions=tuple(journal.results.values()),
             expected_decisive=1,
             expected_false_positives=1,
         )
@@ -346,11 +366,65 @@ def test_extraction_journal_is_terminal_resumable_and_binary_metrics_are_exact(t
         "pair-run",
         pairs,
         coverage,
-        extraction_sha256="c" * 64,
-        pairs_sha256="d" * 64,
+        artifact_sha256={
+            name: "c" * 64
+            for name in (
+                "manifest",
+                "audit",
+                "audit_review",
+                "qualification",
+                "extraction",
+                "pairs",
+            )
+        },
         audit_complete=True,
+        extractions=tuple(journal.results.values()),
         expected_decisive=1,
         expected_false_positives=1,
     )
     assert report.metrics["proposition_pair_mean"].roc_auc == 1.0
+    assert report.extraction.span_validated_propositions == 3
+    assert report.distributions["gold_label"]["entailment"]["entity"].count == 1
     assert report.decision == "graph-next"
+
+    class ProbeExtractor:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def extract(self, source):
+            self.calls += 1
+            if source.source_id.endswith("no-relation"):
+                return ()
+            subject_text = "aspirin" if "aspirin" in source.text else "Aspirin"
+            predicate_text = "reduce" if "does not" in source.text else "reduces"
+            object_text = "fever"
+            polarity = (
+                PropositionPolarity.NEGATIVE
+                if "does not" in source.text
+                else PropositionPolarity.POSITIVE
+            )
+            qualifiers = (
+                (PropositionQualifier(QualifierRole.POPULATION, _span(source.text, "adults")),)
+                if "adults" in source.text
+                else ()
+            )
+            return (
+                GroundedProposition(
+                    source.kind,
+                    source.source_id,
+                    source.sha256,
+                    GroundedSpan(0, len(source.text), source.text),
+                    _span(source.text, subject_text),
+                    _span(source.text, predicate_text),
+                    _span(source.text, object_text),
+                    polarity,
+                    qualifiers,
+                ),
+            )
+
+    probes = ProbeExtractor()
+    qualification = qualify_proposition_extractor(probes, manifest, timer=lambda: 1.0)
+    assert probes.calls == 4
+    assert qualification.passed
+    reloaded = PropositionQualificationReport.from_json(qualification.to_json())
+    validate_qualification_report(reloaded, manifest)

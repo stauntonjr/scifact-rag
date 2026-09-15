@@ -53,7 +53,13 @@ class GroundedSpan:
     @property
     def canonical_key(self) -> str:
         normalized = " ".join(unicodedata.normalize("NFKC", self.text).lower().split())
-        return normalized.strip("".join(chr(code) for code in range(128) if _is_punctuation(code)))
+        start = 0
+        end = len(normalized)
+        while start < end and _is_punctuation(normalized[start]):
+            start += 1
+        while end > start and _is_punctuation(normalized[end - 1]):
+            end -= 1
+        return normalized[start:end]
 
     def validate(self, source: str, *, within: GroundedSpan | None = None) -> None:
         if self.end > len(source) or source[self.start : self.end] != self.text:
@@ -109,6 +115,8 @@ class ExtractionCoverage:
     usable_decisive_documents: int
     audit_documents: int
     usable_audit_documents: int
+    target_documents: int
+    usable_target_documents: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +217,11 @@ def evaluate_extraction_coverage(coverage: ExtractionCoverage) -> ExtractionCove
             coverage.decisive_documents,
         ),
         ("usable_audit_documents", coverage.usable_audit_documents, coverage.audit_documents),
+        (
+            "usable_target_documents",
+            coverage.usable_target_documents,
+            coverage.target_documents,
+        ),
     )
     for name, value, total in pairs:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -226,6 +239,8 @@ def evaluate_extraction_coverage(coverage: ExtractionCoverage) -> ExtractionCove
         failed.append("usable-decisive-documents")
     if coverage.usable_audit_documents != coverage.audit_documents:
         failed.append("usable-audit-documents")
+    if coverage.usable_target_documents != coverage.target_documents:
+        failed.append("usable-target-documents")
     return ExtractionCoverageGate(not failed, tuple(failed), coverage)
 
 
@@ -313,5 +328,5 @@ def _mapped_similarity(
     return (float(value) + 1.0) / 2.0
 
 
-def _is_punctuation(code: int) -> bool:
-    return unicodedata.category(chr(code)).startswith("P")
+def _is_punctuation(value: str) -> bool:
+    return unicodedata.category(value).startswith("P")

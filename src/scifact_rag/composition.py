@@ -613,6 +613,15 @@ def build_proposition_evaluator(
     settings: Settings | None = None,
 ) -> tuple[PropositionEvaluationExecutor, MiniLmEmbedder]:
     resolved = settings or Settings.from_environment()
+    extractor = build_proposition_extractor(manifest, resolved)
+    return PropositionEvaluationExecutor(extractor), MiniLmEmbedder(resolved.embedding_model)
+
+
+def build_proposition_extractor(
+    manifest: PropositionSourceManifest,
+    settings: Settings | None = None,
+) -> OpenAiCompatiblePropositionExtractor:
+    resolved = settings or Settings.from_environment()
     runtime = {
         "extractor_model": resolved.generator_model,
         "prompt_id": PROPOSITION_PROMPT_ID,
@@ -627,12 +636,11 @@ def build_proposition_evaluator(
             "proposition runtime does not match the source manifest: "
             + ", ".join(sorted(mismatched))
         )
-    extractor = OpenAiCompatiblePropositionExtractor(
+    return OpenAiCompatiblePropositionExtractor(
         base_url=resolved.generator_base_url,
         model=resolved.generator_model,
         api_key=resolved.generator_api_key,
     )
-    return PropositionEvaluationExecutor(extractor), MiniLmEmbedder(resolved.embedding_model)
 
 
 def _build_packing_strategy(

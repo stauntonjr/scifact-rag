@@ -294,6 +294,10 @@ def test_proposition_pair_cli_freezes_and_rederives_without_loading_models(
         path = tmp_path / name
         path.write_text("placeholder", encoding="utf-8")
         placeholders.append(path)
+    with pytest.raises(ValueError, match="retained validation artifact"):
+        cli_module._load_proposition_boundary(
+            placeholders[0], placeholders[1], placeholders[2], tmp_path
+        )
     output = tmp_path / "pair"
     common = [
         "--phase3-manifest",

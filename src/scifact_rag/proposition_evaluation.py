@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import statistics
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
@@ -58,6 +59,12 @@ _PHENOMENA = {
     "species-evidence-boundary",
     "cross-sentence-reasoning",
 }
+_QUALIFICATION_PROBES = (
+    ("positive-relation", "Aspirin reduces fever.", "positive"),
+    ("explicit-negation", "Aspirin does not reduce fever.", "negative"),
+    ("scientific-qualifier", "In adults, aspirin reduces fever.", "qualifier"),
+    ("no-relation", "Aspirin. Fever.", "empty"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -340,6 +347,67 @@ class PropositionExtractionSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class PropositionQualificationProbe:
+    name: str
+    source_sha256: str
+    passed: bool
+    proposition_count: int
+    latency_ms: float
+    error_code: str | None
+    error_message: str | None
+
+    def __post_init__(self) -> None:
+        _validate_text("probe name", self.name)
+        _validate_digest("probe source_sha256", self.source_sha256)
+        if not isinstance(self.passed, bool):
+            raise TypeError("probe passed must be boolean")
+        if self.proposition_count < 0 or self.latency_ms < 0 or not math.isfinite(self.latency_ms):
+            raise ValueError("probe counts and latency must be non-negative")
+        errors = (self.error_code, self.error_message)
+        if self.passed != all(value is None for value in errors):
+            raise ValueError("probe pass state does not match error fields")
+        if not self.passed and not all(
+            isinstance(value, str) and value.strip() for value in errors
+        ):
+            raise ValueError("failed probe requires code and message")
+
+
+@dataclass(frozen=True, slots=True)
+class PropositionQualificationReport:
+    schema_version: str
+    run_id: str
+    extractor_model: str
+    prompt_id: str
+    prompt_sha256: str
+    schema_sha256: str
+    seed: int
+    probes: tuple[PropositionQualificationProbe, ...]
+    passed: bool
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "proposition-qualification-report/v1":
+            raise ValueError("qualification report schema is unsupported")
+        for name in ("run_id", "extractor_model", "prompt_id"):
+            _validate_text(name, getattr(self, name))
+        for name in ("prompt_sha256", "schema_sha256"):
+            _validate_digest(name, getattr(self, name))
+        if len(self.probes) != 4 or self.passed != all(probe.passed for probe in self.probes):
+            raise ValueError("qualification pass state must summarize four probes")
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
+
+    @classmethod
+    def from_json(cls, serialized: str) -> PropositionQualificationReport:
+        raw = _json_object(serialized, "qualification report")
+        _require_fields(raw, cls, "qualification report")
+        if not isinstance(raw["probes"], list):
+            raise TypeError("qualification probes must be an array")
+        probes = tuple(_parse_qualification_probe(item) for item in raw["probes"])
+        return cls(**{**raw, "probes": probes})
+
+
+@dataclass(frozen=True, slots=True)
 class PropositionPairRecord:
     candidate_id: str
     query_id: str
@@ -356,6 +424,26 @@ class PropositionPairRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class NumericDistribution:
+    count: int
+    minimum: float
+    median: float
+    mean: float
+    maximum: float
+
+
+@dataclass(frozen=True, slots=True)
+class PropositionExtractionDiagnostics:
+    total_sources: int
+    successful_sources: int
+    empty_sources: int
+    failed_sources: int
+    span_validated_propositions: int
+    failures_by_code: Mapping[str, int]
+    latency_ms: NumericDistribution
+
+
+@dataclass(frozen=True, slots=True)
 class PropositionEvaluationReport:
     schema_version: str
     run_id: str
@@ -364,8 +452,9 @@ class PropositionEvaluationReport:
     extraction_coverage: ExtractionCoverageGate
     metrics: Mapping[str, BinarySeparationMetrics]
     correlations: Mapping[str, float | None]
-    extraction_sha256: str
-    pairs_sha256: str
+    distributions: Mapping[str, Mapping[str, Mapping[str, NumericDistribution]]]
+    extraction: PropositionExtractionDiagnostics
+    artifact_sha256: Mapping[str, str]
     decision: str
 
     def to_json(self) -> str:
@@ -434,6 +523,91 @@ class PropositionEvaluationExecutor:
         )
 
 
+def qualify_proposition_extractor(
+    extractor: PropositionExtractor,
+    manifest: PropositionSourceManifest,
+    *,
+    timer: Callable[[], float] = time.perf_counter,
+) -> PropositionQualificationReport:
+    results: list[PropositionQualificationProbe] = []
+    for name, text, expectation in _QUALIFICATION_PROBES:
+        source = PropositionSource(
+            SourceKind.DOCUMENT,
+            f"qualification-{name}",
+            text,
+            source_digest(text),
+        )
+        started = timer()
+        error: tuple[str, str] | None = None
+        propositions: tuple[GroundedProposition, ...] = ()
+        try:
+            propositions = extractor.extract(source)
+            passed = (
+                (
+                    expectation == "positive"
+                    and any(p.polarity.value == "positive" for p in propositions)
+                )
+                or (
+                    expectation == "negative"
+                    and any(p.polarity.value == "negative" for p in propositions)
+                )
+                or (expectation == "qualifier" and any(p.qualifiers for p in propositions))
+                or (expectation == "empty" and not propositions)
+            )
+            if not passed:
+                error = ("expectation", f"{name} did not satisfy {expectation}")
+        except Exception as caught:  # noqa: BLE001 - all four probe outcomes are retained
+            passed = False
+            error = (str(getattr(caught, "code", type(caught).__name__)), _sanitized_error(caught))
+        results.append(
+            PropositionQualificationProbe(
+                name,
+                source.sha256,
+                passed,
+                len(propositions),
+                max(0.0, (timer() - started) * 1000.0),
+                error[0] if error else None,
+                error[1] if error else None,
+            )
+        )
+    probes = tuple(results)
+    return PropositionQualificationReport(
+        "proposition-qualification-report/v1",
+        manifest.run_id,
+        manifest.extractor_model,
+        manifest.prompt_id,
+        manifest.prompt_sha256,
+        manifest.schema_sha256,
+        manifest.seed,
+        probes,
+        all(item.passed for item in probes),
+    )
+
+
+def validate_qualification_report(
+    report: PropositionQualificationReport,
+    manifest: PropositionSourceManifest,
+) -> None:
+    expected = {
+        "run_id": manifest.run_id,
+        "extractor_model": manifest.extractor_model,
+        "prompt_id": manifest.prompt_id,
+        "prompt_sha256": manifest.prompt_sha256,
+        "schema_sha256": manifest.schema_sha256,
+        "seed": manifest.seed,
+    }
+    if any(getattr(report, name) != value for name, value in expected.items()):
+        raise ValueError("qualification report does not match the source manifest")
+    expected_probes = {
+        name: source_digest(text) for name, text, _expectation in _QUALIFICATION_PROBES
+    }
+    observed = {probe.name: probe.source_sha256 for probe in report.probes}
+    if observed != expected_probes or len(report.probes) != len(expected_probes):
+        raise ValueError("qualification report does not match the four frozen probes")
+    if not report.passed or not all(probe.passed for probe in report.probes):
+        raise ValueError("proposition extraction qualification did not pass")
+
+
 def build_pair_records(
     manifest: PropositionSourceManifest,
     records: Sequence[Phase3CandidateRecord],
@@ -455,6 +629,21 @@ def build_pair_records(
     }
     candidate_document_ids = {record.document_id for record in records}
     claim_ids = {record.query_id for record in records}
+    target = tuple(
+        sorted(
+            (
+                record
+                for record in records
+                if record.gold_label in {"entailment", "contradiction"}
+                or (
+                    record.gold_label == "neutral"
+                    and record.predicted_label in {"entailment", "contradiction"}
+                )
+            ),
+            key=lambda item: item.candidate_id,
+        )
+    )
+    target_document_ids = {record.document_id for record in target}
     coverage = ExtractionCoverage(
         total_sources=len(manifest.sources),
         schema_valid_sources=sum(
@@ -474,25 +663,15 @@ def build_pair_records(
         usable_audit_documents=sum(
             (SourceKind.DOCUMENT, value) in successful for value in audit_document_ids
         ),
+        target_documents=len(target_document_ids),
+        usable_target_documents=sum(
+            (SourceKind.DOCUMENT, value) in successful for value in target_document_ids
+        ),
     )
     gate = evaluate_extraction_coverage(coverage)
     if not gate.passed:
         return (), gate
 
-    target = tuple(
-        sorted(
-            (
-                record
-                for record in records
-                if record.gold_label in {"entailment", "contradiction"}
-                or (
-                    record.gold_label == "neutral"
-                    and record.predicted_label in {"entailment", "contradiction"}
-                )
-            ),
-            key=lambda item: item.candidate_id,
-        )
-    )
     scorable = [
         record
         for record in target
@@ -545,9 +724,11 @@ def build_proposition_report(
     pairs: Sequence[PropositionPairRecord],
     coverage: ExtractionCoverageGate,
     *,
-    extraction_sha256: str,
-    pairs_sha256: str,
+    artifact_sha256: Mapping[str, str],
     audit_complete: bool,
+    audit: Sequence[PropositionAuditRow] = (),
+    reviews: Sequence[PropositionAuditReview] = (),
+    extractions: Sequence[PropositionExtractionResult] = (),
     expected_decisive: int = 120,
     expected_false_positives: int = 4316,
 ) -> PropositionEvaluationReport:
@@ -555,10 +736,10 @@ def build_proposition_report(
         raise ValueError("audit review must be complete before report interpretation")
     if not coverage.passed:
         raise ValueError("extraction coverage gate must pass before report derivation")
-    for name, digest in (
-        ("extraction_sha256", extraction_sha256),
-        ("pairs_sha256", pairs_sha256),
-    ):
+    required_digests = {"manifest", "audit", "audit_review", "qualification", "extraction", "pairs"}
+    if set(artifact_sha256) != required_digests:
+        raise ValueError("report requires every frozen artifact digest")
+    for name, digest in artifact_sha256.items():
         _validate_digest(name, digest)
     decisive = sum(item.gold_label in {"entailment", "contradiction"} for item in pairs)
     false_positives = sum(
@@ -589,6 +770,10 @@ def build_proposition_report(
         "evidence_margin": _pearson(pair_mean, tuple(item.evidence_margin for item in pairs)),
         "polarity_margin": _pearson(pair_mean, tuple(item.polarity_margin for item in pairs)),
     }
+    audit_strata = {row.candidate_id: row.stratum for row in audit}
+    dispositions = {review.candidate_id: review.disposition for review in reviews}
+    distributions = _score_distributions(pairs, audit_strata, dispositions, feature_names)
+    extraction_diagnostics = _extraction_diagnostics(extractions)
     control = metrics["proposition_pair_mean"]
     decision = (
         "graph-next"
@@ -603,8 +788,9 @@ def build_proposition_report(
         coverage,
         metrics,
         correlations,
-        extraction_sha256,
-        pairs_sha256,
+        distributions,
+        extraction_diagnostics,
+        dict(artifact_sha256),
         decision,
     )
 
@@ -992,10 +1178,7 @@ def _parse_proposition(raw: object) -> GroundedProposition:
         predicate=_parse_span(raw["predicate"]),
         object=_parse_span(raw["object"]),
         polarity=PropositionPolarity(raw["polarity"]),
-        qualifiers=tuple(
-            PropositionQualifier(QualifierRole(value["role"]), _parse_span(value["span"]))
-            for value in raw["qualifiers"]
-        ),
+        qualifiers=tuple(_parse_qualifier(value) for value in raw["qualifiers"]),
     )
     proposition_identity(proposition)
     return proposition
@@ -1005,6 +1188,12 @@ def _parse_span(raw: object) -> GroundedSpan:
     if not isinstance(raw, dict) or set(raw) != {"start", "end", "text"}:
         raise ValueError("span fields do not match schema")
     return GroundedSpan(raw["start"], raw["end"], raw["text"])
+
+
+def _parse_qualifier(raw: object) -> PropositionQualifier:
+    if not isinstance(raw, dict) or set(raw) != {"role", "span"}:
+        raise ValueError("qualifier fields do not match schema")
+    return PropositionQualifier(QualifierRole(raw["role"]), _parse_span(raw["span"]))
 
 
 def _validate_digest(name: str, value: object) -> None:
@@ -1064,6 +1253,69 @@ def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
     return sum(a * b for a, b in zip(centered_left, centered_right, strict=True)) / denominator
 
 
+def _score_distributions(
+    pairs: Sequence[PropositionPairRecord],
+    audit_strata: Mapping[str, str],
+    dispositions: Mapping[str, str],
+    feature_names: Sequence[str],
+) -> dict[str, dict[str, dict[str, NumericDistribution]]]:
+    dimensions = {
+        "gold_label": {item.candidate_id: item.gold_label for item in pairs},
+        "predicted_label": {item.candidate_id: item.predicted_label for item in pairs},
+        "audit_stratum": audit_strata,
+        "audit_disposition": dispositions,
+    }
+    output: dict[str, dict[str, dict[str, NumericDistribution]]] = {}
+    for dimension, assignments in dimensions.items():
+        groups: dict[str, list[PropositionPairRecord]] = {}
+        for pair in pairs:
+            group = assignments.get(pair.candidate_id)
+            if group is not None:
+                groups.setdefault(group, []).append(pair)
+        output[dimension] = {
+            group: {
+                feature: _distribution(
+                    tuple(float(getattr(pair.features, feature)) for pair in members)
+                )
+                for feature in feature_names
+            }
+            for group, members in sorted(groups.items())
+        }
+    return output
+
+
+def _extraction_diagnostics(
+    results: Sequence[PropositionExtractionResult],
+) -> PropositionExtractionDiagnostics:
+    if not results:
+        raise ValueError("report requires extraction results")
+    failures: dict[str, int] = {}
+    for result in results:
+        if result.error_code is not None:
+            failures[result.error_code] = failures.get(result.error_code, 0) + 1
+    return PropositionExtractionDiagnostics(
+        total_sources=len(results),
+        successful_sources=sum(item.status is ExtractionStatus.SUCCESS for item in results),
+        empty_sources=sum(item.status is ExtractionStatus.EMPTY for item in results),
+        failed_sources=sum(item.status is ExtractionStatus.FAILURE for item in results),
+        span_validated_propositions=sum(len(item.propositions) for item in results),
+        failures_by_code=dict(sorted(failures.items())),
+        latency_ms=_distribution(tuple(float(item.latency_ms) for item in results)),
+    )
+
+
+def _distribution(values: Sequence[float]) -> NumericDistribution:
+    if not values:
+        raise ValueError("distribution requires values")
+    return NumericDistribution(
+        len(values),
+        min(values),
+        statistics.median(values),
+        statistics.fmean(values),
+        max(values),
+    )
+
+
 def _sanitized_error(error: Exception) -> str:
     message = " ".join(str(error).split())
     return f"{type(error).__name__}: {message[:240]}"
@@ -1091,3 +1343,10 @@ def _parse_source(value: object) -> PropositionSource:
     return PropositionSource(
         SourceKind(value["kind"]), value["source_id"], value["text"], value["sha256"]
     )
+
+
+def _parse_qualification_probe(value: object) -> PropositionQualificationProbe:
+    if not isinstance(value, dict):
+        raise TypeError("qualification probe must be an object")
+    _require_fields(value, PropositionQualificationProbe, "qualification probe")
+    return PropositionQualificationProbe(**value)

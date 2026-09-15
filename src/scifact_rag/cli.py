@@ -25,6 +25,7 @@ from .composition import (
     build_application,
     build_generation_evaluator,
     build_proposition_evaluator,
+    build_proposition_extractor,
     build_scientific_inference_executor,
 )
 from .domain import EvidenceDocument, SearchHit
@@ -32,6 +33,7 @@ from .evaluation import (
     GenerationEvaluationSet,
     GenerationRunManifest,
     GeneratorSettings,
+    ScientificStance,
     write_generation_evaluation_set,
 )
 from .generation import GenerationContextStrategyName
@@ -46,14 +48,17 @@ from .proposition import SourceKind
 from .proposition_evaluation import (
     Phase3CandidateRecord,
     PropositionExtractionJournal,
+    PropositionQualificationReport,
     PropositionSourceManifest,
     build_error_audit,
     build_pair_records,
     build_proposition_report,
     build_source_manifest,
     phase3_candidate_records,
+    qualify_proposition_extractor,
     read_audit,
     read_audit_reviews,
+    validate_qualification_report,
     write_immutable,
 )
 from .retrieval_evaluation import (
@@ -65,6 +70,7 @@ from .retrieval_evaluation import (
     sha256_file,
     write_retrieval_evaluation_report,
 )
+from .scientific_inference import ScientificInferenceLabel, candidate_identity
 from .scientific_inference_evaluation import (
     ScientificInferenceJournal,
     ScientificInferenceRunManifest,
@@ -75,6 +81,9 @@ from .scientific_inference_evaluation import (
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
 app = typer.Typer(no_args_is_help=True, help="Grounded retrieval and generation over SciFact.")
+
+_PHASE3_MANIFEST_SHA256 = "121b7ce11a21a5fdfa7cf4f586c02f35015806f47ddc118fea912189092afcc5"
+_PHASE3_RESULTS_SHA256 = "40701fa9c161662c017602b0ac405e92c0212c0811eea4f4ccad7dbbb6a74b0e"
 
 
 def _emit(value: object) -> None:
@@ -549,6 +558,10 @@ def _load_proposition_boundary(
     str,
     str,
 ]:
+    if sha256_file(phase3_manifest_path) != _PHASE3_MANIFEST_SHA256:
+        raise ValueError("Phase 3 manifest does not match the retained validation artifact")
+    if sha256_file(phase3_results_path) != _PHASE3_RESULTS_SHA256:
+        raise ValueError("Phase 3 results do not match the retained validation artifact")
     phase3 = ScientificInferenceRunManifest.from_json(
         phase3_manifest_path.read_text(encoding="utf-8")
     )
@@ -572,6 +585,23 @@ def _load_proposition_boundary(
         raise ValueError("Phase 3 results do not match the fixed candidate comparison")
     corpus = BeirSciFact(data_dir / "scifact", QrelsSplit.TRAIN_VALIDATION)
     documents = {document.doc_id: document for document in corpus.documents()}
+    cases = {case.query_id: case for case in evaluation.cases}
+    for record in records:
+        case = cases.get(record.query_id)
+        document = documents.get(record.document_id)
+        if case is None or document is None or record.claim != case.claim:
+            raise ValueError("Phase 3 candidate does not match evaluation or corpus identity")
+        expected_gold = (
+            ScientificInferenceLabel.NEUTRAL
+            if record.document_id not in case.cited_document_ids
+            else ScientificInferenceLabel.ENTAILMENT
+            if case.expected_stance is ScientificStance.SUPPORT
+            else ScientificInferenceLabel.CONTRADICTION
+        )
+        if record.gold_label != expected_gold.value or record.candidate_id != candidate_identity(
+            phase3.run_id, case.query_id, case.claim, document
+        ):
+            raise ValueError("Phase 3 candidate identity or gold label is not reproducible")
     return records, documents, evaluation.sha256, sha256_file(phase3_results_path)
 
 
@@ -675,10 +705,34 @@ def proposition_pair_eval_dry_run(
     _emit({"run_id": frozen.run_id, "sources": len(frozen.sources), "audit_rows": 100})
 
 
+@app.command("qualify-proposition-extraction")
+def qualify_proposition_extraction(
+    manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Run and freeze the four predeclared Qwen extraction probes."""
+    try:
+        frozen = PropositionSourceManifest.from_json(manifest.read_text(encoding="utf-8"))
+        report = qualify_proposition_extractor(build_proposition_extractor(frozen), frozen)
+        destination = output or manifest.parent / "qualification.json"
+        write_immutable(destination, report.to_json())
+    except (OSError, TypeError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    _emit(
+        {
+            "run_id": frozen.run_id,
+            "passed": report.passed,
+            "probes": [asdict(probe) for probe in report.probes],
+            "output": str(destination),
+        }
+    )
+
+
 @app.command("run-proposition-pair-eval")
 def run_proposition_pair_eval(
     manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
     audit: Annotated[Path, typer.Option(exists=True, readable=True)],
+    qualification: Annotated[Path, typer.Option(exists=True, readable=True)],
     phase3_manifest: Annotated[Path, typer.Option(exists=True, readable=True)],
     phase3_results: Annotated[Path, typer.Option(exists=True, readable=True)],
     evaluation_set: Annotated[Path, typer.Option(exists=True, readable=True)],
@@ -688,6 +742,10 @@ def run_proposition_pair_eval(
     """Extract, resume, gate, and score the fixed proposition-pair diagnostic."""
     try:
         frozen = PropositionSourceManifest.from_json(manifest.read_text(encoding="utf-8"))
+        qualification_report = PropositionQualificationReport.from_json(
+            qualification.read_text(encoding="utf-8")
+        )
+        validate_qualification_report(qualification_report, frozen)
         expected, records, expected_audit = _proposition_inputs(
             phase3_manifest,
             phase3_results,
@@ -729,14 +787,23 @@ def run_proposition_pair_eval(
             if audit_review is None:
                 response["status"] = "awaiting-audit-review"
             else:
-                read_audit_reviews(audit_review.read_text(encoding="utf-8"), audit_rows)
+                reviews = read_audit_reviews(audit_review.read_text(encoding="utf-8"), audit_rows)
                 report = build_proposition_report(
                     frozen.run_id,
                     pairs,
                     coverage,
-                    extraction_sha256=sha256_file(extraction_path),
-                    pairs_sha256=sha256_file(pairs_path),
+                    artifact_sha256={
+                        "manifest": sha256_file(manifest),
+                        "audit": sha256_file(audit),
+                        "audit_review": sha256_file(audit_review),
+                        "qualification": sha256_file(qualification),
+                        "extraction": sha256_file(extraction_path),
+                        "pairs": sha256_file(pairs_path),
+                    },
                     audit_complete=True,
+                    audit=audit_rows,
+                    reviews=reviews,
+                    extractions=tuple(journal.results.values()),
                 )
                 write_immutable(output_dir / "report.json", report.to_json())
                 response.update({"status": "complete", "decision": report.decision})

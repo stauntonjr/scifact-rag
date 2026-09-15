@@ -50,6 +50,8 @@ does not authorize fusion or default promotion.
 
 - The scientific representation hypothesis is tested before infrastructure is built.
 - Only sources needed by the fixed candidate pool incur extraction cost.
+- The exact retained Phase 3 manifest/results digests and every candidate identity are revalidated
+  against the fixed evaluation set and corpus before the Phase 4 source manifest is accepted.
 - Strict source grounding and assertion-not-truth semantics remain intact.
 - Graph paths, PostgreSQL lifecycle, and capability activation must earn their complexity.
 - Failure can terminate this experiment within one implementation cycle.
@@ -67,8 +69,9 @@ does not authorize fusion or default promotion.
 - **Hallucinated extraction:** require exact source spans and fail closed.
 - **Prompt/model drift:** bind model, prompt/schema, source, and artifact digests.
 - **Audit delay:** freeze first, run review independently, require completion only before interpretation.
-- **Coverage ambiguity:** require 100% usable claims, decisive documents, and audit documents; 99%
-  schema-valid terminal sources; and 95% usable candidate documents.
+- **Coverage ambiguity:** require 100% usable claims, decisive documents, audit documents, and
+  documents in the fixed decisive-versus-false-positive comparison; 99% schema-valid terminal
+  sources; and 95% usable candidate documents.
 - **Metric fishing:** freeze five formulas and the stop/continuation threshold before extraction.
 
 ## Alternatives considered

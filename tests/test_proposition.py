@@ -68,6 +68,7 @@ def test_grounded_propositions_require_exact_source_spans_and_unique_identities(
 
     validate_propositions(source, (proposition,))
     assert proposition.subject.canonical_key == "aspirin"
+    assert GroundedSpan(0, 9, "—Aspirin—").canonical_key == "aspirin"
     assert proposition_identity(proposition) == proposition_identity(proposition)
     assert len(proposition_identity(proposition)) == 64
 
@@ -167,6 +168,8 @@ def test_extraction_coverage_gate_uses_predeclared_thresholds() -> None:
         usable_decisive_documents=120,
         audit_documents=100,
         usable_audit_documents=100,
+        target_documents=700,
+        usable_target_documents=700,
     )
     assert evaluate_extraction_coverage(boundary).passed
 
@@ -176,6 +179,7 @@ def test_extraction_coverage_gate_uses_predeclared_thresholds() -> None:
         "usable-candidate-documents": replace(boundary, usable_candidate_documents=759),
         "usable-decisive-documents": replace(boundary, usable_decisive_documents=119),
         "usable-audit-documents": replace(boundary, usable_audit_documents=99),
+        "usable-target-documents": replace(boundary, usable_target_documents=699),
     }
     for expected, coverage in failures.items():
         result = evaluate_extraction_coverage(coverage)

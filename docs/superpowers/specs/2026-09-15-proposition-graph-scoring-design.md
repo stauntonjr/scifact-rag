@@ -137,6 +137,8 @@ diagnostic artifact, not a general assertion store.
 Qualification uses four fixed probes: positive relation, explicit negation, scientific qualifier,
 and no relation. It establishes schema and span fidelity only. Failure stops before candidate-pool
 extraction; no alternate prompt, retry variant, or fallback model is allowed inside the run.
+The four outcomes are persisted in a qualification artifact bound to the source manifest, and the
+full-pool command refuses to run unless that exact artifact passes.
 
 ## Predeclared extraction stop rule
 
@@ -146,6 +148,8 @@ any condition fails:
 - 100% of the 160 claims have at least one valid grounded proposition;
 - 100% of annotated decisive candidate documents have at least one valid grounded proposition;
 - 100% of documents represented in the 100-row audit have at least one valid grounded proposition;
+- 100% of documents in the fixed 120-decisive plus 4,316-false-positive comparison have at least
+  one valid grounded proposition, because the canonical metric may not silently drop candidates;
 - at least 99% of all source records are terminal and schema-valid, including valid empty results;
 - at least 95% of distinct candidate documents contain one or more valid grounded propositions.
 
@@ -185,6 +189,10 @@ decisive false positives and reports, for each feature and the fixed mean:
 - score distributions by gold label, Phase 3 prediction, audit stratum, and audit disposition;
 - extraction coverage, typed failures, span validation, latency, and exact artifact digests;
 - correlations with ColBERT, Phase 3 evidence margin, and polarity margin.
+
+Before freezing sources, authenticate the exact retained Phase 3 manifest and results digests and
+recompute every candidate identity, claim, corpus-document digest, and gold label against the fixed
+160-case evaluation set. Headline row counts alone are not an identity boundary.
 
 The representation earns a separately governed graph-connectivity experiment only if the fixed
 `proposition_pair_mean` achieves ROC-AUC at least `0.65` and average precision at least twice the
