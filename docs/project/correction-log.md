@@ -463,3 +463,20 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   runtime. The complete local and remote gates are retained in the Issue #7 engineering evidence.
 - Prevention: workflow interpreter pins must remain within the application's declared
   `requires-python` range whenever the workflow executes application package smoke.
+
+## SCIFACT-RAG-004: proposition preflight misclassified cited NEI candidates
+
+- Date: 2026-09-15.
+- Workflow: authenticate the fixed Phase 3 candidate boundary before proposition extraction.
+- Failed approach: the new external gold-label join mapped every cited case that was not SUPPORT to
+  contradiction, overlooking cited `NOT_ENOUGH_INFO` cases that Phase 3 correctly labels neutral.
+- Error signature: the authenticated dry-run stopped with `Phase 3 candidate identity or gold label
+  is not reproducible`; no Qwen or MiniLM call had started.
+- Mutation check: only ignored source/audit manifests existed, and neither proposition extraction
+  nor scoring output had been created.
+- Corrected path: map a candidate to neutral when its document is uncited or its case stance is
+  `NOT_ENOUGH_INFO`, then map the remaining cited cases to entailment or contradiction.
+- Verification: all 21,711 retained rows rejoined the exact 160 cases and corpus successfully; the
+  dry-run reproduced 160 claims, 4,867 documents, and the same 100-row audit.
+- Prevention: the authenticated no-model preflight remains mandatory before qualification or
+  full-pool extraction.

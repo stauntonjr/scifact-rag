@@ -594,6 +594,7 @@ def _load_proposition_boundary(
         expected_gold = (
             ScientificInferenceLabel.NEUTRAL
             if record.document_id not in case.cited_document_ids
+            or case.expected_stance is ScientificStance.NOT_ENOUGH_INFO
             else ScientificInferenceLabel.ENTAILMENT
             if case.expected_stance is ScientificStance.SUPPORT
             else ScientificInferenceLabel.CONTRADICTION
