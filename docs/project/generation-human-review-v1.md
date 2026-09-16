@@ -66,6 +66,39 @@ For every distinct answer, record these fields:
 The human reviewer records their identity and UTC completion time. `uncertain` is not silently
 treated as a pass. Automatic stance and citation scores remain separate from this rubric.
 
+## Local review tool
+
+Build the standalone reviewer from the frozen blank worksheet:
+
+```bash
+python3 tools/generation_review.py build \
+  --worksheet artifacts/generation-validation-v2-human-review.json \
+  --output artifacts/generation-validation-v2-human-review.html
+```
+
+Open `artifacts/generation-validation-v2-human-review.html` in a local browser. It presents one
+blinded response at a time, stores progress only in that browser's local storage, and enables
+export after the reviewer name and all categorical judgments are complete. Notes are optional for
+a clean pass and should cite the smallest evidence and answer spans for a non-pass or uncertainty.
+The page embeds neither the separate policy mapping nor any external resource, service call, or
+model request. Its explicit browser policy disables network connections.
+
+The source worksheet remains unchanged. The exported file is named
+`generation-validation-v2-human-review.completed.json`; retain it separately and validate it
+before joining it to the policy map:
+
+```bash
+python3 tools/generation_review.py validate \
+  --source artifacts/generation-validation-v2-human-review.json \
+  --worksheet PATH/TO/generation-validation-v2-human-review.completed.json
+```
+
+Validation fails closed on a missing reviewer, missing or invalid completion timestamp, malformed
+rows, unexpected fields, duplicate or reordered response identities, or incomplete/invalid rubric
+values. It also verifies that every claim, evidence passage, answer, and response identity still
+matches the frozen blank worksheet. The export remains blinded until a separate reporting step
+joins it to the retained map.
+
 ## Interpretation boundary
 
 The corrected validation execution may characterize whole-document versus DP context and verify
