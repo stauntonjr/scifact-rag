@@ -244,3 +244,17 @@ def test_builder_requires_exact_frozen_row_count(tmp_path: Path) -> None:
 
     with pytest.raises(module.ReviewValidationError, match="exactly 42 rows"):
         module.build_reviewer(worksheet, output, expected_sha256=digest)
+
+
+def test_validator_reports_the_32_character_response_id_contract() -> None:
+    module = _tool_module()
+    data = _worksheet()
+    rows = data["rows"]
+    assert isinstance(rows, list)
+    rows[0]["response_id"] = "too-short"
+
+    with pytest.raises(
+        module.ReviewValidationError,
+        match=r"response_id must be 32 lowercase hexadecimal characters",
+    ):
+        module.validate_worksheet(data, require_complete=False)

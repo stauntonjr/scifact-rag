@@ -95,7 +95,7 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
         _nonempty_text(row.get("claim"), f"{location}.claim", errors)
         response_id = row.get("response_id")
         if not isinstance(response_id, str) or not RESPONSE_ID_PATTERN.fullmatch(response_id):
-            errors.append(f"{location}.response_id must be 16 lowercase hexadecimal characters")
+            errors.append(f"{location}.response_id must be 32 lowercase hexadecimal characters")
         else:
             response_ids.append(response_id)
 
