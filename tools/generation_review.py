@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "generation-human-review/v1"
-FROZEN_WORKSHEET_SHA256 = "f6387ab3f4c1fe2110fbf671689377d624c1a10194ef1b34c805b34fdcb5f00b"
+FROZEN_WORKSHEET_SHA256 = "f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2"
 TOP_LEVEL_FIELDS = {"completed_at", "reviewer", "rows", "schema_version", "selection_protocol"}
 ROW_FIELDS = {"answer", "claim", "evidence", "response_id", "review"}
 EVIDENCE_FIELDS = {"document_id", "text", "title"}
@@ -29,7 +29,7 @@ REVIEW_OPTIONS = {
     "qualifier_omission": {"yes", "no", "not_applicable", "uncertain"},
 }
 REVIEW_FIELDS = set(REVIEW_OPTIONS) | {"notes"}
-RESPONSE_ID_PATTERN = re.compile(r"^[0-9a-f]{16}$")
+RESPONSE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 class ReviewValidationError(ValueError):
@@ -147,7 +147,11 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
 
 
 def load_worksheet(
-    path: Path, *, require_complete: bool, expected_sha256: str | None = None
+    path: Path,
+    *,
+    require_complete: bool,
+    expected_sha256: str | None = None,
+    expected_rows: int = 42,
 ) -> tuple[dict[str, Any], bytes]:
     raw = path.read_bytes()
     actual_sha256 = hashlib.sha256(raw).hexdigest()
@@ -159,7 +163,12 @@ def load_worksheet(
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise ReviewValidationError(f"worksheet is not valid JSON: {exc}") from exc
-    return validate_worksheet(data, require_complete=require_complete), raw
+    validated = validate_worksheet(data, require_complete=require_complete)
+    if len(validated["rows"]) != expected_rows:
+        raise ReviewValidationError(
+            f"worksheet must contain exactly {expected_rows} rows, got {len(validated['rows'])}"
+        )
+    return validated, raw
 
 
 HTML_TEMPLATE = r"""<!doctype html>
@@ -294,6 +303,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       ['comparison_omission', 'Comparison omission', 'Is the comparator changed or omitted materially?', ['yes','no','not_applicable','uncertain']],
       ['outcome_omission', 'Outcome omission', 'Is the measured outcome changed or omitted materially?', ['yes','no','not_applicable','uncertain']]
     ];
+    const allowedByField = Object.fromEntries(rubric.map(([field,,, options]) => [field, new Set(options)]));
     let current = 0;
     let state = { reviewer: '', reviews: {} };
     const card = document.getElementById('review-card');
@@ -307,12 +317,28 @@ HTML_TEMPLATE = r"""<!doctype html>
     function loadState() {
       try {
         const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
-        if (saved && typeof saved === 'object' && saved.reviews) state = saved;
+        state = normalizeState(saved);
       } catch (error) {
         message.textContent = 'Saved browser progress could not be read; export frequently.';
         message.className = 'message warn';
       }
       reviewer.value = state.reviewer || '';
+    }
+    function normalizeState(candidate) {
+      const normalized = {
+        reviewer: candidate && typeof candidate.reviewer === 'string' ? candidate.reviewer : '',
+        reviews: {}
+      };
+      for (const row of source.rows) {
+        const saved = candidate && candidate.reviews && candidate.reviews[row.response_id];
+        if (!saved || typeof saved !== 'object') continue;
+        const review = { notes: typeof saved.notes === 'string' ? saved.notes : '' };
+        for (const field of categoricalFields) {
+          if (allowedByField[field].has(saved[field])) review[field] = saved[field];
+        }
+        normalized.reviews[row.response_id] = review;
+      }
+      return normalized;
     }
     function saveState() {
       try {
@@ -330,7 +356,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
     function rowComplete(row) {
       const review = state.reviews[row.response_id] || {};
-      return categoricalFields.every(field => typeof review[field] === 'string' && review[field]);
+      return categoricalFields.every(field => allowedByField[field].has(review[field]));
     }
     function updateProgress() {
       const complete = source.rows.filter(rowComplete).length;
@@ -380,6 +406,13 @@ HTML_TEMPLATE = r"""<!doctype html>
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function exportReview() {
+      state = normalizeState(state);
+      if (!reviewer.value.trim() || !source.rows.every(rowComplete)) {
+        message.textContent = 'Complete every categorical judgment and the reviewer name before export.';
+        message.className = 'message warn';
+        updateProgress();
+        return;
+      }
       const rows = source.rows.map(row => ({
         ...row,
         review: { ...state.reviews[row.response_id], notes: state.reviews[row.response_id].notes || '' }
@@ -414,9 +447,18 @@ HTML_TEMPLATE = r"""<!doctype html>
 
 
 def build_reviewer(
-    worksheet: Path, output: Path, *, expected_sha256: str = FROZEN_WORKSHEET_SHA256
+    worksheet: Path,
+    output: Path,
+    *,
+    expected_sha256: str = FROZEN_WORKSHEET_SHA256,
+    expected_rows: int = 42,
 ) -> dict[str, object]:
-    data, raw = load_worksheet(worksheet, require_complete=False, expected_sha256=expected_sha256)
+    data, raw = load_worksheet(
+        worksheet,
+        require_complete=False,
+        expected_sha256=expected_sha256,
+        expected_rows=expected_rows,
+    )
     digest = hashlib.sha256(raw).hexdigest()
     embedded = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     embedded = embedded.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
@@ -444,10 +486,19 @@ def _source_projection(data: dict[str, Any]) -> dict[str, object]:
 
 
 def validate_completed(
-    worksheet: Path, source: Path, *, expected_sha256: str = FROZEN_WORKSHEET_SHA256
+    worksheet: Path,
+    source: Path,
+    *,
+    expected_sha256: str = FROZEN_WORKSHEET_SHA256,
+    expected_rows: int = 42,
 ) -> dict[str, object]:
-    data, _ = load_worksheet(worksheet, require_complete=True)
-    source_data, _ = load_worksheet(source, require_complete=False, expected_sha256=expected_sha256)
+    data, _ = load_worksheet(worksheet, require_complete=True, expected_rows=expected_rows)
+    source_data, _ = load_worksheet(
+        source,
+        require_complete=False,
+        expected_sha256=expected_sha256,
+        expected_rows=expected_rows,
+    )
     if _source_projection(data) != _source_projection(source_data):
         raise ReviewValidationError("non-review content differs from the frozen source")
     return {
@@ -464,11 +515,9 @@ def _parser() -> argparse.ArgumentParser:
     build = subparsers.add_parser("build", help="Build the standalone blinded reviewer")
     build.add_argument("--worksheet", type=Path, required=True)
     build.add_argument("--output", type=Path, required=True)
-    build.add_argument("--expected-sha256", default=FROZEN_WORKSHEET_SHA256)
     validate = subparsers.add_parser("validate", help="Validate an exported completed review")
     validate.add_argument("--source", type=Path, required=True)
     validate.add_argument("--worksheet", type=Path, required=True)
-    validate.add_argument("--expected-sha256", default=FROZEN_WORKSHEET_SHA256)
     return parser
 
 
@@ -476,11 +525,9 @@ def main() -> int:
     args = _parser().parse_args()
     try:
         result = (
-            build_reviewer(args.worksheet, args.output, expected_sha256=args.expected_sha256)
+            build_reviewer(args.worksheet, args.output)
             if args.command == "build"
-            else validate_completed(
-                args.worksheet, args.source, expected_sha256=args.expected_sha256
-            )
+            else validate_completed(args.worksheet, args.source)
         )
     except (OSError, ReviewValidationError) as exc:
         print(f"error: {exc}", file=sys.stderr)

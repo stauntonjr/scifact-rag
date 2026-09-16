@@ -480,3 +480,23 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   dry-run reproduced 160 claims, 4,867 documents, and the same 100-row audit.
 - Prevention: the authenticated no-model preflight remains mandatory before qualification or
   full-pool extraction.
+
+## SCIFACT-RAG-005: deterministic review IDs exposed blinded policy assignments
+
+- Date: 2026-09-16.
+- Workflow: prepare the frozen generation-groundedness worksheet for human review.
+- Failed approach: derive each displayed response ID from a published SHA-256 construction over
+  the public query ID and one of three known context strategies, assuming truncating the digest
+  made the identity opaque.
+- Error signature: enumerating the 24 published query IDs and three strategy names reconstructed
+  42 of 42 worksheet response IDs and their policy assignments.
+- Mutation check: the defect was found before a reviewer identity, completion timestamp, or any of
+  the 378 rubric fields had been written. No model request or result selection was repeated.
+- Corrected path: assign unique random 128-bit response IDs once, retain them only through the
+  separate map, re-freeze the blank worksheet/map digests, and hard-bind the local reviewer to the
+  new 42-row worksheet.
+- Verification: exact content projections prove every claim, evidence passage, answer,
+  query/policy association, and raw-result identity is unchanged; only response IDs and row order
+  differ. Independent review must confirm that public inputs no longer reconstruct the new IDs.
+- Prevention: reviewer-visible opaque identifiers must not be derived from published low-entropy
+  inputs; frozen mappings remain separate and are not supplied during scoring.

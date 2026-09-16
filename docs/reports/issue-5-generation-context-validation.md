@@ -115,12 +115,18 @@ outputs are deduplicated:
 
 | Artifact | SHA-256 | State |
 |---|---|---|
-| `artifacts/generation-validation-v2-human-review.json` | `f6387ab3f4c1fe2110fbf671689377d624c1a10194ef1b34c805b34fdcb5f00b` | 42 rows; reviewer and 378 rubric fields blank |
-| `artifacts/generation-validation-v2-human-review-map.json` | `deb59a6c5c031313adf266bf1efd2b345d999087c0b0a94845c50e01f610e0ae` | retained separately from reviewer-facing data |
+| `artifacts/generation-validation-v2-human-review.json` | `f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2` | 42 rows; reviewer and 378 rubric fields blank |
+| `artifacts/generation-validation-v2-human-review-map.json` | `436de342736b264b4c7e21faa33e7df8c1b90e702750e764502bfb9e60f87372` | retained separately from reviewer-facing data |
 
 The worksheet omits policy name, expected stance, predicted stance, automatic correctness, tokens,
 latency, and aggregate results. A human reviewer must fill the rubric, identity, and UTC completion
 time; an agent must not invent that provenance.
+
+The first blank worksheet/map hashes (`f6387ab3...` and `deb59a6c...`) are superseded before human
+review because their documented deterministic ID formula allowed all 42 policy assignments to be
+reconstructed. The re-frozen artifacts change only response IDs and row order. A complete
+content-preservation check proves that the claims, evidence, answers, query/policy associations,
+and raw-result identities are unchanged. No model request or result selection was repeated.
 
 ## Disposition
 

@@ -8,8 +8,11 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 - Added a dependency-free local browser reviewer for the frozen 42-response generation
   groundedness worksheet. It keeps policy identity separate, presents one blinded response at a
-  time, autosaves in browser-local storage, validates the fixed rubric, and exports a completed
-  JSON artifact without a service, network resource, model call, or product-UI activation.
+  time, normalizes browser-local progress, validates the fixed rubric, and exports a completed JSON
+  artifact without a service, network resource, model call, or product-UI activation. Before human
+  review, the blank worksheet and separate map were re-keyed with random 128-bit response IDs after
+  independent review proved the original public hash formula reconstructed all 42 policies; no
+  claim, evidence, answer, sample, mapping association, or model output changed.
 - Added a bounded, opt-in grounded proposition-pair diagnostic without changing retrieval,
   generation, PostgreSQL, or capability defaults. Its authenticated preflight froze 160 claims,
   4,867 candidate documents, and a deterministic 100-row audit, but the fixed Qwen qualification

@@ -34,10 +34,12 @@ It does not inspect generated text or answer metrics.
 ## Blinded worksheet
 
 After generation, create one row per distinct `(query_id, supplied_contexts, raw_generated_text)`.
-Do not duplicate a row for a policy whose exact prompt reused an earlier response. Assign opaque
-response IDs by sorting SHA-256 of
-`scifact-generation-human-review-order-v1\0{query_id}\0{context_strategy}`. The reviewer-facing
-worksheet must include the claim, supplied title/text evidence, answer, and document IDs, but omit:
+Do not duplicate a row for a policy whose exact prompt reused an earlier response. At the first
+freeze, assign every distinct response a unique random 128-bit hexadecimal ID and sort by that ID.
+Freeze those identities in the separate map and reuse them for any byte-equivalent rebuild; do not
+derive them from query or policy values and do not regenerate them after review starts. The
+reviewer-facing worksheet must include the claim, supplied title/text evidence, answer, and
+document IDs, but omit:
 
 - policy name and reuse source;
 - expected and predicted stance;
@@ -45,7 +47,8 @@ worksheet must include the claim, supplied title/text evidence, answer, and docu
 - aggregate results.
 
 Retain a separate mapping from opaque response ID to query ID, policy, and raw-result identity so
-the completed review can be joined without modifying raw model output.
+the completed review can be joined without modifying raw model output. Do not provide that map or
+the local artifact builder to the reviewer during scoring.
 
 ## Human rubric
 
