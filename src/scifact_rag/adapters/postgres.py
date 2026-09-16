@@ -61,6 +61,8 @@ _REPRESENTATIONS = Table(
     Column("text", Text, nullable=False),
     Column("embedding", Vector(_DIMENSIONS), nullable=True),
 )
+_MAX_BIND_PARAMETERS = 65_535
+_MAX_REPRESENTATION_ROWS_PER_INSERT = _MAX_BIND_PARAMETERS // len(_REPRESENTATIONS.columns)
 
 
 class PostgresEvidenceStore:
@@ -218,20 +220,24 @@ class PostgresEvidenceStore:
                     _REPRESENTATIONS.c.representation.in_(represented),
                 )
             )
-            connection.execute(
-                _REPRESENTATIONS.insert().values(
-                    [
-                        {
-                            "doc_id": chunk.doc_id,
-                            "representation": chunk.representation,
-                            "ordinal": chunk.ordinal,
-                            "text": chunk.text,
-                            "embedding": list(embedding) if embedding is not None else None,
-                        }
-                        for chunk, embedding in zip(chunks, embeddings, strict=True)
-                    ]
+            representation_rows = [
+                {
+                    "doc_id": chunk.doc_id,
+                    "representation": chunk.representation,
+                    "ordinal": chunk.ordinal,
+                    "text": chunk.text,
+                    "embedding": list(embedding) if embedding is not None else None,
+                }
+                for chunk, embedding in zip(chunks, embeddings, strict=True)
+            ]
+            for start in range(0, len(representation_rows), _MAX_REPRESENTATION_ROWS_PER_INSERT):
+                connection.execute(
+                    _REPRESENTATIONS.insert().values(
+                        representation_rows[
+                            start : start + _MAX_REPRESENTATION_ROWS_PER_INSERT
+                        ]
+                    )
                 )
-            )
 
     def search_vector(
         self,

@@ -5,7 +5,9 @@ import uuid
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
+from scifact_rag.adapters import postgres
 from scifact_rag.adapters.postgres import PostgresEvidenceStore
 from scifact_rag.domain import EvidenceChunk, EvidenceDocument
 
@@ -146,4 +148,45 @@ def test_pgvector_round_trip() -> None:
             connection.execute(
                 text("DELETE FROM documents WHERE doc_id IN (:first, :second)"),
                 {"first": first.doc_id, "second": second.doc_id},
+            )
+
+
+@pytest.mark.integration
+def test_representation_partition_failure_rolls_back_the_entire_upsert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        pytest.skip("DATABASE_URL is not configured")
+    store = PostgresEvidenceStore(database_url)
+    store.initialize()
+    monkeypatch.setattr(postgres, "_MAX_REPRESENTATION_ROWS_PER_INSERT", 2, raising=False)
+    doc_id = f"rollback-{uuid.uuid4().hex}"
+    document = EvidenceDocument(doc_id, "title", "abstract")
+    chunks = [
+        EvidenceChunk(doc_id, 0, "first", "raw", embedding_required=False),
+        EvidenceChunk(doc_id, 1, "second", "raw", embedding_required=False),
+        EvidenceChunk(doc_id, 0, "duplicate", "raw", embedding_required=False),
+    ]
+
+    try:
+        with pytest.raises(IntegrityError):
+            store.upsert([document], chunks, [None, None, None])
+
+        with store._engine.connect() as connection:
+            document_count = connection.execute(
+                text("SELECT count(*) FROM documents WHERE doc_id = :doc_id"),
+                {"doc_id": doc_id},
+            ).scalar_one()
+            representation_count = connection.execute(
+                text("SELECT count(*) FROM document_representations WHERE doc_id = :doc_id"),
+                {"doc_id": doc_id},
+            ).scalar_one()
+        assert document_count == 0
+        assert representation_count == 0
+    finally:
+        with store._engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM documents WHERE doc_id = :doc_id"),
+                {"doc_id": doc_id},
             )
