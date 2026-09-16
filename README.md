@@ -106,10 +106,9 @@ docker compose run --rm app search \
 - Retrieval fallback: `bm25-token-window-rrf`.
 - Generation-context default: `whole-document`; `adaptive` is the scalable opt-in policy.
 - CLI is active; API, MCP, web UI, graph scoring, and agent-development evaluation are downstream.
-- The next architecture phase is explicit scientific inference scoring for synonymy, polarity,
-  negation, contradiction, qualifiers, and cross-sentence evidence.
-- A frozen human review of generation grounding remains open and is not replaced by retrieval
-  metrics.
+- The fixed blinded generation review is complete: all three recorded policy names scored 18/24
+  grounded answers, which is expected on short abstracts and does not test long-document scaling.
+- The next product gate is a reproducible CLI acceptance run and retained release report.
 
 ## Documentation
 

@@ -1,9 +1,10 @@
 # Issue #5: corrected generation-context validation
 
 - Date: 2026-09-14
+- Human review completed: 2026-09-16
 - Governing roadmap: `docs/project/roadmap.md`, Phase 1
 - Governing decision: ADR-0028
-- Evidence class: corrected fixed validation execution; automatic measures complete, human review pending
+- Evidence class: corrected fixed validation execution plus completed blinded human review
 - Default changed: no
 
 ## Executive result
@@ -21,9 +22,11 @@ response in every equivalent policy row. All 160 DP/adaptive contexts, answers, 
 outcomes, and token counts are therefore exactly equal rather than being confounded by backend
 nondeterminism.
 
-Whole-document remains the compatibility default. The corrected automatic result characterizes the
-tradeoff but cannot authorize a promotion: Issue #5 had no prospectively declared non-inferiority
-margin, and the frozen blinded human groundedness review is not yet scored.
+Whole-document remains the compatibility default. The corrected automatic result and completed
+human review characterize the tradeoff but cannot authorize a promotion: Issue #5 had no
+prospectively declared non-inferiority margin. Equal groundedness on short SciFact abstracts is
+expected and does not invalidate adaptive chunking's separate scaling rationale for larger
+documents.
 
 ## Provenance
 
@@ -107,7 +110,7 @@ The current DP policy therefore provides a lower worst-case prompt but no materi
 on this corpus. Its scaling rationale remains plausible for documents much longer than SciFact
 abstracts; this validation does not demonstrate it.
 
-## Human-review handoff
+## Completed blinded human review
 
 The prospective selection and rubric are in `docs/project/generation-human-review-v1.md`. The local
 review worksheet contains 42 distinct responses across the 24 frozen claims after exact-equivalent
@@ -117,10 +120,12 @@ outputs are deduplicated:
 |---|---|---|
 | `artifacts/generation-validation-v2-human-review.json` | `f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2` | 42 rows; reviewer and 378 rubric fields blank |
 | `artifacts/generation-validation-v2-human-review-map.json` | `436de342736b264b4c7e21faa33e7df8c1b90e702750e764502bfb9e60f87372` | retained separately from reviewer-facing data |
+| `artifacts/generation-validation-v2-human-review.completed.json` | `8388c3da046a9ec4d671b4230168b29fcd7208d55353ba0f84a700e37d16d62b` | 42/42 rows complete; reviewer `Jack`; completed `2026-09-16T19:43:24Z` |
 
-The worksheet omits policy name, expected stance, predicted stance, automatic correctness, tokens,
-latency, and aggregate results. A human reviewer must fill the rubric, identity, and UTC completion
-time; an agent must not invent that provenance.
+The reviewer-facing worksheet omitted policy name, expected stance, predicted stance, automatic
+correctness, tokens, latency, and aggregate results. The completed artifact records the human
+reviewer's rubric, identity, and UTC completion time; automatic scores remained separate until the
+validated review was joined to the retained map.
 
 The first blank worksheet/map hashes (`f6387ab3...` and `deb59a6c...`) are superseded before human
 review because their documented deterministic ID formula allowed all 42 policy assignments to be
@@ -128,12 +133,29 @@ reconstructed. The re-frozen artifacts change only response IDs and row order. A
 content-preservation check proves that the claims, evidence, answers, query/policy associations,
 and raw-result identities are unchanged. No model request or result selection was repeated.
 
+The completed worksheet passed the source-bound validator before the separate map was joined. It
+contains 32 grounded and 10 ungrounded distinct responses, eight material-overstatement findings,
+ten explanatory notes, and no `uncertain` judgments. Expanding each response through its retained
+equivalent-policy assignments gives 24 reviewed claims per policy:
+
+| Policy | Grounded | Material overstatement present | Qualifier omission | Population omission | Intervention omission | Comparison omission | Outcome omission |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Whole document | 18 / 24 | 5 / 24 | 5 / 24 | 1 / 24 | 2 / 24 | 1 / 24 | 3 / 24 |
+| Top DP chunks | 18 / 24 | 5 / 24 | 5 / 24 | 2 / 24 | 2 / 24 | 1 / 24 | 3 / 24 |
+| Adaptive | 18 / 24 | 5 / 24 | 5 / 24 | 2 / 24 | 2 / 24 | 1 / 24 | 3 / 24 |
+
+No response lost a material negation. Top-DP and adaptive have identical full rubrics on all 24
+claims. Whole-document differs from them on only query `1084`; both answers are ungrounded and
+overstated, while the chunk-aware answer also omits the studied population. The review therefore
+shows no groundedness improvement from chunking on this fixed small-abstract subset and no new
+quality failure that warrants removing the scalable opt-in path.
+
 ## Disposition
 
 Keep whole-document as the simple generation default. Keep one chunk-aware strategy as an opt-in
 scalability path. `adaptive` is the canonical chunk-aware policy and `top-dp-chunks` remains an
 exact compatibility alias. New paired evaluations compare only whole-document and adaptive; the
 retained historical three-name records remain reportable. Do not run another SciFact validation
-comparison or tune the context policy from these results. Issue #5 remains open only for the frozen
-human review and its joined report; that review cannot retroactively promote a policy without the
-missing prospective margin.
+comparison or tune the context policy from these results. The completed review closes Issue #5 but
+cannot retroactively promote a policy without the missing prospective margin. Phase 1 is complete;
+the next product gate is the Phase 5 CLI acceptance run and retained release report.

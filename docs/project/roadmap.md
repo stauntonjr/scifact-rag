@@ -49,7 +49,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Pointwise ranking | Whole-title-plus-abstract ColBERT reaches test nDCG 0.744417 and recall 0.852667 under a local protocol that is not identical to the published full-corpus protocol | ColBERT is the practical ranking leader, but the result does not authorize further test-set tuning |
 | Long-document ranking | Fixed-pool DP content-max ColBERT reaches development nDCG 0.755459 and recall 0.870853, close to the whole-document control at 0.759619 and 0.869055 | DP content views are a credible scalable representation even though the complete multiview fusion regressed |
 | Current retrieval default | DP content-max ColBERT is applied through one shared default constant after it reached validation nDCG 0.742493 and recall 0.806250 versus 0.673519 and 0.787500 for BM25 plus token windows | BM25/token-window remains the fast/no-ColBERT fallback; no retrieval retuning is planned |
-| Generation | Corrected 160-claim automatic validation retains whole-document as default; adaptive is the one canonical chunk-aware policy and the frozen human review is pending | Do not rerun or tune on SciFact validation; complete the blinded review before closing Phase 1 |
+| Generation | Corrected automatic validation and the completed 24-claim blinded review retain whole-document as default; adaptive is the canonical scalable opt-in | Phase 1 is complete; do not rerun or tune on SciFact validation |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
 | Interfaces | CLI is active; HTTP, MCP, and web UI are inactive | New interfaces remain out of the current product proof |
@@ -101,7 +101,7 @@ multi-step recovery that cannot remain clear in ordinary application services.
 | Order | Phase | Product result | Gate to proceed |
 |---:|---|---|---|
 | 0 | Establish the execution boundary | Reproducible manifests and canonical work items | Evaluation inputs and immutable settings recorded |
-| 1 | Evaluate generation context | Whole-document control versus canonical adaptive chunking | Automatic decision recorded; frozen human review completed |
+| 1 | Evaluate generation context | Completed: whole-document retained; adaptive remains the scalable opt-in | Automatic decision and frozen human review recorded |
 | 2 | Select the retrieval default | One defensible default plus retained opt-in experiments | Validation gate passed without test-set tuning |
 | 3 | Add scientific inference scoring | Support, contradiction, and insufficiency become explicit evidence | Fixed validation comparison demonstrates useful incremental signal |
 | 4 | Test grounded proposition pairs | Determine whether explicit structure merits graph work | Stopped at the frozen extraction qualification; graph work is not earned |
@@ -148,6 +148,9 @@ without adding product features.
 - No retrieval, prompt, or model behavior changes in this phase.
 
 ## Phase 1: evaluate generation-context strategies
+
+Status: completed 2026-09-16. The corrected automatic comparison and frozen blinded review confirm
+whole-document as the compatibility default while retaining adaptive as the scalable opt-in.
 
 ### Question
 
@@ -377,8 +380,8 @@ Retain the model-neutral contracts, strict adapter, authenticated Phase 3 bounda
 workflow as a failed-but-informative experiment. Do not change the prompt, retry the probes, swap
 extractors, activate `semantic-evidence-ledger`, or build graph infrastructure under Issue #9. Any
 new extraction-method comparison requires a separately approved issue and an uninspected decision
-boundary. The product roadmap returns to completing the outstanding blinded generation review and
-then hardening the CLI vertical slice.
+boundary. The completed blinded generation review closes Phase 1, so the product roadmap now
+advances to hardening the CLI vertical slice.
 
 ## Phase 5: harden and release the CLI vertical slice
 
@@ -477,11 +480,9 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Complete the already-frozen blinded generation review and close that decision without
-   post-result tuning.
-2. Complete the CLI release gate and publish the acceptance report.
-3. Add HTTP, MCP, and web adapters as separate post-release Issues.
-4. Decide whether to begin the separate template/Pi effectiveness program.
+1. Complete the CLI release gate and publish the acceptance report.
+2. Add HTTP, MCP, and web adapters as separate post-release Issues.
+3. Decide whether to begin the separate template/Pi effectiveness program.
 
 Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
 unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved

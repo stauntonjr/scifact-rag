@@ -4,11 +4,12 @@
 
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
 comparison, fixed retrieval-default comparison, and Phase 3 scientific-inference diagnostic are
-complete. Phase 1 still has its frozen human review outstanding, Issue #7 applied ADR-0029's
-selected retrieval default, Issue #8 retained scientific-inference architecture without promoting
-its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its strict Qwen extraction
-qualification. Complete the outstanding blinded generation review, then harden the CLI vertical
-slice; graph work is not currently earned.
+complete. Phase 1's frozen human review is also complete: every policy scored 18/24 grounded
+answers and 5/24 material overstatements, an expected parity result for short abstracts. Issue #7
+applied ADR-0029's selected retrieval default, Issue #8 retained scientific-inference architecture
+without promoting its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its
+strict Qwen extraction qualification. The active product gate is now CLI hardening and acceptance;
+graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -79,7 +80,8 @@ UI, but only CLI is active now.
   the compatibility default; `adaptive` keeps exact one-view abstracts whole and ColBERT-selects at
   most two raw DP chunks for longer parents. The accepted legacy name `top-dp-chunks` is now an
   exact alias for `adaptive`, not a third evaluation arm. The corrected 160-claim automatic
-  comparison is retained; its blinded human groundedness review remains pending.
+  comparison and completed blinded review retain whole-document as default and adaptive as the
+  scalable opt-in without post-result tuning.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
 - `application-composition-root`, `cli-interface`, and the bounded
   `product-validation-challenges` corpus are active in `harness/capabilities.json`.

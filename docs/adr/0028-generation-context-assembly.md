@@ -1,9 +1,9 @@
 # ADR-0028: Document-aware generation context assembly
 
-- Status: accepted; whole-document default retained after deterministic validation
+- Status: accepted; whole-document default confirmed after automatic and blinded human validation
 - Date: 2026-08-29
 - Decider: Jack Rory Staunton, human owner
-- Governing issue: local generation-context decision; no GitHub Issue exists
+- Governing issue: [#5](https://github.com/stauntonjr/scifact-rag/issues/5)
 
 ## Context
 
@@ -108,8 +108,18 @@ evidence recall. Whole-document is retained as the default. The two chunk strate
 identical contexts and outcomes for all 160 claims, so their duplication is a simplification
 follow-up rather than evidence for either label. That follow-up now makes `adaptive` canonical,
 retains `top-dp-chunks` as an exact CLI alias, and limits future paired evaluation to
-`whole-document` and `adaptive`; retained three-policy records remain reportable. The blinded human review remains pending and no
-prospective non-inferiority margin exists; no promotion claim is made.
+`whole-document` and `adaptive`; retained three-policy records remain reportable. No prospective
+non-inferiority margin exists, so no promotion claim is made.
+
+## 2026-09-16 blinded human review
+
+The fixed 24-claim review contains 42 distinct deduplicated responses. After source-bound
+validation and policy-map join, every policy has 18/24 grounded answers and 5/24 material
+overstatements. Top-DP and adaptive have identical full rubrics; whole-document differs on one
+query but not in groundedness or overstatement. This parity is expected for short abstracts and
+does not establish long-document superiority or failure. It confirms the existing decision:
+whole-document remains the compatibility default and adaptive remains the explicit scalable
+opt-in. Issue #5 is complete without a model rerun, policy retuning, or default change.
 
 ## Verification and revisit trigger
 
@@ -118,8 +128,7 @@ per-parent selection, deterministic ordering and ties, batch scorer alignment, m
 failure, composition and CLI exposure, actual-context handoff, and retrieved-parent citation
 validation. No live model result is required for implementation acceptance.
 
-Revisit after downstream comparison of whole-document and adaptive contexts using
-answer or label correctness, evidence-sentence recall, citation correctness, groundedness, input
-tokens, and latency. Supersede this decision if longer documents require a global generator-token
-budget, neighboring evidence expansion, more than one representation, or a different passage
-scorer.
+The SciFact downstream comparison is complete. Revisit only when a larger-document application
+exposes prompt overflow, truncation, or a measured context-loss class that requires a global
+generator-token budget, neighboring evidence expansion, more than one representation, or a
+different passage scorer.
