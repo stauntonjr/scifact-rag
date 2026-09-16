@@ -103,6 +103,31 @@ def _case() -> GenerationEvaluationCase:
     )
 
 
+def test_cli_acceptance_fixture_freezes_representative_public_cases() -> None:
+    fixture = Path(__file__).parent / "fixtures" / "cli_acceptance_cases.jsonl"
+
+    evaluation_set = GenerationEvaluationSet.from_jsonl(
+        fixture.read_text(encoding="utf-8")
+    )
+
+    assert tuple(case.query_id for case in evaluation_set.cases) == (
+        "30",
+        "40",
+        "622",
+        "1084",
+    )
+    assert tuple(case.expected_stance for case in evaluation_set.cases) == (
+        ScientificStance.SUPPORT,
+        ScientificStance.CONTRADICT,
+        ScientificStance.NOT_ENOUGH_INFO,
+        ScientificStance.SUPPORT,
+    )
+    qualified = evaluation_set.cases[-1]
+    assert "associated with the highest adjusted hazard ratios" in (
+        qualified.rationales[0].sentences[0]
+    )
+
+
 def test_paired_evaluator_retrieves_once_and_preserves_parent_order_for_every_policy() -> None:
     parents = [
         SearchHit("2", "Second", "Other evidence.", 0.9),
