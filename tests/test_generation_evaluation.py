@@ -113,7 +113,7 @@ def test_cli_acceptance_fixture_freezes_representative_public_cases() -> None:
     assert tuple(case.query_id for case in evaluation_set.cases) == (
         "30",
         "40",
-        "622",
+        "92",
         "1084",
     )
     assert tuple(case.expected_stance for case in evaluation_set.cases) == (
