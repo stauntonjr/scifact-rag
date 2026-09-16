@@ -95,8 +95,9 @@ The first fixed 160-claim execution is retained in
 `top-dp-chunks` and `adaptive` are operationally identical for the current raw DP representation
 and that unseeded temperature-0.1 sampling confounds their answer differences. DP did not lower
 median input tokens overall or on the long/retrieved subset and omitted some gold evidence. The
-whole-document compatibility default is therefore retained. This is not a completed downstream
-quality comparison: deterministic stance output and the fixed human review are still missing.
+whole-document compatibility default is therefore retained. That initial execution was not a
+completed downstream quality comparison: deterministic stance output and the fixed human review
+were still missing from it.
 
 ## 2026-09-14 corrected validation
 
@@ -115,9 +116,10 @@ non-inferiority margin exists, so no promotion claim is made.
 
 The fixed 24-claim review contains 42 distinct deduplicated responses. After source-bound
 validation and policy-map join, every policy has 18/24 grounded answers and 5/24 material
-overstatements. Top-DP and adaptive have identical full rubrics; whole-document differs on one
-query but not in groundedness or overstatement. This parity is expected for short abstracts and
-does not establish long-document superiority or failure. It confirms the existing decision:
+overstatements. Top-DP and adaptive have identical categorical rubric judgments; whole-document
+differs categorically on one query but not in groundedness or overstatement. This parity is
+expected for short abstracts and does not establish long-document superiority or failure. It
+confirms the existing decision:
 whole-document remains the compatibility default and adaptive remains the explicit scalable
 opt-in. Issue #5 is complete without a model rerun, policy retuning, or default change.
 

@@ -144,11 +144,12 @@ equivalent-policy assignments gives 24 reviewed claims per policy:
 | Top DP chunks | 18 / 24 | 5 / 24 | 5 / 24 | 2 / 24 | 2 / 24 | 1 / 24 | 3 / 24 |
 | Adaptive | 18 / 24 | 5 / 24 | 5 / 24 | 2 / 24 | 2 / 24 | 1 / 24 | 3 / 24 |
 
-No response lost a material negation. Top-DP and adaptive have identical full rubrics on all 24
-claims. Whole-document differs from them on only query `1084`; both answers are ungrounded and
-overstated, while the chunk-aware answer also omits the studied population. The review therefore
-shows no groundedness improvement from chunking on this fixed small-abstract subset and no new
-quality failure that warrants removing the scalable opt-in path.
+No response lost a material negation. Top-DP and adaptive have identical categorical rubric
+judgments on all 24 claims. Whole-document differs from them categorically on only query `1084`;
+both answers are ungrounded and overstated, while the chunk-aware answer also omits the studied
+population. Free-text notes remain answer-specific and are not compared as a metric. The review
+therefore shows no groundedness improvement from chunking on this fixed small-abstract subset and
+no new quality failure that warrants removing the scalable opt-in path.
 
 ## Disposition
 
