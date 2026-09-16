@@ -49,8 +49,7 @@ def test_upsert_partitions_representation_inserts_inside_one_transaction(
     representation_inserts = [
         statement
         for statement in engine.connection.statements
-        if isinstance(statement, Insert)
-        and statement.table.name == "document_representations"
+        if isinstance(statement, Insert) and statement.table.name == "document_representations"
     ]
     assert engine.begin_calls == 1
     assert [len(statement.compile().params) for statement in representation_inserts] == [

@@ -106,9 +106,7 @@ def _case() -> GenerationEvaluationCase:
 def test_cli_acceptance_fixture_freezes_representative_public_cases() -> None:
     fixture = Path(__file__).parent / "fixtures" / "cli_acceptance_cases.jsonl"
 
-    evaluation_set = GenerationEvaluationSet.from_jsonl(
-        fixture.read_text(encoding="utf-8")
-    )
+    evaluation_set = GenerationEvaluationSet.from_jsonl(fixture.read_text(encoding="utf-8"))
 
     assert tuple(case.query_id for case in evaluation_set.cases) == (
         "30",
@@ -123,8 +121,9 @@ def test_cli_acceptance_fixture_freezes_representative_public_cases() -> None:
         ScientificStance.SUPPORT,
     )
     qualified = evaluation_set.cases[-1]
-    assert "associated with the highest adjusted hazard ratios" in (
-        qualified.rationales[0].sentences[0]
+    assert (
+        "associated with the highest adjusted hazard ratios"
+        in (qualified.rationales[0].sentences[0])
     )
 
 

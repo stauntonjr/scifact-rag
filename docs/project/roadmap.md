@@ -53,7 +53,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
 | Interfaces | CLI is active; HTTP, MCP, and web UI are inactive | New interfaces remain out of the current product proof |
-| Planning | The public repository and bounded Issues exist; no dedicated SciFact roadmap Project is required for the current CLI proof | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
+| Planning | Public GitHub Project #17 tracks the bounded roadmap Issues; Issue #10 completed the CLI release gate | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
 The public test qrels have been inspected repeatedly. Their scores are descriptive historical
 evidence only. They are not a parameter-selection surface.
@@ -105,7 +105,7 @@ multi-step recovery that cannot remain clear in ordinary application services.
 | 2 | Select the retrieval default | One defensible default plus retained opt-in experiments | Validation gate passed without test-set tuning |
 | 3 | Add scientific inference scoring | Support, contradiction, and insufficiency become explicit evidence | Fixed validation comparison demonstrates useful incremental signal |
 | 4 | Test grounded proposition pairs | Determine whether explicit structure merits graph work | Stopped at the frozen extraction qualification; graph work is not earned |
-| 5 | Harden and release the CLI proof | Reproducible end-to-end application release | Clean DGX run and retained acceptance report pass |
+| 5 | Harden and release the CLI proof | Completed: reproducible end-to-end CLI application acceptance | Clean DGX run and retained acceptance report passed |
 | 6 | Add composition adapters | API, MCP, and small web UI reuse the same application services | CLI semantics remain unchanged across adapters |
 | 7 | Evaluate the template and weaker models | Separate evidence about agent-development effectiveness | Product proof is already accepted |
 
@@ -411,6 +411,27 @@ advances to hardening the CLI vertical slice.
 - The release report records model/container revisions, metrics, limitations, and known failure
   classes.
 
+### Outcome (2026-09-16)
+
+Issue #10 completed the first CLI release gate on one DGX Spark. A clean public branch validated
+Compose and built from locked dependencies. A separately named empty PostgreSQL volume ingested all
+5,183 documents, and a second full ingest preserved the exact document tuple digest, all seven
+representation counts, 5,183 BM25 vectors, and the 8,306,688-byte BM25 index before a successful
+live BM25 query.
+
+Acceptance exposed and corrected one adapter defect: 512 documents expanded to 15,256
+representation rows and exceeded PostgreSQL's 65,535 bind-parameter limit. Representation inserts
+are now partitioned below a bound derived from the table column count while the document upsert,
+BM25 update, delete, and every partition remain in one transaction. Focused unit and PostgreSQL
+tests cover bounded statements and later-partition rollback.
+
+The fixed four-case live artifact retained eight whole-document/adaptive rows with zero failures,
+valid supplied-parent citations, correct selected-sample stances, exact `insufficient evidence`
+with no citations, and association language for the qualified antidepressant example. Two direct
+default `ask` calls separately confirmed supported citation behavior and exact insufficiency. The
+initial loopback-only ColBERT network failure remains retained rather than being erased. See
+`docs/reports/issue-10-cli-acceptance.md` for the evidence boundary and artifact digests.
+
 ## Phase 6: add composition adapters
 
 After the CLI proof is accepted, expose the same application services through thin adapters in
@@ -480,9 +501,8 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Complete the CLI release gate and publish the acceptance report.
-2. Add HTTP, MCP, and web adapters as separate post-release Issues.
-3. Decide whether to begin the separate template/Pi effectiveness program.
+1. Add HTTP, MCP, and web adapters as separate post-release Issues.
+2. Decide whether to begin the separate template/Pi effectiveness program.
 
 Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
 unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved

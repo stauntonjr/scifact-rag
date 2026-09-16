@@ -233,9 +233,7 @@ class PostgresEvidenceStore:
             for start in range(0, len(representation_rows), _MAX_REPRESENTATION_ROWS_PER_INSERT):
                 connection.execute(
                     _REPRESENTATIONS.insert().values(
-                        representation_rows[
-                            start : start + _MAX_REPRESENTATION_ROWS_PER_INSERT
-                        ]
+                        representation_rows[start : start + _MAX_REPRESENTATION_ROWS_PER_INSERT]
                     )
                 )
 

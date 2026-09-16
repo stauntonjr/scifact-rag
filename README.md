@@ -108,7 +108,10 @@ docker compose run --rm app search \
 - CLI is active; API, MCP, web UI, graph scoring, and agent-development evaluation are downstream.
 - The fixed blinded generation review is complete: all three recorded policy names scored 18/24
   grounded answers, which is expected on short abstracts and does not test long-document scaling.
-- The next product gate is a reproducible CLI acceptance run and retained release report.
+- The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests
+  preserve all 5,183 documents and BM25 invariants, and the retained live sample verifies support,
+  contradiction, scientific qualification, exact insufficiency, and parent-only citations.
+- The next product phase is thin HTTP, MCP, and web adapters over the accepted application layer.
 
 ## Documentation
 
@@ -121,6 +124,8 @@ docker compose run --rm app search \
   comparisons with evidence boundaries.
 - [Issue #6 validation report](docs/reports/issue-6-retrieval-default-validation.md): raw artifact
   hashes, component revisions, metrics, and query-level transitions behind the selected default.
+- [Issue #10 CLI acceptance](docs/reports/issue-10-cli-acceptance.md): clean-build, transactional
+  ingest, live generation, citation, latency, provenance, limitation, and failure evidence.
 - [Project handoff](docs/project/handoff.md): current implementation and operating state.
 
 ## Development

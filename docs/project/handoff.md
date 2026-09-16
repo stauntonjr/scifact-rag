@@ -8,8 +8,10 @@ complete. Phase 1's frozen human review is also complete: every policy scored 18
 answers and 5/24 material overstatements, an expected parity result for short abstracts. Issue #7
 applied ADR-0029's selected retrieval default, Issue #8 retained scientific-inference architecture
 without promoting its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its
-strict Qwen extraction qualification. The active product gate is now CLI hardening and acceptance;
-graph work is not currently earned.
+strict Qwen extraction qualification. Issue #10 then accepted the CLI vertical slice through a
+clean public build, isolated empty/no-op ingestion, retained four-case generation evidence, direct
+default-CLI smoke cases, and the complete repository gate. The next product phase is thin HTTP,
+MCP, and web adapters over the accepted application layer; graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -38,6 +40,10 @@ UI, but only CLI is active now.
 - PostgreSQL-native keyword, VectorChord-BM25, strict-dense-plus-keyword RRF, and seven fixed
   BM25-plus-vector RRF pairings are selectable. BM25/token-window RRF is the supported
   fast/no-ColBERT fallback.
+- Representation upserts partition their five-column inserts at or below PostgreSQL's 65,535 bind-
+  parameter limit while retaining one transaction around document/BM25 updates, representation
+  replacement, and every insert partition. Issue #10 discovered the boundary at batch size 512;
+  focused unit and PostgreSQL tests cover statement bounds and later-partition rollback.
 - A pinned MS MARCO cross-encoder over the fixed pooled candidate union is a separately
   hosted TEI GPU experiment. It does not replace the default.
 - Feature-preserving pooled ranking retains generation and matching-passage provenance, completely
@@ -117,6 +123,8 @@ at-most-once journal, and no-fusion boundary. The completed result and no-promot
 `docs/adr/0031-proposition-graph-scoring.md` records the narrowed proposition-pair experiment. Its
 four-probe Qwen qualification stopped on exact-span failures before full extraction or scoring;
 see `docs/reports/phase-4-proposition-pair-qualification.md`.
+`docs/reports/issue-10-cli-acceptance.md` is the accepted clean-build, ingest, live generation,
+citation, provenance, limitation, and failure boundary for the CLI release decision.
 
 ## Live environment observed 2026-08-27
 
@@ -321,8 +329,8 @@ see `docs/reports/phase-4-proposition-pair-qualification.md`.
 - Qwen initially used its 512-token answer budget for reasoning and returned null final content.
   The adapter now passes the checkpoint's supported `enable_thinking=false` chat-template option;
   an adapter regression test covers that request contract.
-- The public GitHub repository and bounded Issues exist. No dedicated roadmap Project, image
-  publication, or deployment has been created.
+- Public GitHub Project #17 tracks the roadmap Issues. No image publication or deployment has been
+  created.
 - The owner selected MIT for the application. `LICENSE`, package metadata, intake, project
   contract, charter, and README are reconciled. pg_tokenizer remains Apache-2.0 and
   VectorChord-BM25 remains separately dual-licensed under AGPLv3 or Elastic License v2; the custom

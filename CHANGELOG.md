@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Accepted the CLI vertical slice on one DGX Spark with a clean public build, isolated empty and
+  no-op 5,183-document ingests, retained support/contradiction/qualification/insufficiency rows,
+  direct default-CLI smoke cases, exact parent-citation checks, component provenance, latency, and
+  explicit network-failure evidence. Acceptance also fixed PostgreSQL's 65,535 bind-parameter
+  boundary by partitioning representation inserts inside the existing transaction; focused tests
+  cover statement bounds and later-partition rollback.
 - Added a dependency-free local browser reviewer for the frozen 42-response generation
   groundedness worksheet. It keeps policy identity separate, presents one blinded response at a
   time, normalizes browser-local progress, validates the fixed rubric, and exports a completed JSON
