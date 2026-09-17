@@ -1,6 +1,6 @@
 # ADR-0033: Expose the application through a thin MCP adapter
 
-- Status: proposed after bounded review correction; awaiting owner confirmation
+- Status: accepted
 - Date: 2026-09-17
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: [#12](https://github.com/stauntonjr/scifact-rag/issues/12)

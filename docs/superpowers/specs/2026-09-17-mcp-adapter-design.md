@@ -4,7 +4,7 @@ Date: 2026-09-17
 
 Governing issue: [#12](https://github.com/stauntonjr/scifact-rag/issues/12)
 
-Status: revised after bounded written review; awaiting owner confirmation
+Status: accepted by the human owner on 2026-09-17 after bounded written review
 
 ## Objective
 
