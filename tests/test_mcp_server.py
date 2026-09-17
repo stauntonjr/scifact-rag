@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from mcp import Client, MCPError
 from mcp_types import INVALID_PARAMS, TextContent
-from pydantic import BaseModel, ValidationError
 
 from scifact_rag import mcp_server as mcp_server_module
 from scifact_rag.application import RagApplication
@@ -13,6 +12,8 @@ from scifact_rag.domain import Answer, SearchHit
 from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.mcp_server import (
     AnswerToolArguments,
+    McpAnswerResult,
+    McpSearchResult,
     SearchToolArguments,
     create_mcp_server,
 )
@@ -60,6 +61,18 @@ def recording_resolver(
     return resolve
 
 
+def without_schema_cosmetics(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: without_schema_cosmetics(child)
+            for key, child in value.items()
+            if key not in {"additionalProperties", "title"}
+        }
+    if isinstance(value, list):
+        return [without_schema_cosmetics(child) for child in value]
+    return value
+
+
 @pytest.mark.anyio
 async def test_discovery_exposes_only_two_tools_and_no_other_mcp_primitives() -> None:
     application = RecordingApplication()
@@ -79,53 +92,55 @@ async def test_discovery_exposes_only_two_tools_and_no_other_mcp_primitives() ->
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("tool_name", ("search_scifact", "answer_scifact"))
-@pytest.mark.parametrize(
-    "invalid_arguments",
-    (
-        {"query": "claim", "unexpected": _REJECTED_VALUE},
-        {"query": "claim", "limit": _REJECTED_VALUE},
-    ),
-)
-async def test_invalid_arguments_are_rejected_without_disclosure_or_downstream_calls(
-    tool_name: str,
-    invalid_arguments: dict[str, object],
-) -> None:
+async def test_all_invalid_arguments_are_rejected_at_the_public_boundary() -> None:
     application = RecordingApplication()
     resolutions: list[tuple[RetrievalStrategyName, GenerationContextStrategyName]] = []
     server = create_mcp_server(recording_resolver(application, resolutions))
-
-    async with Client(server) as client:
-        with pytest.raises(MCPError) as exc_info:
-            await client.call_tool(tool_name, invalid_arguments)
-
-    assert exc_info.value.code == INVALID_PARAMS
-    assert exc_info.value.message == f"Invalid arguments for tool {tool_name}"
-    assert exc_info.value.data is None
-    assert _REJECTED_VALUE not in str(exc_info.value)
-    assert _REJECTED_VALUE not in repr(exc_info.value.error)
-    assert resolutions == []
-    assert application.calls == []
-
-
-def test_argument_models_reject_every_bounded_contract_violation() -> None:
-    invalid_cases: tuple[tuple[type[BaseModel], dict[str, object]], ...] = (
-        (SearchToolArguments, {}),
-        (SearchToolArguments, {"query": "   "}),
-        (SearchToolArguments, {"query": "x" * 4097}),
-        (SearchToolArguments, {"query": "claim", "limit": 0}),
-        (SearchToolArguments, {"query": "claim", "limit": 101}),
-        (SearchToolArguments, {"query": "claim", "limit": True}),
-        (SearchToolArguments, {"query": "claim", "limit": "5"}),
-        (SearchToolArguments, {"query": "claim", "limit": 5.0}),
-        (SearchToolArguments, {"query": "claim", "strategy": "unknown"}),
-        (AnswerToolArguments, {"query": "claim", "limit": 21}),
-        (AnswerToolArguments, {"query": "claim", "context_strategy": "unknown"}),
+    overlong_query = _REJECTED_VALUE + ("x" * 4097)
+    invalid_calls: tuple[tuple[str, dict[str, object]], ...] = (
+        ("search_scifact", {}),
+        ("search_scifact", {"query": []}),
+        ("search_scifact", {"query": "   "}),
+        ("search_scifact", {"query": overlong_query}),
+        ("search_scifact", {"query": "claim", "limit": 0}),
+        ("search_scifact", {"query": "claim", "limit": 101}),
+        ("search_scifact", {"query": "claim", "limit": True}),
+        ("search_scifact", {"query": "claim", "limit": _REJECTED_VALUE}),
+        ("search_scifact", {"query": "claim", "limit": 5.0}),
+        ("search_scifact", {"query": "claim", "strategy": _REJECTED_VALUE}),
+        ("search_scifact", {"query": "claim", "unexpected": _REJECTED_VALUE}),
+        ("answer_scifact", {}),
+        ("answer_scifact", {"query": []}),
+        ("answer_scifact", {"query": "   "}),
+        ("answer_scifact", {"query": overlong_query}),
+        ("answer_scifact", {"query": "claim", "limit": 0}),
+        ("answer_scifact", {"query": "claim", "limit": 21}),
+        ("answer_scifact", {"query": "claim", "limit": True}),
+        ("answer_scifact", {"query": "claim", "limit": _REJECTED_VALUE}),
+        ("answer_scifact", {"query": "claim", "limit": 5.0}),
+        ("answer_scifact", {"query": "claim", "strategy": _REJECTED_VALUE}),
+        ("answer_scifact", {"query": "claim", "context_strategy": _REJECTED_VALUE}),
+        ("answer_scifact", {"query": "claim", "unexpected": _REJECTED_VALUE}),
     )
 
-    for model, arguments in invalid_cases:
-        with pytest.raises(ValidationError):
-            model.model_validate(arguments)
+    async with Client(server) as client:
+        for tool_name, invalid_arguments in invalid_calls:
+            with pytest.raises(MCPError) as exc_info:
+                await client.call_tool(tool_name, invalid_arguments)
+
+            assert exc_info.value.code == INVALID_PARAMS, (tool_name, invalid_arguments)
+            assert exc_info.value.message == f"Invalid arguments for tool {tool_name}", (
+                tool_name,
+                invalid_arguments,
+            )
+            assert exc_info.value.data is None, (tool_name, invalid_arguments)
+            assert _REJECTED_VALUE not in str(exc_info.value), (tool_name, invalid_arguments)
+            assert _REJECTED_VALUE not in repr(exc_info.value.error), (
+                tool_name,
+                invalid_arguments,
+            )
+            assert resolutions == [], (tool_name, invalid_arguments)
+            assert application.calls == [], (tool_name, invalid_arguments)
 
 
 @pytest.mark.anyio
@@ -228,40 +243,29 @@ async def test_discovery_publishes_bounded_schemas_and_read_only_annotations() -
 
     search = discovered["search_scifact"]
     answer = discovered["answer_scifact"]
-    assert search.input_schema["required"] == ["query"]
-    assert set(search.input_schema["properties"]) == {"query", "limit", "strategy"}
-    assert search.input_schema["properties"]["query"] == {
-        "maxLength": 4096,
-        "minLength": 1,
-        "title": "Query",
-        "type": "string",
-    }
-    assert search.input_schema["properties"]["limit"] == {
-        "default": 5,
-        "maximum": 100,
-        "minimum": 1,
-        "title": "Limit",
-        "type": "integer",
-    }
-    assert set(answer.input_schema["properties"]) == {
-        "query",
-        "limit",
-        "strategy",
-        "context_strategy",
-    }
-    assert answer.input_schema["properties"]["limit"]["maximum"] == 20
-    assert answer.input_schema["properties"]["context_strategy"]["default"] == "whole-document"
+    assert without_schema_cosmetics(search.input_schema) == without_schema_cosmetics(
+        SearchToolArguments.model_json_schema()
+    )
+    assert without_schema_cosmetics(answer.input_schema) == without_schema_cosmetics(
+        AnswerToolArguments.model_json_schema()
+    )
+    assert search.description == (
+        "Retrieve ranked parent documents from the public SciFact corpus."
+    )
+    assert answer.description == (
+        "Retrieve evidence and invoke configured model inference to answer from the public "
+        "SciFact corpus; this read-only call may consume significant compute."
+    )
     assert search.output_schema is not None
     assert answer.output_schema is not None
-    assert set(search.output_schema["required"]) == {"schema_version", "hits"}
-    assert set(answer.output_schema["required"]) == {
-        "schema_version",
-        "query",
-        "text",
-        "citations",
-        "model",
-        "evidence",
-    }
+    assert without_schema_cosmetics(search.output_schema) == without_schema_cosmetics(
+        McpSearchResult.model_json_schema()
+    )
+    assert without_schema_cosmetics(answer.output_schema) == without_schema_cosmetics(
+        McpAnswerResult.model_json_schema()
+    )
+    assert search.output_schema["properties"]["schema_version"]["const"] == ("mcp-search-result/v1")
+    assert answer.output_schema["properties"]["schema_version"]["const"] == ("mcp-answer-result/v1")
     for tool in (search, answer):
         assert tool.annotations is not None
         assert tool.annotations.read_only_hint is True
