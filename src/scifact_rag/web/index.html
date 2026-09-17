@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>SciFact Evidence Inspector</title>
+    <link rel="stylesheet" href="/assets/scifact.css">
+    <script id="scifact-config" type="application/json">__SCIFACT_CONFIG__</script>
+    <script src="/assets/scifact.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-layout">
+        <div>
+          <p class="eyebrow">Grounded scientific retrieval</p>
+          <h1>SciFact Evidence Inspector</h1>
+        </div>
+        <p class="header-note">Public benchmark prototype · Local DGX service</p>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="intro" aria-labelledby="intro-title">
+        <div>
+          <h2 id="intro-title">Trace an answer back to its supplied evidence.</h2>
+          <p>
+            Search the SciFact corpus or ask for a grounded response. Generated answers cite only
+            the parent documents shown below, or report exact insufficient evidence.
+          </p>
+        </div>
+        <p class="limitation">
+          Research demonstration only. This interface is not a clinical decision system.
+        </p>
+      </section>
+
+      <section class="query-panel" aria-labelledby="query-title">
+        <h2 id="query-title">Scientific claim</h2>
+        <form id="claim-form">
+          <label for="claim-input">Claim or research question</label>
+          <textarea
+            id="claim-input"
+            name="query"
+            rows="4"
+            maxlength="4096"
+            required
+            aria-describedby="query-help"
+            placeholder="Example: Rapamycin delays aging in organisms."
+          ></textarea>
+          <p id="query-help" class="field-help">
+            Submit a complete claim. Evidence comes only from the local SciFact corpus.
+          </p>
+
+          <details class="advanced-controls">
+            <summary>Retrieval controls</summary>
+            <div class="control-grid">
+              <div class="field">
+                <label for="strategy-select">Retrieval strategy</label>
+                <select id="strategy-select" name="strategy"></select>
+              </div>
+              <div class="field">
+                <label for="context-strategy-select">Answer context</label>
+                <select id="context-strategy-select" name="context_strategy"></select>
+              </div>
+              <div class="field field-limit">
+                <label for="result-limit">Result limit</label>
+                <input id="result-limit" name="limit" type="number" min="1" max="100" value="5">
+              </div>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button id="answer-button" class="primary" type="submit" value="answer">
+              Answer with evidence
+            </button>
+            <button id="search-button" class="secondary" type="submit" value="search">
+              Search documents
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <p id="request-status" class="request-status" role="status" aria-live="polite">
+        Ready for a claim.
+      </p>
+
+      <section id="result-summary" class="result-summary" aria-labelledby="result-title" hidden>
+        <p id="result-kicker" class="eyebrow"></p>
+        <h2 id="result-title">Result</h2>
+        <p id="answer-text" class="answer-text"></p>
+        <dl id="result-meta" class="result-meta"></dl>
+        <div id="citation-list" class="citation-list" aria-label="Citations"></div>
+      </section>
+
+      <section class="evidence-section" aria-labelledby="evidence-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Inspect the source boundary</p>
+            <h2 id="evidence-title">Supplied evidence</h2>
+          </div>
+          <p id="evidence-count" class="evidence-count">No evidence loaded</p>
+        </div>
+        <div id="evidence-list" class="evidence-list"></div>
+      </section>
+
+      <noscript>
+        <p class="noscript">JavaScript is required to call the local search and answer APIs.</p>
+      </noscript>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>SciFact RAG · Evidence-first, inspectable, and bounded to the public corpus.</p>
+      </div>
+    </footer>
+  </body>
+</html>

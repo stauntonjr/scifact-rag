@@ -14,6 +14,7 @@ from .composition import build_application
 from .domain import Answer, SearchHit
 from .generation import GenerationContextStrategyName
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
+from .web import create_web_router
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,6 +124,7 @@ def _error_json(response: ErrorResponse) -> dict[str, object]:
 
 def create_http_app(resolver: ApplicationResolver) -> FastAPI:
     app = FastAPI(title="SciFact RAG API", version="1.0.0")
+    app.include_router(create_web_router())
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(
