@@ -4,7 +4,7 @@ Date: 2026-09-17
 
 Governing issue: [#11](https://github.com/stauntonjr/scifact-rag/issues/11)
 
-Status: owner-approved design under implementation
+Status: implemented and accepted under Issue #11
 
 ## Objective
 

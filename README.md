@@ -126,8 +126,8 @@ docker compose run --rm app search \
 - The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests
   preserve all 5,183 documents and BM25 invariants, and the retained live sample verifies support,
   contradiction, scientific qualification, exact insufficiency, and parent-only citations.
-- Phase 6 has reached the HTTP adapter; MCP is the next separate interface slice after HTTP live
-  acceptance.
+- The loopback HTTP adapter passed full engineering, integration, supported-answer,
+  exact-insufficiency, and parent-citation acceptance. MCP is the next separate interface slice.
 
 ## Documentation
 
@@ -142,6 +142,8 @@ docker compose run --rm app search \
   hashes, component revisions, metrics, and query-level transitions behind the selected default.
 - [Issue #10 CLI acceptance](docs/reports/issue-10-cli-acceptance.md): clean-build, transactional
   ingest, live generation, citation, latency, provenance, limitation, and failure evidence.
+- [Issue #11 HTTP acceptance](docs/reports/issue-11-http-api-acceptance.md): schema, parity,
+  loopback, integration, supported-answer, insufficiency, and parent-citation evidence.
 - [Project handoff](docs/project/handoff.md): current implementation and operating state.
 
 ## Development

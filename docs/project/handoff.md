@@ -10,10 +10,10 @@ applied ADR-0029's selected retrieval default, Issue #8 retained scientific-infe
 without promoting its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its
 strict Qwen extraction qualification. Issue #10 then accepted the CLI vertical slice through a
 clean public build, isolated empty/no-op ingestion, retained four-case generation evidence, direct
-default-CLI smoke cases, and the complete repository gate. Issue #11 now implements the first
-Phase 6 slice: a thin loopback HTTP adapter. Its focused contract is green; full integration and
-live supported/insufficient acceptance remain before closure. MCP and web remain inactive, and
-graph work is not currently earned.
+default-CLI smoke cases, and the complete repository gate. Issue #11 accepts the first Phase 6
+slice: a thin loopback HTTP adapter. Its full repository gate, three affected integrations, live
+supported case, exact insufficiency case, and parent-citation check passed. MCP and web remain
+inactive, and graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -167,10 +167,12 @@ error, and loopback deployment boundary for Issue #11.
 ## Implementation state
 
 - Generated project intake is sufficient for bounded planning.
-- Issue #11's HTTP implementation exposes `/healthz`, `/v1/search`, and `/v1/ask` with versioned
+- Issue #11's accepted HTTP implementation exposes `/healthz`, `/v1/search`, and `/v1/ask` with versioned
   schemas, strict validation before application resolution, safe errors, finite strategy-pair
-  caching, generated OpenAPI, and normalized CLI parity. Focused unit/contract checks pass; the
-  full repository gate, affected integrations, and retained live acceptance are next.
+  caching, generated OpenAPI, and normalized CLI parity. The retained acceptance uses image
+  `13387a8234c2` on `spark-3a8f`: health returned in 0.004328 seconds, the exact supported case
+  returned parent-valid citations in 7.638888 seconds, and the exact insufficiency case returned in
+  1.038191 seconds. See `docs/reports/issue-11-http-api-acceptance.md`.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or

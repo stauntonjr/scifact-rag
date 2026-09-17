@@ -52,7 +52,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Generation | Corrected automatic validation and the completed 24-claim blinded review retain whole-document as default; adaptive is the canonical scalable opt-in | Phase 1 is complete; do not rerun or tune on SciFact validation |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
-| Interfaces | CLI is accepted; the thin loopback HTTP adapter is active under Issue #11; MCP and web UI are inactive | HTTP must complete live acceptance before the next adapter |
+| Interfaces | CLI and the thin loopback HTTP adapter are accepted; MCP and web UI are inactive | Open one bounded MCP issue before implementation |
 | Planning | Public GitHub Project #17 tracks the bounded roadmap Issues; Issue #10 completed the CLI release gate | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
 The public test qrels have been inspected repeatedly. Their scores are descriptive historical
@@ -434,8 +434,7 @@ initial loopback-only ColBERT network failure remains retained rather than being
 
 ## Phase 6: add composition adapters
 
-Status: HTTP implementation active under Issue #11; live acceptance pending. MCP and web remain
-inactive.
+Status: HTTP accepted under Issue #11 on 2026-09-17. MCP and web remain inactive.
 
 After the CLI proof is accepted, expose the same application services through thin adapters in
 this order:
@@ -451,11 +450,12 @@ the same request through CLI and each new adapter and compare the normalized app
 The web UI should remain an evidence inspection surface, not a second application architecture. It
 should show the answer, parent citations, supplied evidence text, and the active strategy names.
 
-The HTTP slice exposes only health, search, and ask through FastAPI/Uvicorn. It preserves CLI
+The accepted HTTP slice exposes only health, search, and ask through FastAPI/Uvicorn. It preserves CLI
 limits, strategy enums, dataclass results, exact insufficiency, and parent citations; the Compose
 port is host-loopback only. Completion requires full engineering checks plus retained live parity
-for one supported and one insufficient-evidence case. MCP does not begin before that evidence is
-recorded.
+for one supported and one insufficient-evidence case. That gate passed on the DGX Spark with all
+citations constrained to supplied parents and exact insufficiency retained. MCP remains a separate
+owner-approved activation.
 
 ## Phase 7: evaluate the template and weaker-model development
 
@@ -510,7 +510,7 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Complete Issue #11 HTTP live acceptance, then open a separate bounded MCP Issue.
+1. Open a separate bounded MCP Issue and obtain its capability activation decision.
 2. Add the small web adapter only after the MCP boundary is accepted.
 3. Decide whether to begin the separate template/Pi effectiveness program.
 
