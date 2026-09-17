@@ -30,7 +30,7 @@ supported fast/no-ColBERT alternative.
 ## What the project demonstrates
 
 - A clean application core built from frozen Python dataclasses and replaceable ports, with thin
-  Typer CLI, FastAPI HTTP, and official-SDK MCP adapters.
+  Typer CLI, FastAPI HTTP, official-SDK MCP, and browser presentation adapters.
 - PostgreSQL 17 with pgvector and VectorChord-BM25 as one inspectable evidence store rather than a
   collection of hidden managed services.
 - Dedicated candidate generation, feature-preserving pooling, complete reranking, and parent-level
@@ -73,8 +73,9 @@ Qwen NVFP4 --> cited answer or `insufficient evidence`
 
 The pipeline is a modular monolith with one explicit composition root. LangGraph is intentionally
 absent: the current request path is deterministic and does not need a stateful agent workflow.
-The CLI, loopback HTTP API, and loopback MCP service share the same application services. The web
-UI remains a separate future adapter.
+The CLI, loopback HTTP API, loopback MCP service, and small evidence-inspection page share the same
+application services. The browser calls the existing HTTP contracts rather than implementing a
+second retrieval or generation path.
 
 ## Try it
 
@@ -106,6 +107,18 @@ curl -X POST http://127.0.0.1:8090/v1/search \
 The API is a loopback-only prototype, not a public deployment. Complete request, response, error,
 and OpenAPI details are in the [technical reference](docs/project/technical-reference.md#http-api).
 
+The same API service hosts the evidence inspector:
+
+```bash
+docker compose up -d --build api
+# Open http://127.0.0.1:8090/
+```
+
+It shows the active strategies, answer status, citations, ordered parent-document evidence,
+document IDs, scores, matching passages, and the complete text supplied to generation. It is a
+local inspection surface without authentication, TLS, public ingress, or independent retrieval
+logic.
+
 Start the DGX-local MCP service over the same application layer:
 
 ```bash
@@ -129,8 +142,9 @@ docker compose run --rm app search \
 - Retrieval default: `pooled-coref-interval-content-max-colbert`.
 - Retrieval fallback: `bm25-token-window-rrf`.
 - Generation-context default: `whole-document`; `adaptive` is the scalable opt-in policy.
-- CLI, loopback HTTP, and DGX-local loopback MCP are accepted; web UI, graph scoring, and
-  agent-development evaluation remain downstream.
+- CLI, loopback HTTP, and DGX-local loopback MCP are accepted. The web UI implementation and
+  packaged-resource checks are complete; bounded DGX browser acceptance remains. Graph scoring
+  and agent-development evaluation remain downstream.
 - The fixed blinded generation review is complete: all three recorded policy names scored 18/24
   grounded answers, which is expected on short abstracts and does not test long-document scaling.
 - The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests

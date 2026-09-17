@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Implemented the owner-approved evidence-inspection web adapter inside the existing loopback API
+  service. Packaged HTML, CSS, and JavaScript call only the versioned same-origin search and ask
+  endpoints and render active strategies, citations, ordered parent evidence, scores, matching
+  passages, complete supplied text, exact insufficiency, and bounded error states. The slice adds
+  no frontend service, build system, runtime dependency, CORS policy, authentication, or retrieval
+  behavior; live DGX browser acceptance remains pending.
 - Implemented the owner-approved thin MCP adapter over the existing application layer using the
   pinned official Python SDK 2.2.0. The loopback Compose service exposes exactly
   `search_scifact` and `answer_scifact`; strict pre-dispatch validation rejects unknown or invalid
@@ -17,8 +23,8 @@ All notable changes to the harness are recorded here. The harness version and a 
   liveness, search, and grounded ask through the existing composition root; strict versioned
   schemas reject invalid input before application construction, explicit response mapping
   preserves exact insufficiency and parent citations, safe errors expose no exception details,
-  and focused tests establish CLI/API parity. MCP, web UI, authentication, public deployment, and
-  retrieval or generation changes remain outside this slice. The DGX acceptance passed health,
+  and focused tests establish CLI/API parity. Authentication, public deployment, and retrieval or
+  generation changes remain outside this slice. The DGX acceptance passed health,
   all three affected integrations, one supported response with citations constrained to returned
   parents, and one exact `insufficient evidence` response with no citations.
 - Accepted the CLI vertical slice on one DGX Spark with a clean public build, isolated empty and

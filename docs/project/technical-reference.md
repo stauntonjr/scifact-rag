@@ -74,11 +74,12 @@ packing. Each strategy ranks every deduplicated candidate with only its named sc
 uses a pinned RankLLM coordinator and a separate memory-bounded vLLM model service. The three
 strategies do not fuse rerankers or mix retrieval scores into their order.
 
-The product boundary has CLI, loopback HTTP, and loopback MCP adapters. Domain and application
-contracts are Python dataclasses; one visible composition root wires replaceable corpus,
-embedding, storage, and generation adapters. FastAPI/Pydantic types remain inside the HTTP
-transport, while MCP SDK/Pydantic types remain inside the MCP transport. Web UI, model
-tool-calling, and Pi effectiveness evaluation are intentionally inactive.
+The product boundary has CLI, loopback HTTP, loopback MCP, and browser presentation adapters.
+Domain and application contracts are Python dataclasses; one visible composition root wires
+replaceable corpus, embedding, storage, and generation adapters. FastAPI/Pydantic types remain
+inside the HTTP transport, MCP SDK/Pydantic types remain inside the MCP transport, and the web UI
+only calls the existing HTTP contracts. Model tool-calling and Pi effectiveness evaluation remain
+intentionally inactive.
 The ordered delivery plan, phase gates, stop rules, and explicit deferrals are documented in
 [`roadmap.md`](roadmap.md).
 
@@ -208,6 +209,31 @@ actual supplied evidence. The API does not reinterpret exact `insufficient evide
 This is a local non-production interface. There is no authentication, TLS, CORS middleware,
 rate limiting, public ingress, streaming, or job queue. Revisit the architecture before binding
 beyond loopback or accepting untrusted traffic.
+
+## Web evidence inspector
+
+The existing `api` service also serves a packaged browser interface; no separate frontend service
+or build tool is required:
+
+```bash
+docker compose up -d --build api
+# Open http://127.0.0.1:8090/
+```
+
+`GET /` returns the semantic HTML document, while `/assets/scifact.css` and
+`/assets/scifact.js` return its packaged local assets. The page sends same-origin requests only to
+`POST /v1/search` and `POST /v1/ask`, so strategy defaults, request validation, retrieval,
+generation, citations, and supplied evidence still come from the accepted HTTP/application path.
+
+The result view shows the active retrieval and generation-context strategies, answer status and
+model when applicable, ordered parent-document evidence, document IDs, scores, matching passages,
+complete supplied evidence text, and citation links. Exact `insufficient evidence` is displayed
+only when the answer has no citations or supplied evidence. Validation, unavailable-service, and
+contract-mismatch states use fixed bounded messages rather than raw server responses.
+
+The UI is a single-user loopback inspection surface. It adds no authentication, TLS, CORS,
+non-loopback exposure, persistence, administration, retrieval logic, or generation logic. Its
+assets ship with the Python wheel and deployment follows the existing API image.
 
 ## MCP service
 

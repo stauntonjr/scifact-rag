@@ -529,7 +529,7 @@
         "browser-ui",
         "web-ui-adapter"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Add a small web interface over proven application use cases without creating an independent domain implementation.",
       "source_projects": [
         {
@@ -559,6 +559,29 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner for GitHub Issue #13 on 2026-09-17",
+        "runtime_dependencies": [
+          "FastAPI",
+          "native browser HTML/CSS/JavaScript"
+        ],
+        "ci_checks": [
+          "uv run pytest tests/test_web_ui.py tests/test_http_api.py tests/test_interface_contracts.py",
+          "python3 tools/python_package_smoke.py",
+          "docker compose config --quiet",
+          "make smoke"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/web/__init__.py",
+          "src/scifact_rag/web/index.html",
+          "src/scifact_rag/web/scifact.css",
+          "src/scifact_rag/web/scifact.js",
+          "src/scifact_rag/http_api.py",
+          "tests/test_web_ui.py",
+          "docs/adr/0034-web-ui.md",
+          "docs/superpowers/specs/2026-09-17-web-ui-design.md"
+        ]
       }
     },
     {

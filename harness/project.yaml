@@ -4,7 +4,7 @@
   "template_mode": false,
   "project": {
     "name": "SciFact RAG",
-    "summary": "A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, and loopback MCP interfaces over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+    "summary": "A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, loopback MCP, and a small evidence-inspection web interface over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
     "lifecycle": "new",
     "profile": "python-data",
     "status": "active",
@@ -28,12 +28,12 @@
       "Typer CLI commands for ingest, search, ask, and retrieval evaluation",
       "A thin loopback HTTP API for liveness, search, and ask over the same application layer",
       "A thin loopback MCP service exposing search_scifact and answer_scifact over the same application layer",
+      "A small loopback evidence-inspection web UI over the existing HTTP application contracts",
       "Python dataclass domain and application contracts",
       "One explicit composition root with PostgreSQL/pgvector/VectorChord-BM25, MiniLM, SciFact, and OpenAI-compatible generation adapters",
       "Docker Compose operation on one DGX Spark"
     ],
     "out_of_scope": [
-      "Web UI",
       "Pi or weaker-model effectiveness comparisons",
       "A bespoke adoption-effectiveness evaluation framework",
       "Tool-calling by the generation model",
@@ -103,6 +103,7 @@
         "CLI commands and JSON result schemas",
         "Versioned loopback HTTP request, response, and error schemas",
         "Versioned loopback MCP tool argument, result, and error contracts",
+        "Loopback evidence-inspection web routes and packaged asset contract",
         "Docker Compose environment-variable contract"
       ],
       "source": "harness/project.yaml:engineering.versioning.current",

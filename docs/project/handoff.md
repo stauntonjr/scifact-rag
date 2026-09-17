@@ -15,7 +15,10 @@ slice: a thin loopback HTTP adapter. Its full repository gate, three affected in
 supported case, exact insufficiency case, and parent-citation check passed. Issue #12 accepts the
 separate two-tool loopback MCP adapter after its full repository gate, three affected integrations,
 official-client discovery, supported case, exact insufficiency case, parent-citation check, and
-invalid-input check passed. Web is inactive, and graph work is not currently earned.
+invalid-input check passed. Issue #13 implements the final Phase 6 slice: a packaged,
+same-process evidence-inspection UI over the accepted HTTP contracts. Its focused checks pass;
+bounded DGX browser acceptance remains before the interface is accepted. Graph work is not
+currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -26,8 +29,9 @@ BEIR SciFact -> MiniLM -> PostgreSQL/pgvector -> retrieved evidence
                                Qwen NVFP4 -> cited answer or insufficient evidence
 ```
 
-The same dataclass application layer now serves CLI, HTTP, and MCP. It remains the future
-composition root for a small web UI; that capability is not active.
+The same dataclass application layer now serves CLI, HTTP, MCP, and the web presentation adapter.
+The UI adds no second application implementation: it calls the existing versioned HTTP search and
+ask endpoints from the same loopback origin.
 
 ## Accepted decisions
 
@@ -101,6 +105,9 @@ composition root for a small web UI; that capability is not active.
 - ADR-0033 adopts the pinned official MCP Python SDK v2.2.0 for exactly two read-only,
   closed-corpus tools. A refusal-only validator rejects malformed recognized calls before SDK tool
   dispatch; Compose publishes the service only at `127.0.0.1:8091/mcp`.
+- ADR-0034 serves packaged HTML, CSS, and JavaScript from the existing FastAPI process at `/` and
+  fixed `/assets/` routes. Browser calls remain same-origin at `127.0.0.1:8090`; there is no new
+  service, port, runtime dependency, CORS policy, or application behavior.
 
 See `docs/adr/0013-scifact-rag-composition-and-runtime.md`,
 `docs/adr/0015-modular-coreference-retrieval.md`,
@@ -139,6 +146,8 @@ citation, provenance, limitation, and failure boundary for the CLI release decis
 error, and loopback deployment boundary for Issue #11.
 `docs/adr/0033-mcp-adapter.md` records the accepted SDK, validation correction, two-tool contract,
 and loopback deployment boundary for Issue #12.
+`docs/adr/0034-web-ui.md` records the accepted same-process presentation boundary, packaged assets,
+same-origin API reuse, and browser-acceptance requirements for Issue #13.
 
 ## Live environment observed 2026-08-27
 
@@ -186,6 +195,12 @@ and loopback deployment boundary for Issue #12.
   normalized CLI parity. The DGX URL client passed live discovery, supported-answer,
   exact-insufficiency, parent-citation, and invalid-input gates against image `b0490480b967` at
   commit `161fe973b20c`; see `docs/reports/issue-12-mcp-acceptance.md`.
+- Issue #13 packages one evidence-inspection page into the existing API image and serves it from
+  `/` with fixed CSS and JavaScript assets. The UI renders active strategies, ordered parent
+  evidence, scores, complete supplied text, citations, and exact insufficiency through the
+  existing `/v1/search` and `/v1/ask` contracts. Focused route, HTTP/interface, formatting,
+  typing, and wheel-resource checks pass; live supported, insufficient, validation, unavailable,
+  responsive, focus, and reduced-motion browser acceptance is still pending.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or

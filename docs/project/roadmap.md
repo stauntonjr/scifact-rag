@@ -52,7 +52,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Generation | Corrected automatic validation and the completed 24-claim blinded review retain whole-document as default; adaptive is the canonical scalable opt-in | Phase 1 is complete; do not rerun or tune on SciFact validation |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
-| Interfaces | CLI, loopback HTTP, and the two-tool DGX-local MCP adapter are accepted; web UI is inactive | Require a separate activation decision before web work |
+| Interfaces | CLI, loopback HTTP, and the two-tool DGX-local MCP adapter are accepted; Issue #13 implements the approved same-process evidence-inspection UI | Complete browser acceptance before closing Phase 6 |
 | Planning | Public GitHub Project #17 tracks the bounded roadmap Issues; Issue #10 completed the CLI release gate | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
 The public test qrels have been inspected repeatedly. Their scores are descriptive historical
@@ -434,8 +434,9 @@ initial loopback-only ColBERT network failure remains retained rather than being
 
 ## Phase 6: add composition adapters
 
-Status: HTTP accepted under Issue #11 and MCP accepted under Issue #12 on 2026-09-17. Web remains
-inactive.
+Status: HTTP accepted under Issue #11 and MCP accepted under Issue #12 on 2026-09-17. The human
+owner activated the final small web adapter under Issue #13; implementation is complete and bounded
+DGX browser acceptance remains before Phase 6 closes.
 
 After the CLI proof is accepted, expose the same application services through thin adapters in
 this order:
@@ -465,6 +466,14 @@ schema, failure, Compose, and normalized CLI-parity checks passed. The official 
 passed discovery, supported-answer, exact-insufficiency, parent-citation, and invalid-input gates;
 the retained evidence is in `docs/reports/issue-12-mcp-acceptance.md`.
 
+The web slice serves one packaged evidence inspector from the existing FastAPI process at `/` and
+uses same-origin calls to the accepted search and answer endpoints. It adds no runtime dependency,
+service, port, CORS policy, or application semantics. The page shows answers, active strategies,
+parent citations, ordered evidence, document IDs, scores, and complete supplied evidence text;
+exact insufficiency and bounded error states remain explicit. ADR-0034 records the same-process
+boundary. Issue #13 requires retained supported, insufficient-evidence, validation, unavailable,
+responsive, focus, and reduced-motion browser evidence before acceptance.
+
 ## Phase 7: evaluate the template and weaker-model development
 
 This is a separate program-level goal and cannot delay the SciFact product proof.
@@ -491,7 +500,6 @@ The following are not active work:
 - graph-based candidate generation;
 - a learned graph ranker;
 - LangGraph orchestration;
-- web work without a separate activation decision;
 - production or multi-node deployment;
 - tool-calling by the generator;
 - bespoke template-adoption evaluation;
@@ -518,7 +526,7 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Add the small web adapter only after an explicit activation decision.
+1. Complete Issue #13's bounded browser acceptance and close Phase 6.
 2. Decide whether to begin the separate template/Pi effectiveness program.
 
 Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
