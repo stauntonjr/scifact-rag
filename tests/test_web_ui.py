@@ -34,6 +34,7 @@ async def test_web_resources_are_served_without_application_resolution() -> None
 
     assert index.status_code == 200
     assert index.headers["content-type"].startswith("text/html")
+    assert index.headers["cache-control"] == "no-store"
     for marker in (
         "<main",
         'id="claim-form"',
@@ -55,9 +56,11 @@ async def test_web_resources_are_served_without_application_resolution() -> None
 
     assert stylesheet.status_code == 200
     assert stylesheet.headers["content-type"].startswith("text/css")
+    assert stylesheet.headers["cache-control"] == "no-store"
     assert stylesheet.text.strip()
     assert script.status_code == 200
     assert "javascript" in script.headers["content-type"]
+    assert script.headers["cache-control"] == "no-store"
     assert script.text.strip()
 
 

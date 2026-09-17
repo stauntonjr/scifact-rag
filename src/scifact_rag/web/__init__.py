@@ -43,10 +43,10 @@ def create_web_router() -> APIRouter:
 
     @router.get("/assets/scifact.css")
     def web_stylesheet() -> Response:
-        return Response(stylesheet, media_type="text/css")
+        return Response(stylesheet, media_type="text/css", headers={"Cache-Control": "no-store"})
 
     @router.get("/assets/scifact.js")
     def web_script() -> Response:
-        return Response(script, media_type="text/javascript")
+        return Response(script, media_type="text/javascript", headers={"Cache-Control": "no-store"})
 
     return router
