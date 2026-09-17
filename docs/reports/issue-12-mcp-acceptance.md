@@ -46,9 +46,10 @@ inspection confirmed that port 80 was published only to host `127.0.0.1:8091`.
 - all 56 Python files matched formatting;
 - Ruff passed;
 - Pyright reported zero errors and warnings;
-- 335 non-integration tests passed; the final review suite consolidates the MCP/interface
-  contract into 19 focused checks, including table-driven coverage of every rejected input
-  category through the public client boundary and full normalized schema parity;
+- 331 non-integration tests passed; the final review suite consolidates the formerly
+  parameterized MCP/interface cases into 19 focused checks, including table-driven coverage of
+  every rejected input category through the public client boundary and full normalized schema
+  parity;
 - source distribution, wheel build, isolated installation, and package import passed.
 
 All three affected integrations passed in 12.84 seconds against the existing loopback services:
