@@ -43,7 +43,7 @@ container against the existing named volume; PostgreSQL returned healthy before 
 - all 54 Python files matched formatting;
 - Ruff passed;
 - Pyright reported zero errors and warnings;
-- 311 non-integration tests passed, including 22 focused HTTP/interface cases;
+- 317 non-integration tests passed after review repair, including 28 focused HTTP/interface cases;
 - source distribution, wheel build, isolated installation, and package import passed.
 
 The affected integration suite passed all three checks in 12.48 seconds against loopback
@@ -101,4 +101,3 @@ engineering, integration, supported-answer, exact-insufficiency, and parent-cita
 This acceptance does not authorize MCP, web UI, authentication infrastructure, public deployment,
 or changes to retrieval and generation. The next bounded product action is a separate MCP adapter
 issue over the same application layer.
-

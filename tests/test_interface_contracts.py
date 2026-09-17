@@ -154,6 +154,8 @@ def test_compose_exposes_only_the_loopback_api_factory() -> None:
     assert 'entrypoint: ["uv", "run", "--no-dev", "uvicorn"]' in service
     assert "scifact_rag.http_api:build_http_app" in service
     assert "- --factory" in service
+    assert "- --host\n      - 0.0.0.0" in service
+    assert '- --workers\n      - "1"' in service
     assert '- "127.0.0.1:8090:80"' in service
     assert "postgres:" in service
     assert "condition: service_healthy" in service

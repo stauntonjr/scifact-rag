@@ -48,13 +48,13 @@ class QueryRequest(StrictTransportModel):
 
 class SearchRequest(QueryRequest):
     schema_version: Literal["search-request/v1"]
-    limit: Annotated[int, Field(ge=1, le=100)] = 5
+    limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 5
     strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY
 
 
 class AskRequest(QueryRequest):
     schema_version: Literal["ask-request/v1"]
-    limit: Annotated[int, Field(ge=1, le=20)] = 5
+    limit: Annotated[int, Field(strict=True, ge=1, le=20)] = 5
     strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY
     context_strategy: GenerationContextStrategyName = GenerationContextStrategyName.WHOLE_DOCUMENT
 

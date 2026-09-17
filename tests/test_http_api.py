@@ -208,11 +208,35 @@ async def test_ask_preserves_exact_insufficient_evidence_result() -> None:
         ),
         (
             "/v1/search",
+            {"schema_version": "search-request/v1", "query": "claim", "limit": True},
+        ),
+        (
+            "/v1/search",
+            {"schema_version": "search-request/v1", "query": "claim", "limit": "5"},
+        ),
+        (
+            "/v1/search",
+            {"schema_version": "search-request/v1", "query": "claim", "limit": 5.0},
+        ),
+        (
+            "/v1/search",
             {"schema_version": "search-request/v1", "query": "claim", "strategy": "bad"},
         ),
         (
             "/v1/ask",
             {"schema_version": "ask-request/v1", "query": "claim", "limit": 21},
+        ),
+        (
+            "/v1/ask",
+            {"schema_version": "ask-request/v1", "query": "claim", "limit": True},
+        ),
+        (
+            "/v1/ask",
+            {"schema_version": "ask-request/v1", "query": "claim", "limit": "5"},
+        ),
+        (
+            "/v1/ask",
+            {"schema_version": "ask-request/v1", "query": "claim", "limit": 5.0},
         ),
         (
             "/v1/ask",

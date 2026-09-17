@@ -95,4 +95,3 @@ Revisit this decision before non-loopback exposure, multiple workers, authentica
 streaming, background jobs, or model-lifetime ownership. A measured thread-safety or resource-
 lifetime failure may justify explicit startup/shutdown management; it does not authorize a general
 web-platform refactor.
-
