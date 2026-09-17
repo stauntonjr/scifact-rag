@@ -61,15 +61,28 @@ def recording_resolver(
     return resolve
 
 
-def without_schema_cosmetics(value: Any) -> Any:
+def without_schema_cosmetics(
+    value: Any,
+    *,
+    omit_additional_properties: bool = False,
+) -> Any:
     if isinstance(value, dict):
         return {
-            key: without_schema_cosmetics(child)
+            key: without_schema_cosmetics(
+                child,
+                omit_additional_properties=omit_additional_properties,
+            )
             for key, child in value.items()
-            if key not in {"additionalProperties", "title"}
+            if key != "title" and not (omit_additional_properties and key == "additionalProperties")
         }
     if isinstance(value, list):
-        return [without_schema_cosmetics(child) for child in value]
+        return [
+            without_schema_cosmetics(
+                child,
+                omit_additional_properties=omit_additional_properties,
+            )
+            for child in value
+        ]
     return value
 
 
@@ -243,11 +256,19 @@ async def test_discovery_publishes_bounded_schemas_and_read_only_annotations() -
 
     search = discovered["search_scifact"]
     answer = discovered["answer_scifact"]
-    assert without_schema_cosmetics(search.input_schema) == without_schema_cosmetics(
-        SearchToolArguments.model_json_schema()
+    assert without_schema_cosmetics(
+        search.input_schema,
+        omit_additional_properties=True,
+    ) == without_schema_cosmetics(
+        SearchToolArguments.model_json_schema(),
+        omit_additional_properties=True,
     )
-    assert without_schema_cosmetics(answer.input_schema) == without_schema_cosmetics(
-        AnswerToolArguments.model_json_schema()
+    assert without_schema_cosmetics(
+        answer.input_schema,
+        omit_additional_properties=True,
+    ) == without_schema_cosmetics(
+        AnswerToolArguments.model_json_schema(),
+        omit_additional_properties=True,
     )
     assert search.description == (
         "Retrieve ranked parent documents from the public SciFact corpus."
