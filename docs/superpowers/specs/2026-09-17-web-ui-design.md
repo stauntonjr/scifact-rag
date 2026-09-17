@@ -131,8 +131,10 @@ answer evidence preserve server order. Answer citations are rendered only when t
 occur in supplied evidence. If the server ever returns a citation outside that evidence, the UI
 shows a bounded response-contract error rather than inventing or linking evidence.
 
-Exact `text == "insufficient evidence"` with empty citations and evidence produces the dedicated
-insufficient state. Any contradictory shape produces the same bounded response-contract error.
+Exact `text == "insufficient evidence"` with empty citations produces the dedicated insufficient
+state while preserving any valid retrieved evidence returned by the application. A non-insufficient
+answer requires at least one evidence-resolving citation. Any contradictory shape produces the same
+bounded response-contract error.
 
 HTTP validation errors show the fixed server message. HTTP 500, non-JSON responses, network
 failures, and malformed response shapes show a fixed unavailable/error state without exception
@@ -210,7 +212,8 @@ operation. Compose validation proves that no topology expansion occurred.
 Against the rebuilt loopback `api` service, retain four observations:
 
 1. one supported claim renders an answer whose citations all resolve to displayed evidence;
-2. one known unsupported claim renders exact insufficient evidence with no citations or evidence;
+2. one known unsupported claim renders exact insufficient evidence with no citations while
+   preserving the application's returned evidence boundary;
 3. an invalid client value is rejected and rendered as a bounded validation state;
 4. after the loaded page loses its API connection in a controlled reversible probe, a request
    renders the fixed unavailable state, and the service is restored and rechecked.

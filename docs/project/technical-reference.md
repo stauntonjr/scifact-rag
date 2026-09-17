@@ -228,8 +228,9 @@ generation, citations, and supplied evidence still come from the accepted HTTP/a
 The result view shows the active retrieval and generation-context strategies, answer status and
 model when applicable, ordered parent-document evidence, document IDs, scores, matching passages,
 complete supplied evidence text, and citation links. Exact `insufficient evidence` is displayed
-only when the answer has no citations or supplied evidence. Validation, unavailable-service, and
-contract-mismatch states use fixed bounded messages rather than raw server responses.
+only when the answer has no citations; any valid retrieved evidence remains visible as the context
+the application evaluated. Validation, unavailable-service, and contract-mismatch states use fixed
+bounded messages rather than raw server responses.
 
 The UI is a single-user loopback inspection surface. It adds no authentication, TLS, CORS,
 non-loopback exposure, persistence, administration, retrieval logic, or generation logic. Its
@@ -258,8 +259,8 @@ Both tools advertise `readOnlyHint=true` and `openWorldHint=false`. Queries cont
 code points, must not be blank, and reach the application unchanged. Strategy values and defaults
 are identical to the CLI. Search results use `mcp-search-result/v1`; answer results use
 `mcp-answer-result/v1` and preserve query, text, citation order, model, and supplied parent evidence.
-Exact `insufficient evidence` remains unchanged with empty citations and evidence when returned by
-the application.
+Exact `insufficient evidence` remains unchanged with empty citations when returned by the
+application; supplied evidence remains part of the result.
 
 An SDK-supported refusal-only middleware validates recognized `tools/call` arguments against
 strict project-owned models before SDK dispatch. Unknown fields, invalid enums, blank or overlong

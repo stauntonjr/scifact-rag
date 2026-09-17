@@ -28,9 +28,11 @@ evidence, or citation behavior.
 The server derives the browser's retrieval and context-strategy choices and defaults from the
 existing enums. The browser renders response data only as text, preserves evidence order, and
 requires each answer citation to resolve to a supplied evidence document. Exact insufficiency is
-presented only when the answer text is `insufficient evidence` and both citations and evidence are
-empty. Response-shape mismatches and request failures produce fixed presentation errors without
-raw exception or response-body text.
+presented only when the answer text is `insufficient evidence` and citations are empty; valid
+retrieved evidence remains visible because the application retains the context it evaluated. A
+non-insufficient answer requires at least one evidence-resolving citation. Response-shape
+mismatches and request failures produce fixed presentation errors without raw exception or
+response-body text.
 
 Keep the current `api` Compose service, image, one-worker runtime, and
 `127.0.0.1:8090:80` publication. Add no frontend framework, Node build, external browser asset,

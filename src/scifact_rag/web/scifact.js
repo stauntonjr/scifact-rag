@@ -180,7 +180,10 @@ function renderAnswer(payload, strategy, contextStrategy) {
   }
 
   const isInsufficient = payload.text === "insufficient evidence";
-  if (isInsufficient !== (payload.citations.length === 0 && payload.evidence.length === 0)) {
+  if (
+    (isInsufficient && payload.citations.length !== 0) ||
+    (!isInsufficient && payload.citations.length === 0)
+  ) {
     throw new Error("contract");
   }
 
