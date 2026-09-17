@@ -20,9 +20,9 @@ already-inspected boundary, not new model-quality evidence.
 
 | Item | Accepted boundary |
 |---|---|
-| Repository commit | `742efc41f430c920bdfe358bb21670e8e5ce23d1` |
+| Application source commit used to build API | `438b761cf77545961159d36a86fd20329ef54d06` |
 | Host | `spark-3a8f`, NVIDIA DGX Spark |
-| API image | `scifact-rag-api`, image ID `13387a8234c2`, Linux ARM64 |
+| API image | `scifact-rag-api`, image ID `41a8b5139e45`, Linux ARM64 |
 | PostgreSQL image | `scifact-rag-postgres:pg17-pgvector0.8.6-vchord-bm250.3.0`, image ID `f9542714f92c` |
 | ColBERT image | pinned NVIDIA vLLM image, image ID `59f44d868668` |
 | Generator model reported by responses | `nvidia/Qwen3.6-35B-A3B-NVFP4` |
@@ -57,9 +57,10 @@ two database tests passed and retrieval failed while resolving the container-onl
 
 | Operation | HTTP | Latency | Contract result |
 |---|---:|---:|---|
-| `GET /healthz` | 200 | 0.004328 s | Exact `health/v1` and `ok`; no application resolution |
-| Query 30 `POST /v1/ask` | 200 | 7.638888 s | `answer/v1`; supported answer; citations `24341590`, `13069283`, and `20454006` |
-| Query 92 `POST /v1/ask` | 200 | 1.038191 s | `answer/v1`; exact `insufficient evidence`; zero citations |
+| `GET /healthz` | 200 | 0.019397 s | Exact `health/v1` and `ok`; no application resolution |
+| Query 30 `POST /v1/ask` | 200 | 14.723107 s | `answer/v1`; supported answer; citations `24341590`, `13069283`, and `20454006` |
+| Query 92 `POST /v1/ask` | 200 | 1.890405 s | `answer/v1`; exact `insufficient evidence`; zero citations |
+| Boolean `limit` `POST /v1/ask` | 422 | 0.003068 s | `error/v1`; strict integer validation; no application resolution |
 
 For query 30, all three citations were members of the five returned evidence parent IDs and the
 gold parent `24341590` was present. For query 92, the response retained five retrieved evidence
@@ -70,7 +71,8 @@ CLI in Issue #10.
 One preliminary supported request used a typographic apostrophe instead of the frozen ASCII claim.
 It also returned HTTP 200 with parent-valid citations, but it is not the canonical row above. The
 exact frozen ASCII claim was rerun immediately without changing any setting; only that 7.638888-
-second response is used for acceptance.
+second response is used for the original acceptance. The table above records the final repaired-
+candidate rerun instead.
 
 The deterministic contract suite separately drives CLI and HTTP through equivalent application
 results and proves normalized equality for ordered search hits, answers, evidence, and parent
