@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Literal, Protocol, Self
 
 from mcp import MCPError
 from mcp.server import ServerRequestContext
@@ -11,6 +11,7 @@ from mcp_types import INVALID_PARAMS, ToolAnnotations
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
 from .application import RagApplication
+from .domain import Answer, SearchHit
 from .generation import GenerationContextStrategyName
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
@@ -53,6 +54,46 @@ class AnswerToolArguments(StrictToolArguments):
     limit: AnswerLimit = 5
     strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY
     context_strategy: GenerationContextStrategyName = GenerationContextStrategyName.WHOLE_DOCUMENT
+
+
+class StrictToolResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class McpSearchHit(StrictToolResult):
+    doc_id: str
+    title: str
+    text: str
+    score: Annotated[float, Field(allow_inf_nan=False)]
+
+    @classmethod
+    def from_domain(cls, hit: SearchHit) -> Self:
+        return cls(doc_id=hit.doc_id, title=hit.title, text=hit.text, score=hit.score)
+
+
+class McpSearchResult(StrictToolResult):
+    schema_version: Literal["mcp-search-result/v1"]
+    hits: tuple[McpSearchHit, ...]
+
+
+class McpAnswerResult(StrictToolResult):
+    schema_version: Literal["mcp-answer-result/v1"]
+    query: str
+    text: str
+    citations: tuple[str, ...]
+    model: str
+    evidence: tuple[McpSearchHit, ...]
+
+    @classmethod
+    def from_domain(cls, answer: Answer) -> Self:
+        return cls(
+            schema_version="mcp-answer-result/v1",
+            query=answer.query,
+            text=answer.text,
+            citations=answer.citations,
+            model=answer.model,
+            evidence=tuple(McpSearchHit.from_domain(hit) for hit in answer.evidence),
+        )
 
 
 _ARGUMENT_MODELS: dict[str, type[StrictToolArguments]] = {
@@ -108,8 +149,14 @@ def create_mcp_server(resolver: ApplicationResolver) -> MCPServer:
         query: QueryText,
         limit: SearchLimit = 5,
         strategy: RetrievalStrategyName = DEFAULT_RETRIEVAL_STRATEGY,
-    ) -> dict[str, object]:
-        raise NotImplementedError("search result mapping is implemented in the next plan task")
+    ) -> McpSearchResult:
+        application = resolver(strategy, GenerationContextStrategyName.WHOLE_DOCUMENT)
+        return McpSearchResult(
+            schema_version="mcp-search-result/v1",
+            hits=tuple(
+                McpSearchHit.from_domain(hit) for hit in application.search(query, limit=limit)
+            ),
+        )
 
     @server.tool(
         name="answer_scifact",
@@ -127,7 +174,8 @@ def create_mcp_server(resolver: ApplicationResolver) -> MCPServer:
         context_strategy: GenerationContextStrategyName = (
             GenerationContextStrategyName.WHOLE_DOCUMENT
         ),
-    ) -> dict[str, object]:
-        raise NotImplementedError("answer result mapping is implemented in the next plan task")
+    ) -> McpAnswerResult:
+        application = resolver(strategy, context_strategy)
+        return McpAnswerResult.from_domain(application.ask(query, limit=limit))
 
     return server
