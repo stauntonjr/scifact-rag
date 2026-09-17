@@ -181,6 +181,41 @@ services:
       - ./artifacts:/app/artifacts
       - huggingface-cache:/models/huggingface
 
+  api:
+    build: .
+    entrypoint: ["uv", "run", "--no-dev", "uvicorn"]
+    command:
+      - scifact_rag.http_api:build_http_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "80"
+      - --workers
+      - "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://scifact:scifact-local@postgres:5432/scifact
+      EMBEDDING_MODEL: sentence-transformers/paraphrase-MiniLM-L6-v2
+      GENERATOR_BASE_URL: ${GENERATOR_BASE_URL:-http://host.docker.internal:8000/v1}
+      GENERATOR_MODEL: ${GENERATOR_MODEL:-nvidia/Qwen3.6-35B-A3B-NVFP4}
+      RERANKER_BASE_URL: http://reranker:80
+      LATE_INTERACTION_BASE_URL: http://late-interaction:80
+      LATE_INTERACTION_MODEL: answerdotai/answerai-colbert-small-v1
+      RANK_LLM_BASE_URL: http://rankllm:80
+      SCIENTIFIC_INFERENCE_BASE_URL: http://scientific-inference:80
+      HF_HOME: /models/huggingface
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+      - huggingface-cache:/models/huggingface
+
 volumes:
   postgres-data:
   huggingface-cache:

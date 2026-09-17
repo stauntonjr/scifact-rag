@@ -74,9 +74,10 @@ packing. Each strategy ranks every deduplicated candidate with only its named sc
 uses a pinned RankLLM coordinator and a separate memory-bounded vLLM model service. The three
 strategies do not fuse rerankers or mix retrieval scores into their order.
 
-The product boundary is CLI-first. Domain and application contracts are Python dataclasses; one
-visible composition root wires replaceable corpus, embedding, storage, and generation adapters.
-HTTP, MCP, web UI, model tool-calling, and Pi effectiveness evaluation are intentionally inactive.
+The product boundary has CLI and loopback HTTP adapters. Domain and application contracts are
+Python dataclasses; one visible composition root wires replaceable corpus, embedding, storage, and
+generation adapters. FastAPI/Pydantic types remain inside the HTTP transport. MCP, web UI, model
+tool-calling, and Pi effectiveness evaluation are intentionally inactive.
 The ordered delivery plan, phase gates, stop rules, and explicit deferrals are documented in
 [`roadmap.md`](roadmap.md).
 
@@ -152,6 +153,60 @@ docker compose run --rm app search "What evidence links immune signaling to dise
 docker compose run --rm app ask "What evidence links immune signaling to disease?"
 docker compose run --rm app evaluate --cutoff 10
 ```
+
+## HTTP API
+
+The `api` service uses the same image, environment, composition root, data, and model cache as the
+CLI. It runs one Uvicorn worker and publishes only host loopback port 8090:
+
+```bash
+docker compose up -d api
+curl http://127.0.0.1:8090/healthz
+```
+
+Interactive OpenAPI is available locally at `http://127.0.0.1:8090/docs`; the machine-readable
+schema is at `/openapi.json`. Liveness does not probe PostgreSQL or model services.
+
+Search accepts the same retrieval strategies and default as the CLI. Its limit is 1 through 100:
+
+```bash
+curl -X POST http://127.0.0.1:8090/v1/search \
+  -H 'content-type: application/json' \
+  -d '{
+    "schema_version": "search-request/v1",
+    "query": "What evidence links immune signaling to disease?",
+    "limit": 5,
+    "strategy": "pooled-coref-interval-content-max-colbert"
+  }'
+```
+
+Ask accepts the same retrieval and generation-context strategies as the CLI. Its limit is 1
+through 20:
+
+```bash
+curl -X POST http://127.0.0.1:8090/v1/ask \
+  -H 'content-type: application/json' \
+  -d '{
+    "schema_version": "ask-request/v1",
+    "query": "What evidence links immune signaling to disease?",
+    "limit": 5,
+    "strategy": "pooled-coref-interval-content-max-colbert",
+    "context_strategy": "whole-document"
+  }'
+```
+
+Requests reject unknown fields, blank or over-4,096-character queries, invalid enums, and wrong
+schema versions before composing an application. Validation returns HTTP 422 with `error/v1`,
+field locations, messages, and types but no rejected values. Unexpected failures return HTTP 500
+with only `internal_error` and `The request could not be completed`. The adapter does not retry.
+
+Successful search responses use `search-response/v1` and contain ordered `SearchHit` fields.
+Successful ask responses use `answer/v1` and map the complete application answer, citations, and
+actual supplied evidence. The API does not reinterpret exact `insufficient evidence` results.
+
+This is a local non-production interface. There is no authentication, TLS, CORS middleware,
+rate limiting, public ingress, streaming, or job queue. Revisit the architecture before binding
+beyond loopback or accepting untrusted traffic.
 
 The chunk-aware generation policy requires the existing DP rows and the healthy ColBERT service.
 It does not change retrieval and can be paired with any retrieval strategy. The legacy command is

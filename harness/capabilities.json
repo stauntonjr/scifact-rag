@@ -413,7 +413,7 @@
         "api-adapter",
         "http-adapter"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Expose existing application use cases through a thin HTTP adapter without moving semantics into the web framework.",
       "source_projects": [
         {
@@ -443,6 +443,27 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner for GitHub Issue #11 on 2026-09-17",
+        "runtime_dependencies": [
+          "FastAPI",
+          "Uvicorn"
+        ],
+        "ci_checks": [
+          "uv run pytest tests/test_http_api.py tests/test_interface_contracts.py",
+          "docker compose config --quiet",
+          "make smoke"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/http_api.py",
+          "tests/test_http_api.py",
+          "tests/test_interface_contracts.py",
+          "compose.yaml",
+          "docs/research/scifact-rag-http-api.md",
+          "docs/adr/0032-http-api-adapter.md",
+          "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md"
+        ]
       }
     },
     {

@@ -4,7 +4,7 @@ Date: 2026-09-17
 
 Governing issue: [#11](https://github.com/stauntonjr/scifact-rag/issues/11)
 
-Status: owner-approved design pending written-spec review
+Status: owner-approved design under implementation
 
 ## Objective
 
@@ -223,7 +223,9 @@ response model; handlers never return `dataclasses.asdict` directly. Boundary co
 copy every field explicitly, preventing newly added dataclass fields from leaking automatically.
 Response models reject non-finite scores and are validated during tests.
 
-Pydantic types stay in `scifact_rag.http_api`. Domain, port, application, composition, CLI, and
+Pydantic types stay in `scifact_rag.http_api`. In-process tests use HTTPX's maintained ASGI
+transport rather than FastAPI 0.141's deprecated `TestClient` compatibility path. Domain, port,
+application, composition, CLI, and
 adapter modules remain framework-neutral.
 
 ## Compose boundary

@@ -6,7 +6,7 @@
 
 **Architecture:** `scifact_rag.http_api` owns strict Pydantic transport models, explicit dataclass conversion, route handlers, safe error envelopes, and an injected application resolver. The runtime resolver caches applications built by the existing composition root; Docker Compose launches the same image under a Uvicorn entrypoint.
 
-**Tech Stack:** Python 3.12, FastAPI, Pydantic, Uvicorn, HTTPX/TestClient, Typer, Docker Compose, pytest, Ruff, Pyright
+**Tech Stack:** Python 3.12, FastAPI, Pydantic, Uvicorn, HTTPX ASGI transport, Typer, Docker Compose, pytest, Ruff, Pyright
 
 **Spec:** `docs/superpowers/specs/2026-09-17-http-api-adapter-design.md`
 
@@ -40,12 +40,17 @@
 - [ ] **Step 1: Write the failing liveness test**
 
 ```python
-def test_health_is_liveness_only() -> None:
-    def fail_if_resolved(*args: object) -> Never:
+@pytest.mark.anyio
+async def test_health_is_liveness_only() -> None:
+    def fail_if_resolved(
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
         raise AssertionError("health must not resolve an application")
 
-    with TestClient(create_http_app(fail_if_resolved)) as client:
-        response = client.get("/healthz")
+    transport = httpx.ASGITransport(app=create_http_app(fail_if_resolved))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/healthz")
 
     assert response.status_code == 200
     assert response.json() == {"schema_version": "health/v1", "status": "ok"}
@@ -222,7 +227,7 @@ Convert `RequestValidationError.errors()` to details containing only `location`,
 
 - [ ] **Step 4: Verify validation GREEN and write the failing internal-error test**
 
-Run validation tests, then configure `TestClient(..., raise_server_exceptions=False)` with a
+Run validation tests, then configure `httpx.ASGITransport(..., raise_app_exceptions=False)` with a
 resolver that raises `RuntimeError("secret configuration")`. Assert status 500 and that neither
 `secret` nor the exception type appears in the response.
 

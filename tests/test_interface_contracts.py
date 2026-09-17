@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+from pathlib import Path
 from typing import cast
 
 import httpx
@@ -14,6 +16,8 @@ from scifact_rag.domain import Answer, SearchHit
 from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.http_api import create_http_app
 from scifact_rag.strategies import RetrievalStrategyName
+
+_ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
@@ -135,3 +139,45 @@ async def test_ask_cli_and_http_have_normalized_parent_citation_parity(
     normalized_http.pop("schema_version")
     assert normalized_http == json.loads(cli_result.stdout)
     assert normalized_http["citations"] == [normalized_http["evidence"][0]["doc_id"]]
+
+
+def test_compose_exposes_only_the_loopback_api_factory() -> None:
+    compose = (_ROOT / "compose.yaml").read_text(encoding="utf-8")
+    match = re.search(
+        r"^  api:\n(?P<body>.*?)(?=^  [a-z][a-z-]*:\n|^volumes:\n)",
+        compose,
+        re.MULTILINE | re.DOTALL,
+    )
+
+    assert match is not None
+    service = match.group("body")
+    assert 'entrypoint: ["uv", "run", "--no-dev", "uvicorn"]' in service
+    assert "scifact_rag.http_api:build_http_app" in service
+    assert "- --factory" in service
+    assert '- "127.0.0.1:8090:80"' in service
+    assert "postgres:" in service
+    assert "condition: service_healthy" in service
+
+
+def test_http_capability_is_active_with_exact_delivery_contract() -> None:
+    catalog = json.loads((_ROOT / "harness/capabilities.json").read_text(encoding="utf-8"))
+    capability = next(
+        item for item in catalog["capabilities"] if item["id"] == "http-api-interface"
+    )
+
+    assert capability["status"] == "active"
+    contract = capability["active_contract"]
+    assert contract["runtime_dependencies"] == ["FastAPI", "Uvicorn"]
+    assert (
+        "uv run pytest tests/test_http_api.py tests/test_interface_contracts.py"
+        in contract["ci_checks"]
+    )
+    assert set(contract["implementation_paths"]) == {
+        "src/scifact_rag/http_api.py",
+        "tests/test_http_api.py",
+        "tests/test_interface_contracts.py",
+        "compose.yaml",
+        "docs/research/scifact-rag-http-api.md",
+        "docs/adr/0032-http-api-adapter.md",
+        "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md",
+    }

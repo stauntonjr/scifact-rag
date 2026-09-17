@@ -10,8 +10,10 @@ applied ADR-0029's selected retrieval default, Issue #8 retained scientific-infe
 without promoting its fixed DeBERTa scores, and Issue #9 stopped proposition-pair work at its
 strict Qwen extraction qualification. Issue #10 then accepted the CLI vertical slice through a
 clean public build, isolated empty/no-op ingestion, retained four-case generation evidence, direct
-default-CLI smoke cases, and the complete repository gate. The next product phase is thin HTTP,
-MCP, and web adapters over the accepted application layer; graph work is not currently earned.
+default-CLI smoke cases, and the complete repository gate. Issue #11 now implements the first
+Phase 6 slice: a thin loopback HTTP adapter. Its focused contract is green; full integration and
+live supported/insufficient acceptance remain before closure. MCP and web remain inactive, and
+graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -22,8 +24,8 @@ BEIR SciFact -> MiniLM -> PostgreSQL/pgvector -> retrieved evidence
                                Qwen NVFP4 -> cited answer or insufficient evidence
 ```
 
-The same dataclass application layer is the future composition root for HTTP, MCP, and a small web
-UI, but only CLI is active now.
+The same dataclass application layer now serves CLI and HTTP. It remains the future composition
+root for MCP and a small web UI; those capabilities are not active.
 
 ## Accepted decisions
 
@@ -89,8 +91,11 @@ UI, but only CLI is active now.
   comparison and completed blinded review retain whole-document as default and adaptive as the
   scalable opt-in without post-result tuning.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
-- `application-composition-root`, `cli-interface`, and the bounded
+- `application-composition-root`, `cli-interface`, `http-api-interface`, and the bounded
   `product-validation-challenges` corpus are active in `harness/capabilities.json`.
+- ADR-0032 adopts FastAPI/Uvicorn for three versioned read-only operations. Pydantic stays at the
+  transport boundary; an injected resolver delegates cache misses to the existing composition
+  root, and Compose publishes the service only at `127.0.0.1:8090`.
 
 See `docs/adr/0013-scifact-rag-composition-and-runtime.md`,
 `docs/adr/0015-modular-coreference-retrieval.md`,
@@ -125,6 +130,8 @@ four-probe Qwen qualification stopped on exact-span failures before full extract
 see `docs/reports/phase-4-proposition-pair-qualification.md`.
 `docs/reports/issue-10-cli-acceptance.md` is the accepted clean-build, ingest, live generation,
 citation, provenance, limitation, and failure boundary for the CLI release decision.
+`docs/adr/0032-http-api-adapter.md` records the accepted HTTP framework, composition, validation,
+error, and loopback deployment boundary for Issue #11.
 
 ## Live environment observed 2026-08-27
 
@@ -160,6 +167,10 @@ citation, provenance, limitation, and failure boundary for the CLI release decis
 ## Implementation state
 
 - Generated project intake is sufficient for bounded planning.
+- Issue #11's HTTP implementation exposes `/healthz`, `/v1/search`, and `/v1/ask` with versioned
+  schemas, strict validation before application resolution, safe errors, finite strategy-pair
+  caching, generated OpenAPI, and normalized CLI parity. Focused unit/contract checks pass; the
+  full repository gate, affected integrations, and retained live acceptance are next.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or

@@ -42,8 +42,10 @@ only one capability owns each responsibility.
 `scifact-rag` initially activated `application-composition-root` and `cli-interface`. After the
 public qrels exposed stable retrieval failures, the human owner approved
 `product-validation-challenges`. Its implementation is limited to 12 rescued queries and one
-focused integration oracle; the full 300-query benchmark remains authoritative.
+focused integration oracle; the full 300-query benchmark remains authoritative. After Issue #10
+accepted the CLI proof, the owner activated `http-api-interface` for Issue #11's three-operation,
+loopback-only FastAPI adapter with explicit CLI parity.
 
-HTTP, MCP, web, durable memory, architecture analysis, complexity review, and role parallelism
-remain inactive. The increase to 3.72 chunk vectors per document is below the accepted four-vector
-budget and does not yet justify activating a separate complexity-analysis capability.
+MCP, web, durable memory, architecture analysis, complexity review, and role parallelism remain
+inactive. The increase to 3.72 chunk vectors per document is below the accepted four-vector budget
+and does not yet justify activating a separate complexity-analysis capability.

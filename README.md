@@ -29,8 +29,8 @@ supported fast/no-ColBERT alternative.
 
 ## What the project demonstrates
 
-- A clean application core built from frozen Python dataclasses and replaceable ports, with Typer
-  as a thin CLI adapter.
+- A clean application core built from frozen Python dataclasses and replaceable ports, with thin
+  Typer CLI and FastAPI HTTP adapters.
 - PostgreSQL 17 with pgvector and VectorChord-BM25 as one inspectable evidence store rather than a
   collection of hidden managed services.
 - Dedicated candidate generation, feature-preserving pooling, complete reranking, and parent-level
@@ -73,7 +73,8 @@ Qwen NVFP4 --> cited answer or `insufficient evidence`
 
 The pipeline is a modular monolith with one explicit composition root. LangGraph is intentionally
 absent: the current request path is deterministic and does not need a stateful agent workflow.
-HTTP, MCP, and web adapters remain deferred until the CLI product proof is complete.
+The CLI and loopback HTTP API share the same application services; MCP and web remain separate
+future adapters.
 
 ## Try it
 
@@ -92,6 +93,19 @@ docker compose run --rm app ask \
   "What evidence links immune signaling to disease?"
 ```
 
+Start the local HTTP adapter over the same application layer:
+
+```bash
+docker compose up -d api
+curl http://127.0.0.1:8090/healthz
+curl -X POST http://127.0.0.1:8090/v1/search \
+  -H 'content-type: application/json' \
+  -d '{"schema_version":"search-request/v1","query":"immune signaling","limit":5}'
+```
+
+The API is a loopback-only prototype, not a public deployment. Complete request, response, error,
+and OpenAPI details are in the [technical reference](docs/project/technical-reference.md#http-api).
+
 Use the fast fallback explicitly when ColBERT is unavailable:
 
 ```bash
@@ -105,13 +119,15 @@ docker compose run --rm app search \
 - Retrieval default: `pooled-coref-interval-content-max-colbert`.
 - Retrieval fallback: `bm25-token-window-rrf`.
 - Generation-context default: `whole-document`; `adaptive` is the scalable opt-in policy.
-- CLI is active; API, MCP, web UI, graph scoring, and agent-development evaluation are downstream.
+- CLI and the loopback HTTP API are active; MCP, web UI, graph scoring, and agent-development
+  evaluation remain downstream.
 - The fixed blinded generation review is complete: all three recorded policy names scored 18/24
   grounded answers, which is expected on short abstracts and does not test long-document scaling.
 - The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests
   preserve all 5,183 documents and BM25 invariants, and the retained live sample verifies support,
   contradiction, scientific qualification, exact insufficiency, and parent-only citations.
-- The next product phase is thin HTTP, MCP, and web adapters over the accepted application layer.
+- Phase 6 has reached the HTTP adapter; MCP is the next separate interface slice after HTTP live
+  acceptance.
 
 ## Documentation
 

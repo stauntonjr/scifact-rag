@@ -4,7 +4,7 @@
   "template_mode": false,
   "project": {
     "name": "SciFact RAG",
-    "summary": "A CLI-first grounded retrieval-augmented generation prototype over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+    "summary": "A grounded retrieval-augmented generation prototype with CLI and loopback HTTP interfaces over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
     "lifecycle": "new",
     "profile": "python-data",
     "status": "active",
@@ -26,12 +26,13 @@
     ],
     "in_scope": [
       "Typer CLI commands for ingest, search, ask, and retrieval evaluation",
+      "A thin loopback HTTP API for liveness, search, and ask over the same application layer",
       "Python dataclass domain and application contracts",
       "One explicit composition root with PostgreSQL/pgvector/VectorChord-BM25, MiniLM, SciFact, and OpenAI-compatible generation adapters",
       "Docker Compose operation on one DGX Spark"
     ],
     "out_of_scope": [
-      "HTTP API, MCP adapter, or web UI",
+      "MCP adapter or web UI",
       "Pi or weaker-model effectiveness comparisons",
       "A bespoke adoption-effectiveness evaluation framework",
       "Tool-calling by the generation model",
@@ -99,6 +100,7 @@
       "current": "0.1.0",
       "public_contract": [
         "CLI commands and JSON result schemas",
+        "Versioned loopback HTTP request, response, and error schemas",
         "Docker Compose environment-variable contract"
       ],
       "source": "harness/project.yaml:engineering.versioning.current",

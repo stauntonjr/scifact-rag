@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Activated the thin loopback HTTP adapter after CLI acceptance. FastAPI/Uvicorn expose only
+  liveness, search, and grounded ask through the existing composition root; strict versioned
+  schemas reject invalid input before application construction, explicit response mapping
+  preserves exact insufficiency and parent citations, safe errors expose no exception details,
+  and focused tests establish CLI/API parity. MCP, web UI, authentication, public deployment, and
+  retrieval or generation changes remain outside this slice.
 - Accepted the CLI vertical slice on one DGX Spark with a clean public build, isolated empty and
   no-op 5,183-document ingests, retained support/contradiction/qualification/insufficiency rows,
   direct default-CLI smoke cases, exact parent-citation checks, component provenance, latency, and
