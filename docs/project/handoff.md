@@ -12,9 +12,10 @@ strict Qwen extraction qualification. Issue #10 then accepted the CLI vertical s
 clean public build, isolated empty/no-op ingestion, retained four-case generation evidence, direct
 default-CLI smoke cases, and the complete repository gate. Issue #11 accepts the first Phase 6
 slice: a thin loopback HTTP adapter. Its full repository gate, three affected integrations, live
-supported case, exact insufficiency case, and parent-citation check passed. Issue #12 now implements
-the separate two-tool loopback MCP adapter; its focused engineering checks pass, but bounded live
-DGX acceptance remains. Web is inactive, and graph work is not currently earned.
+supported case, exact insufficiency case, and parent-citation check passed. Issue #12 accepts the
+separate two-tool loopback MCP adapter after its full repository gate, three affected integrations,
+official-client discovery, supported case, exact insufficiency case, parent-citation check, and
+invalid-input check passed. Web is inactive, and graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -182,8 +183,9 @@ and loopback deployment boundary for Issue #12.
 - Issue #12's implementation exposes only `search_scifact` and `answer_scifact` through MCP
   Streamable HTTP. The official in-memory client proves discovery, strict non-disclosing argument
   rejection, structured result mapping, sanitized unexpected failures, exact insufficiency, and
-  normalized CLI parity. Compose topology is verified statically; the official URL-client live
-  run and retained acceptance report remain outstanding.
+  normalized CLI parity. The DGX URL client passed live discovery, supported-answer,
+  exact-insufficiency, parent-citation, and invalid-input gates against image `b0490480b967` at
+  commit `161fe973b20c`; see `docs/reports/issue-12-mcp-acceptance.md`.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or

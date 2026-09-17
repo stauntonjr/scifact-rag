@@ -129,16 +129,17 @@ docker compose run --rm app search \
 - Retrieval default: `pooled-coref-interval-content-max-colbert`.
 - Retrieval fallback: `bm25-token-window-rrf`.
 - Generation-context default: `whole-document`; `adaptive` is the scalable opt-in policy.
-- CLI, loopback HTTP, and loopback MCP are active; MCP live acceptance is pending, while web UI,
-  graph scoring, and agent-development evaluation remain downstream.
+- CLI, loopback HTTP, and DGX-local loopback MCP are accepted; web UI, graph scoring, and
+  agent-development evaluation remain downstream.
 - The fixed blinded generation review is complete: all three recorded policy names scored 18/24
   grounded answers, which is expected on short abstracts and does not test long-document scaling.
 - The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests
   preserve all 5,183 documents and BM25 invariants, and the retained live sample verifies support,
   contradiction, scientific qualification, exact insufficiency, and parent-only citations.
 - The loopback HTTP adapter passed full engineering, integration, supported-answer,
-  exact-insufficiency, and parent-citation acceptance. The MCP adapter is implemented with focused
-  SDK-client and CLI-parity checks; its bounded live DGX acceptance has not yet run.
+  exact-insufficiency, and parent-citation acceptance. The MCP adapter passed the full engineering
+  and affected integration gates plus official-client discovery, supported-answer,
+  exact-insufficiency, parent-citation, and invalid-input acceptance.
 
 ## Documentation
 
@@ -155,6 +156,8 @@ docker compose run --rm app search \
   ingest, live generation, citation, latency, provenance, limitation, and failure evidence.
 - [Issue #11 HTTP acceptance](docs/reports/issue-11-http-api-acceptance.md): schema, parity,
   loopback, integration, supported-answer, insufficiency, and parent-citation evidence.
+- [Issue #12 MCP acceptance](docs/reports/issue-12-mcp-acceptance.md): official-client discovery,
+  strict validation, parity, loopback topology, integration, citation, and insufficiency evidence.
 - [Project handoff](docs/project/handoff.md): current implementation and operating state.
 
 ## Development

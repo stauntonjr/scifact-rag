@@ -52,7 +52,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Generation | Corrected automatic validation and the completed 24-claim blinded review retain whole-document as default; adaptive is the canonical scalable opt-in | Phase 1 is complete; do not rerun or tune on SciFact validation |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
-| Interfaces | CLI and loopback HTTP are accepted; the two-tool loopback MCP adapter is implemented pending live acceptance; web UI is inactive | Complete Issue #12 live acceptance before opening web work |
+| Interfaces | CLI, loopback HTTP, and the two-tool DGX-local MCP adapter are accepted; web UI is inactive | Require a separate activation decision before web work |
 | Planning | Public GitHub Project #17 tracks the bounded roadmap Issues; Issue #10 completed the CLI release gate | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
 The public test qrels have been inspected repeatedly. Their scores are descriptive historical
@@ -434,8 +434,8 @@ initial loopback-only ColBERT network failure remains retained rather than being
 
 ## Phase 6: add composition adapters
 
-Status: HTTP accepted under Issue #11 on 2026-09-17. The Issue #12 MCP adapter is implemented and
-awaiting bounded live DGX acceptance. Web remains inactive.
+Status: HTTP accepted under Issue #11 and MCP accepted under Issue #12 on 2026-09-17. Web remains
+inactive.
 
 After the CLI proof is accepted, expose the same application services through thin adapters in
 this order:
@@ -461,8 +461,9 @@ The MCP slice exposes exactly `search_scifact` and `answer_scifact` through the 
 v2.2.0 at `http://127.0.0.1:8091/mcp`. It preserves the same limits, strategies, structured result
 fields, exact insufficiency, and parent citations. One refusal-only pre-dispatch validator closes
 the SDK's unknown-argument and rejected-value-disclosure gaps before application resolution. Unit,
-schema, failure, Compose, and normalized CLI-parity checks are implemented; the official URL-client
-live gate remains before acceptance.
+schema, failure, Compose, and normalized CLI-parity checks passed. The official URL client also
+passed discovery, supported-answer, exact-insufficiency, parent-citation, and invalid-input gates;
+the retained evidence is in `docs/reports/issue-12-mcp-acceptance.md`.
 
 ## Phase 7: evaluate the template and weaker-model development
 
@@ -490,7 +491,7 @@ The following are not active work:
 - graph-based candidate generation;
 - a learned graph ranker;
 - LangGraph orchestration;
-- web work before MCP acceptance;
+- web work without a separate activation decision;
 - production or multi-node deployment;
 - tool-calling by the generator;
 - bespoke template-adoption evaluation;
@@ -517,9 +518,8 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Complete and retain Issue #12's bounded official-client DGX acceptance.
-2. Add the small web adapter only after the MCP boundary is accepted.
-3. Decide whether to begin the separate template/Pi effectiveness program.
+1. Add the small web adapter only after an explicit activation decision.
+2. Decide whether to begin the separate template/Pi effectiveness program.
 
 Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
 unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved
