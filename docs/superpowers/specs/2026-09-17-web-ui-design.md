@@ -192,20 +192,18 @@ must replace the `api` container with its newly built image.
 
 ### Deterministic checks
 
-One focused `tests/test_web_ui.py` module will verify:
+One focused `tests/test_web_ui.py` module will verify through the real ASGI application:
 
-- `/` and every asset return the expected media type and stable identifying content;
+- `/` and every asset return the expected media type and the complete bounded workflow document;
 - no application resolver is invoked while serving UI resources;
 - configuration contains the exact current retrieval/context enum values and defaults;
-- the HTML contains the required semantic controls, landmarks, live region, and no external asset
-  reference;
-- JavaScript contains the two versioned endpoint/request contracts, text-only rendering boundary,
-  citation-to-evidence check, insufficiency condition, and fixed failure messages;
-- CSS contains responsive, focus-visible, and reduced-motion rules.
+- the delivered document has no external asset reference.
 
 Existing HTTP and interface-contract tests continue to prove the application behavior behind the
-UI. A wheel build/install/resource probe proves packaged operation. Compose validation proves that
-no topology expansion occurred.
+UI. Real-browser acceptance executes the search, answer, citation, insufficiency, bounded-error,
+keyboard-focus, responsive-layout, and reduced-motion behaviors; these are not replaced by tests
+that merely search asset source text. A wheel build/install/resource probe proves packaged
+operation. Compose validation proves that no topology expansion occurred.
 
 ### Live browser acceptance
 
