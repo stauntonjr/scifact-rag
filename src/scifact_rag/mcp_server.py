@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from functools import lru_cache
 from typing import Annotated, Any, Literal, Protocol, Self
 
 from mcp import MCPError
@@ -11,6 +12,7 @@ from mcp_types import INVALID_PARAMS, ToolAnnotations
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
 from .application import RagApplication
+from .composition import build_application
 from .domain import Answer, SearchHit
 from .generation import GenerationContextStrategyName
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
@@ -179,3 +181,34 @@ def create_mcp_server(resolver: ApplicationResolver) -> MCPServer:
         return McpAnswerResult.from_domain(application.ask(query, limit=limit))
 
     return server
+
+
+def build_mcp_server() -> MCPServer:
+    cache_size = len(RetrievalStrategyName) * len(GenerationContextStrategyName)
+
+    @lru_cache(maxsize=cache_size)
+    def resolve(
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
+        return build_application(
+            retrieval_strategy=retrieval_strategy,
+            generation_context_strategy=generation_context_strategy,
+        )
+
+    return create_mcp_server(resolve)
+
+
+def main() -> None:
+    build_mcp_server().run(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=80,
+        streamable_http_path="/mcp",
+        stateless_http=True,
+        json_response=True,
+    )
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

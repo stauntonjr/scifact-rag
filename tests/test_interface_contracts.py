@@ -7,6 +7,7 @@ from typing import cast
 
 import httpx
 import pytest
+from mcp import Client
 from typer.testing import CliRunner
 
 from scifact_rag import cli as cli_module
@@ -15,6 +16,7 @@ from scifact_rag.cli import app as cli_app
 from scifact_rag.domain import Answer, SearchHit
 from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.http_api import create_http_app
+from scifact_rag.mcp_server import create_mcp_server
 from scifact_rag.strategies import RetrievalStrategyName
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -139,6 +141,78 @@ async def test_ask_cli_and_http_have_normalized_parent_citation_parity(
     normalized_http.pop("schema_version")
     assert normalized_http == json.loads(cli_result.stdout)
     assert normalized_http["citations"] == [normalized_http["evidence"][0]["doc_id"]]
+
+
+@pytest.mark.anyio
+async def test_search_cli_and_mcp_have_normalized_result_parity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = ParityApplication()
+    monkeypatch.setattr(
+        cli_module,
+        "build_application",
+        lambda **kwargs: cast(RagApplication, application),
+    )
+    cli_result = CliRunner().invoke(
+        cli_app,
+        ["search", "claim", "--limit", "3", "--strategy", "bm25"],
+    )
+
+    async with Client(create_mcp_server(_resolver(application))) as client:
+        mcp_result = await client.call_tool(
+            "search_scifact",
+            {"query": "claim", "limit": 3, "strategy": "bm25"},
+        )
+
+    assert cli_result.exit_code == 0
+    assert not mcp_result.is_error
+    assert mcp_result.structured_content is not None
+    assert mcp_result.structured_content["schema_version"] == "mcp-search-result/v1"
+    assert mcp_result.structured_content["hits"] == json.loads(cli_result.stdout)
+
+
+@pytest.mark.anyio
+async def test_ask_cli_and_mcp_have_normalized_parent_citation_parity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = ParityApplication()
+    monkeypatch.setattr(
+        cli_module,
+        "build_application",
+        lambda **kwargs: cast(RagApplication, application),
+    )
+    cli_result = CliRunner().invoke(
+        cli_app,
+        [
+            "ask",
+            "claim",
+            "--limit",
+            "3",
+            "--strategy",
+            "bm25",
+            "--context-strategy",
+            "adaptive",
+        ],
+    )
+
+    async with Client(create_mcp_server(_resolver(application))) as client:
+        mcp_result = await client.call_tool(
+            "answer_scifact",
+            {
+                "query": "claim",
+                "limit": 3,
+                "strategy": "bm25",
+                "context_strategy": "adaptive",
+            },
+        )
+
+    assert cli_result.exit_code == 0
+    assert not mcp_result.is_error
+    assert mcp_result.structured_content is not None
+    normalized_mcp = dict(mcp_result.structured_content)
+    assert normalized_mcp.pop("schema_version") == "mcp-answer-result/v1"
+    assert normalized_mcp == json.loads(cli_result.stdout)
+    assert normalized_mcp["citations"] == [normalized_mcp["evidence"][0]["doc_id"]]
 
 
 def test_compose_exposes_only_the_loopback_api_factory() -> None:

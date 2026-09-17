@@ -4,12 +4,18 @@ from typing import cast
 
 import pytest
 from mcp import Client, MCPError
-from mcp_types import INVALID_PARAMS
+from mcp_types import INVALID_PARAMS, TextContent
+from pydantic import BaseModel, ValidationError
 
+from scifact_rag import mcp_server as mcp_server_module
 from scifact_rag.application import RagApplication
 from scifact_rag.domain import Answer, SearchHit
 from scifact_rag.generation import GenerationContextStrategyName
-from scifact_rag.mcp_server import create_mcp_server
+from scifact_rag.mcp_server import (
+    AnswerToolArguments,
+    SearchToolArguments,
+    create_mcp_server,
+)
 from scifact_rag.strategies import RetrievalStrategyName
 
 _REJECTED_VALUE = "REJECTED_VALUE_SENTINEL"
@@ -100,6 +106,26 @@ async def test_invalid_arguments_are_rejected_without_disclosure_or_downstream_c
     assert _REJECTED_VALUE not in repr(exc_info.value.error)
     assert resolutions == []
     assert application.calls == []
+
+
+def test_argument_models_reject_every_bounded_contract_violation() -> None:
+    invalid_cases: tuple[tuple[type[BaseModel], dict[str, object]], ...] = (
+        (SearchToolArguments, {}),
+        (SearchToolArguments, {"query": "   "}),
+        (SearchToolArguments, {"query": "x" * 4097}),
+        (SearchToolArguments, {"query": "claim", "limit": 0}),
+        (SearchToolArguments, {"query": "claim", "limit": 101}),
+        (SearchToolArguments, {"query": "claim", "limit": True}),
+        (SearchToolArguments, {"query": "claim", "limit": "5"}),
+        (SearchToolArguments, {"query": "claim", "limit": 5.0}),
+        (SearchToolArguments, {"query": "claim", "strategy": "unknown"}),
+        (AnswerToolArguments, {"query": "claim", "limit": 21}),
+        (AnswerToolArguments, {"query": "claim", "context_strategy": "unknown"}),
+    )
+
+    for model, arguments in invalid_cases:
+        with pytest.raises(ValidationError):
+            model.model_validate(arguments)
 
 
 @pytest.mark.anyio
@@ -241,3 +267,111 @@ async def test_discovery_publishes_bounded_schemas_and_read_only_annotations() -
         assert tool.annotations.read_only_hint is True
         assert tool.annotations.open_world_hint is False
         assert tool.annotations.idempotent_hint is None
+
+
+@pytest.mark.anyio
+async def test_runtime_factory_caches_applications_by_strategy_pair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = RecordingApplication()
+    compositions: list[tuple[RetrievalStrategyName, GenerationContextStrategyName]] = []
+
+    def fake_build_application(
+        *,
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
+        compositions.append((retrieval_strategy, generation_context_strategy))
+        return cast(RagApplication, application)
+
+    monkeypatch.setattr(
+        mcp_server_module,
+        "build_application",
+        fake_build_application,
+        raising=False,
+    )
+    server = mcp_server_module.build_mcp_server()
+
+    async with Client(server) as client:
+        search_arguments = {"query": "claim", "strategy": "bm25"}
+        assert not (await client.call_tool("search_scifact", search_arguments)).is_error
+        assert not (await client.call_tool("search_scifact", search_arguments)).is_error
+        assert not (
+            await client.call_tool(
+                "answer_scifact",
+                {
+                    "query": "claim",
+                    "strategy": "bm25",
+                    "context_strategy": "adaptive",
+                },
+            )
+        ).is_error
+
+    assert compositions == [
+        (RetrievalStrategyName.BM25, GenerationContextStrategyName.WHOLE_DOCUMENT),
+        (RetrievalStrategyName.BM25, GenerationContextStrategyName.ADAPTIVE),
+    ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure_site", ("resolver", "application"))
+async def test_unexpected_failures_use_sanitized_sdk_boundary_without_retry(
+    failure_site: str,
+) -> None:
+    secret = "SECRET_FAILURE_SENTINEL"
+    attempts = 0
+
+    class FailingApplication(RecordingApplication):
+        def search(self, query: str, *, limit: int = 5) -> list[SearchHit]:
+            nonlocal attempts
+            attempts += 1
+            raise RuntimeError(secret)
+
+    application = FailingApplication()
+
+    def failing_resolver(
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
+        nonlocal attempts
+        if failure_site == "resolver":
+            attempts += 1
+            raise RuntimeError(secret)
+        return cast(RagApplication, application)
+
+    server = create_mcp_server(failing_resolver)
+    async with Client(server) as client:
+        result = await client.call_tool("search_scifact", {"query": "claim"})
+
+    assert result.is_error
+    assert result.structured_content is None
+    public_text = " ".join(block.text for block in result.content if isinstance(block, TextContent))
+    assert public_text == "Error executing tool search_scifact"
+    assert secret not in public_text
+    assert "RuntimeError" not in public_text
+    assert attempts == 1
+
+
+def test_main_runs_exact_streamable_http_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    class FakeServer:
+        def run(self, transport: str, **kwargs: object) -> None:
+            calls.append((transport, kwargs))
+
+    monkeypatch.setattr(mcp_server_module, "build_mcp_server", FakeServer)
+
+    mcp_server_module.main()
+
+    assert calls == [
+        (
+            "streamable-http",
+            {
+                "host": "0.0.0.0",
+                "port": 80,
+                "streamable_http_path": "/mcp",
+                "stateless_http": True,
+                "json_response": True,
+            },
+        )
+    ]
