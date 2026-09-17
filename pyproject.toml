@@ -14,6 +14,7 @@ dependencies = [
   "fastapi>=0.116,<1",
   "fastcoref @ https://github.com/shon-otmazgin/fastcoref/archive/ae224139196d122b225af5a7e73b5fc0b6e1076d.tar.gz",
   "httpx>=0.28,<1",
+  "mcp==2.2.0",
   "pgvector>=0.4,<1",
   "psycopg[binary]>=3.2,<4",
   "sentence-transformers>=5.1,<6",
