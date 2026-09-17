@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Protocol, Self
+import logging
+from functools import lru_cache
+from typing import Annotated, Any, Literal, Protocol, Self
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .application import RagApplication
+from .composition import build_application
 from .domain import Answer, SearchHit
 from .generation import GenerationContextStrategyName
 from .strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ApplicationResolver(Protocol):
@@ -87,14 +94,90 @@ class AnswerResponse(StrictTransportModel):
         )
 
 
+class ErrorDetail(StrictTransportModel):
+    location: tuple[str | int, ...]
+    message: str
+    type: str
+
+
+class ErrorBody(StrictTransportModel):
+    code: Literal["validation_error", "internal_error"]
+    message: str
+    details: tuple[ErrorDetail, ...] | None = None
+
+
+class ErrorResponse(StrictTransportModel):
+    schema_version: Literal["error/v1"] = "error/v1"
+    error: ErrorBody
+
+
+_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    422: {"model": ErrorResponse, "description": "Request validation failed"},
+    500: {"model": ErrorResponse, "description": "Request processing failed"},
+}
+
+
+def _error_json(response: ErrorResponse) -> dict[str, object]:
+    return response.model_dump(mode="json", exclude_none=True)
+
+
 def create_http_app(resolver: ApplicationResolver) -> FastAPI:
     app = FastAPI(title="SciFact RAG API", version="1.0.0")
 
-    @app.get("/healthz", response_model=HealthResponse)
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(
+        request: Request,
+        exception: RequestValidationError,
+    ) -> JSONResponse:
+        details = tuple(
+            ErrorDetail(
+                location=tuple(error["loc"]),
+                message=str(error["msg"]),
+                type=str(error["type"]),
+            )
+            for error in exception.errors()
+        )
+        return JSONResponse(
+            status_code=422,
+            content=_error_json(
+                ErrorResponse(
+                    error=ErrorBody(
+                        code="validation_error",
+                        message="Request validation failed",
+                        details=details,
+                    )
+                )
+            ),
+        )
+
+    @app.exception_handler(Exception)
+    async def internal_error(request: Request, exception: Exception) -> JSONResponse:
+        _LOGGER.exception(
+            "Unhandled HTTP request failure",
+            exc_info=exception,
+            extra={"request_path": request.url.path},
+        )
+        return JSONResponse(
+            status_code=500,
+            content=_error_json(
+                ErrorResponse(
+                    error=ErrorBody(
+                        code="internal_error",
+                        message="The request could not be completed",
+                    )
+                )
+            ),
+        )
+
+    @app.get(
+        "/healthz",
+        response_model=HealthResponse,
+        responses={500: _ERROR_RESPONSES[500]},
+    )
     def health() -> HealthResponse:
         return HealthResponse()
 
-    @app.post("/v1/search", response_model=SearchResponse)
+    @app.post("/v1/search", response_model=SearchResponse, responses=_ERROR_RESPONSES)
     def search(request: SearchRequest) -> SearchResponse:
         application = resolver(
             request.strategy,
@@ -107,9 +190,25 @@ def create_http_app(resolver: ApplicationResolver) -> FastAPI:
             )
         )
 
-    @app.post("/v1/ask", response_model=AnswerResponse)
+    @app.post("/v1/ask", response_model=AnswerResponse, responses=_ERROR_RESPONSES)
     def ask(request: AskRequest) -> AnswerResponse:
         application = resolver(request.strategy, request.context_strategy)
         return AnswerResponse.from_domain(application.ask(request.query, limit=request.limit))
 
     return app
+
+
+def build_http_app() -> FastAPI:
+    cache_size = len(RetrievalStrategyName) * len(GenerationContextStrategyName)
+
+    @lru_cache(maxsize=cache_size)
+    def resolve(
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
+        return build_application(
+            retrieval_strategy=retrieval_strategy,
+            generation_context_strategy=generation_context_strategy,
+        )
+
+    return create_http_app(resolve)
