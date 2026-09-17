@@ -1,6 +1,6 @@
 # ADR-0033: Expose the application through a thin MCP adapter
 
-- Status: accepted
+- Status: proposed after bounded review correction; awaiting owner confirmation
 - Date: 2026-09-17
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: [#12](https://github.com/stauntonjr/scifact-rag/issues/12)
@@ -20,8 +20,9 @@ without changing the SciFact use case.
 
 ## Decision
 
-Adopt the official MCP Python SDK v2 as a direct runtime dependency. Keep MCP models and SDK types
-inside `scifact_rag.mcp_server`; domain and application contracts remain frozen dataclasses.
+Adopt and pin the official MCP Python SDK v2.2.0 as a direct runtime dependency. Keep MCP models and
+SDK types inside `scifact_rag.mcp_server`; domain and application contracts remain frozen
+dataclasses.
 
 Expose exactly two tools:
 
@@ -45,9 +46,20 @@ the corpus, configuration, or database. It does not mean calls are cost-free: `a
 invokes the configured generator and its description says so. No idempotence claim is made about
 generated text.
 
-Invalid arguments are rejected by the generated schema before resolver or application invocation.
-Unexpected resolver or application failures use the SDK's sanitized tool-error boundary; raw
-exception text and rejected values are not returned. The adapter adds no retries.
+The SDK-generated v2.2.0 argument model does not reject unknown fields, and its native Pydantic
+validation-error rendering can expose rejected values. Therefore, define project-owned Pydantic
+argument models for both tools with `extra="forbid"`, strict constraints, and
+`hide_input_in_errors=True`. Install one SDK-supported, refusal-only server middleware. For a
+recognized `tools/call`, it validates raw `arguments` before SDK dispatch, passes valid requests
+through unchanged, and converts any `ValidationError` into a fixed `INVALID_PARAMS` MCP error with
+no error data. It neither rewrites nor answers requests. Thus unknown or invalid arguments cause
+zero resolver/application calls and expose neither rejected values nor Pydantic error details.
+
+The middleware API is provisional in v2.2.0; the exact dependency pin and focused in-memory probe
+make any upgrade an explicit revisit point. Mutating SDK-generated models, custom protocol framing,
+and using an advertised extension for local validation policy are prohibited. Unexpected resolver
+or application failures remain on the SDK's separate sanitized tool-error boundary. The adapter
+adds no retries.
 
 Run one MCP server process in Docker Compose using Streamable HTTP at `/mcp`. Bind internally to
 `0.0.0.0:80` for Docker forwarding and publish only `127.0.0.1:8091:80` on the DGX. Configure the
@@ -83,7 +95,10 @@ outside this decision.
   results through an injected application.
 - **Invalid calls doing expensive work:** tests assert malformed arguments cause zero resolver and
   application calls.
-- **Information leakage:** failure tests assert raw exception text and rejected values are absent.
+- **Information leakage:** middleware tests assert fixed `INVALID_PARAMS` errors contain neither
+  raw Pydantic details nor rejected values; separate failure tests cover unexpected exceptions.
+- **Schema/policy drift:** tests compare the registered tool fields, defaults, enums, and constraints
+  with the strict project-owned validation models.
 - **Tool-surface growth:** discovery tests require exactly two tools and empty resources/prompts.
 - **Misleading read-only claims:** tool descriptions disclose inference work and avoid an
   idempotence claim.
@@ -103,12 +118,13 @@ outside this decision.
 ## Verification and revisit trigger
 
 Focused tests cover exact discovery, input schemas, annotations, strict validation, structured
-mapping, exact insufficiency, bounded failures, finite resolver caching, empty resources/prompts,
+mapping, exact insufficiency, fixed non-disclosing invalid-parameter errors, zero downstream calls,
+bounded unexpected failures, finite resolver caching, empty resources/prompts,
 Compose publication, capability declarations, and CLI/application parity. The complete gate,
 affected PostgreSQL/ColBERT integrations, and a retained official-client live run complete Issue
 #12.
 
-Revisit before accepting a Mac client, SSH tunnel, stdio host, non-loopback listener,
-authentication, another tool or MCP primitive, more than one server process, server-to-client
-callbacks, or application-semantic changes. A measured resource-lifetime failure may justify
-explicit lifecycle management but does not authorize a general agent gateway.
+Revisit before upgrading the MCP SDK, or before accepting a Mac client, SSH tunnel, stdio host,
+non-loopback listener, authentication, another tool or MCP primitive, more than one server process,
+server-to-client callbacks, or application-semantic changes. A measured resource-lifetime failure
+may justify explicit lifecycle management but does not authorize a general agent gateway.

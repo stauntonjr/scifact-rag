@@ -4,7 +4,7 @@ Date: 2026-09-17
 
 Governing issue: [#12](https://github.com/stauntonjr/scifact-rag/issues/12)
 
-Status: proposed for written review after owner approval of the in-chat design
+Status: revised after bounded written review; awaiting owner confirmation
 
 ## Objective
 
@@ -38,10 +38,11 @@ or generation behavior, or a general agent gateway.
 
 ## Selected solution
 
-Adopt plain `mcp>=2.2,<3` following `docs/research/scifact-rag-mcp.md`. The high-level `MCPServer`
+Adopt plain `mcp==2.2.0` following `docs/research/scifact-rag-mcp.md`. The high-level `MCPServer`
 owns protocol negotiation, discovery, input/output schemas, structured results, Streamable HTTP,
-and public failure shaping. The project owns only the typed transport models, two tool handlers,
-domain-result mapping, application resolver, Compose process, and acceptance evidence.
+and the unexpected-exception boundary. The project owns only the typed transport models, one
+refusal-only input-validation middleware, two tool handlers, domain-result mapping, application
+resolver, Compose process, and acceptance evidence.
 
 ```text
 official MCP Python SDK v2 Client on DGX
@@ -50,7 +51,7 @@ official MCP Python SDK v2 Client on DGX
        Streamable HTTP 127.0.0.1:8091/mcp
                     |
                     v
-      MCPServer schema validation and discovery
+      strict refusal middleware, then MCPServer discovery/dispatch
                     |
                     v
            search_scifact / answer_scifact
@@ -73,7 +74,9 @@ context assembler. MCP does not call the HTTP API.
 Create `src/scifact_rag/mcp_server.py` containing:
 
 - transport-only Pydantic result models;
-- reusable annotated input types and a non-whitespace validator;
+- strict project-owned Pydantic argument models, reusable annotated input types, and a
+  non-whitespace validator;
+- one refusal-only `tools/call` middleware;
 - an `ApplicationResolver` protocol matching the HTTP adapter's conceptual dependency without
   importing the HTTP module;
 - explicit `SearchHit` and `Answer` conversion functions;
@@ -159,8 +162,38 @@ context_strategy: GenerationContextStrategyName = WHOLE_DOCUMENT
 
 The handler resolves the exact strategy pair and calls `application.ask(query, limit)` once.
 
-Unknown arguments, invalid enums, blank or overlong queries, and invalid limits are rejected by
-the SDK-generated schema before the resolver or application is invoked.
+Define one Pydantic argument model per tool using these exact fields and defaults. Both use
+`ConfigDict(extra="forbid", hide_input_in_errors=True)`. These models are the runtime source of the
+strict input policy; focused tests compare their fields, defaults, enums, and constraints with the
+SDK-published schemas so the policy and discovery contracts cannot drift silently.
+
+SDK v2.2.0's generated top-level argument model ignores unknown fields, and its native validation
+error includes Pydantic details that can contain the rejected value. One server middleware corrects
+both behaviors before tool dispatch:
+
+```python
+async def enforce_tool_arguments(ctx, call_next):
+    if ctx.method != "tools/call":
+        return await call_next(ctx)
+    model = argument_model_for_recognized_tool(ctx.params)
+    if model is None:
+        return await call_next(ctx)
+    try:
+        model.model_validate(raw_arguments(ctx.params))
+    except ValidationError:
+        raise MCPError(
+            code=INVALID_PARAMS,
+            message=f"Invalid arguments for tool {tool_name(ctx.params)}",
+        ) from None
+    return await call_next(ctx)
+```
+
+The middleware uses the public `MCPServer(middleware=[...])` API only to refuse invalid recognized
+calls. It does not rewrite parameters, return successful results, intercept unknown tool names, or
+implement protocol framing. The Pydantic exception is neither logged nor attached as error data.
+Consequently unknown arguments, invalid enums, blank or overlong queries, and invalid limits yield
+a fixed protocol `INVALID_PARAMS` error before resolver or application invocation. The exact
+v2.2.0 pin bounds this provisional SDK hook; any SDK upgrade reopens the decision.
 
 ## Structured output contract
 
@@ -207,9 +240,11 @@ transport wrapper and compare all application fields with the CLI/HTTP-normalize
 
 ## Failure boundary
 
-Input-schema failures are MCP tool errors produced before handler invocation. Tests assert
-`is_error=true`, no structured result, and zero resolver/application calls. Public error text may
-name the invalid field or constraint but must not echo rejected values.
+Input-policy failures are protocol `MCPError`s with code `INVALID_PARAMS` produced by the refusal
+middleware before SDK tool dispatch. Tests assert the fixed message, absent error data, absence of
+the rejected value from both string and structured public error representations, and zero
+resolver/application calls. They separately cover unknown fields and invalid values for both
+tools. Public errors name only the tool, never the invalid field, constraint, or value.
 
 Unexpected resolver or application exceptions are not caught and reworded by project code. MCP
 SDK v2.2 logs the traceback server-side and returns a sanitized tool failure containing the tool
@@ -256,12 +291,16 @@ Focused tests use the official in-memory `Client(server)` path and deterministic
 2. inspect input/output schemas, descriptions, and read-only/closed-world annotations;
 3. call search and answer and verify every argument passed to the resolver/application exactly;
 4. verify every result field, order, schema version, parent citation, and exact insufficiency;
-5. parameterize invalid schema shapes, queries, limits, and enums and assert zero calls;
-6. inject resolver and application failures and assert bounded public tool errors without raw text;
-7. exercise the runtime resolver cache without constructing real dependencies;
-8. compare normalized deterministic CLI/application and MCP results;
-9. assert Compose command, path, internal bind, one-process shape, and exact loopback publication;
-10. assert the capability catalog names only actual dependency, implementation, and check paths.
+5. parameterize unknown fields, invalid schema shapes, queries, limits, and enums for both tools;
+   assert fixed `INVALID_PARAMS`, no error data, no rejected-value disclosure, and zero calls;
+6. prove the registered schemas and strict validation models agree on fields, defaults, enums, and
+   constraints;
+7. inject resolver and application failures and assert the SDK's separate bounded public tool
+   errors without raw text;
+8. exercise the runtime resolver cache without constructing real dependencies;
+9. compare normalized deterministic CLI/application and MCP results;
+10. assert Compose command, path, internal bind, one-process shape, and exact loopback publication;
+11. assert the capability catalog names only actual dependency, implementation, and check paths.
 
 The live Compose acceptance uses the official SDK v2 `Client` over the published URL and records:
 
@@ -293,7 +332,7 @@ remain inactive.
 
 Before merge:
 
-- package metadata and lock resolve the supported MCP v2 line;
+- package metadata and lock resolve exactly MCP v2.2.0;
 - the focused in-memory client, interface parity, capability, and Compose tests pass;
 - formatting, lint, Pyright, unit tests, package smoke, and Compose validation pass;
 - affected PostgreSQL/ColBERT integrations pass;
@@ -305,8 +344,9 @@ Before merge:
 
 ## Revisit triggers
 
-Return to design rather than expanding this slice if implementation requires a Mac client, tunnel,
-stdio acceptance, authentication, a non-loopback listener, another tool or primitive, another
-service, project-owned protocol framing, server-to-client callbacks, new domain semantics,
-application-layer changes, or retrieval/generation changes. A measured resource lifetime or
-concurrency failure may justify explicit lifecycle management but not an unbounded agent gateway.
+Return to design rather than expanding this slice before any MCP SDK upgrade, or if implementation
+requires a Mac client, tunnel, stdio acceptance, authentication, a non-loopback listener, another
+tool or primitive, another service, project-owned protocol framing, server-to-client callbacks,
+new domain semantics, application-layer changes, or retrieval/generation changes. A measured
+resource lifetime or concurrency failure may justify explicit lifecycle management but not an
+unbounded agent gateway.
