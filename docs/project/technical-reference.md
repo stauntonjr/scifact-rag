@@ -74,9 +74,10 @@ packing. Each strategy ranks every deduplicated candidate with only its named sc
 uses a pinned RankLLM coordinator and a separate memory-bounded vLLM model service. The three
 strategies do not fuse rerankers or mix retrieval scores into their order.
 
-The product boundary has CLI and loopback HTTP adapters. Domain and application contracts are
-Python dataclasses; one visible composition root wires replaceable corpus, embedding, storage, and
-generation adapters. FastAPI/Pydantic types remain inside the HTTP transport. MCP, web UI, model
+The product boundary has CLI, loopback HTTP, and loopback MCP adapters. Domain and application
+contracts are Python dataclasses; one visible composition root wires replaceable corpus,
+embedding, storage, and generation adapters. FastAPI/Pydantic types remain inside the HTTP
+transport, while MCP SDK/Pydantic types remain inside the MCP transport. Web UI, model
 tool-calling, and Pi effectiveness evaluation are intentionally inactive.
 The ordered delivery plan, phase gates, stop rules, and explicit deferrals are documented in
 [`roadmap.md`](roadmap.md).
@@ -207,6 +208,65 @@ actual supplied evidence. The API does not reinterpret exact `insufficient evide
 This is a local non-production interface. There is no authentication, TLS, CORS middleware,
 rate limiting, public ingress, streaming, or job queue. Revisit the architecture before binding
 beyond loopback or accepting untrusted traffic.
+
+## MCP service
+
+The `mcp` Compose service uses the same project image, environment, composition root, data, and
+model cache as the CLI and HTTP API. It runs one official MCP Python SDK v2.2.0 process and
+publishes only the DGX host-loopback endpoint:
+
+```bash
+docker compose up -d mcp
+# MCP endpoint: http://127.0.0.1:8091/mcp
+```
+
+Discovery returns exactly two tools and no resources, resource templates, or prompts:
+
+- `search_scifact(query, limit=5, strategy=...)` retrieves ordered parent documents. Its limit is
+  a strict integer from 1 through 100.
+- `answer_scifact(query, limit=5, strategy=..., context_strategy="whole-document")` retrieves
+  evidence and invokes configured model inference. Its limit is a strict integer from 1 through
+  20. The call is read-only but can consume significant GPU compute.
+
+Both tools advertise `readOnlyHint=true` and `openWorldHint=false`. Queries contain at most 4,096
+code points, must not be blank, and reach the application unchanged. Strategy values and defaults
+are identical to the CLI. Search results use `mcp-search-result/v1`; answer results use
+`mcp-answer-result/v1` and preserve query, text, citation order, model, and supplied parent evidence.
+Exact `insufficient evidence` remains unchanged with empty citations and evidence when returned by
+the application.
+
+An SDK-supported refusal-only middleware validates recognized `tools/call` arguments against
+strict project-owned models before SDK dispatch. Unknown fields, invalid enums, blank or overlong
+queries, and invalid limits return protocol code `-32602` with only
+`Invalid arguments for tool <tool-name>`. No rejected value, Pydantic detail, or error data is
+returned, and neither the resolver nor application is called. Unexpected resolver/application
+exceptions use the SDK's separate sanitized tool-error path. The adapter performs no retries.
+
+A DGX-local official client can connect as follows:
+
+```python
+import anyio
+from mcp import Client
+
+
+async def call() -> None:
+    async with Client("http://127.0.0.1:8091/mcp") as client:
+        tools = await client.list_tools()
+        result = await client.call_tool(
+            "search_scifact",
+            {"query": "immune signaling", "limit": 5, "strategy": "bm25"},
+        )
+        print([tool.name for tool in tools.tools])
+        print(result.structured_content)
+
+
+anyio.run(call)
+```
+
+The service is a local non-production interface. It has no authentication, TLS, non-loopback
+publication, Mac connection path, stdio acceptance, resources, prompts, administration, ingest,
+or evaluation tools. The SDK is pinned exactly to 2.2.0 because the refusal middleware contract is
+provisional; upgrading it requires revisiting ADR-0033 and rerunning the focused disclosure probe.
 
 The chunk-aware generation policy requires the existing DP rows and the healthy ColBERT service.
 It does not change retrieval and can be paired with any retrieval strategy. The legacy command is

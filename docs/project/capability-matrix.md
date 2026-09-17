@@ -44,8 +44,10 @@ public qrels exposed stable retrieval failures, the human owner approved
 `product-validation-challenges`. Its implementation is limited to 12 rescued queries and one
 focused integration oracle; the full 300-query benchmark remains authoritative. After Issue #10
 accepted the CLI proof, the owner activated `http-api-interface` for Issue #11's three-operation,
-loopback-only FastAPI adapter with explicit CLI parity.
+loopback-only FastAPI adapter with explicit CLI parity. For Issue #12, the owner activated
+`mcp-interface` for exactly two read-only, closed-corpus tools over the same application layer,
+using the official SDK and a DGX-local loopback client path.
 
-MCP, web, durable memory, architecture analysis, complexity review, and role parallelism remain
+Web, durable memory, architecture analysis, complexity review, and role parallelism remain
 inactive. The increase to 3.72 chunk vectors per document is below the accepted four-vector budget
 and does not yet justify activating a separate complexity-analysis capability.

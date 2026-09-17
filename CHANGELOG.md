@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Implemented the owner-approved thin MCP adapter over the existing application layer using the
+  pinned official Python SDK 2.2.0. The loopback Compose service exposes exactly
+  `search_scifact` and `answer_scifact`; strict pre-dispatch validation rejects unknown or invalid
+  arguments without disclosing values or invoking the application, and versioned structured
+  results preserve CLI/application semantics. Focused and live DGX acceptance remain separate;
+  this entry does not claim deployment verification yet.
 - Activated the thin loopback HTTP adapter after CLI acceptance. FastAPI/Uvicorn expose only
   liveness, search, and grounded ask through the existing composition root; strict versioned
   schemas reject invalid input before application construction, explicit response mapping

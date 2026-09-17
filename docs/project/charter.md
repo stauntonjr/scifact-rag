@@ -4,9 +4,9 @@ Status: active
 
 ## Purpose
 
-A grounded retrieval-augmented generation prototype with CLI and loopback HTTP interfaces over the
-public SciFact corpus, using PostgreSQL with pgvector, MiniLM embeddings, and a DGX-hosted NVFP4
-generator.
+A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, and loopback MCP
+interfaces over the public SciFact corpus, using PostgreSQL with pgvector, MiniLM embeddings, and a
+DGX-hosted NVFP4 generator.
 
 Primary users:
 
@@ -33,13 +33,15 @@ Success measures:
 
 - Typer CLI commands for ingest, search, ask, and retrieval evaluation
 - A thin loopback HTTP API for liveness, search, and ask over the same application layer
+- A thin loopback MCP service exposing `search_scifact` and `answer_scifact` over the same
+  application layer
 - Python dataclass domain and application contracts
 - One explicit composition root with PostgreSQL/pgvector, MiniLM, SciFact, and OpenAI-compatible generation adapters
 - Docker Compose operation on one DGX Spark
 
 ### Out
 
-- MCP adapter or web UI
+- Web UI
 - Pi or weaker-model effectiveness comparisons
 - A bespoke adoption-effectiveness evaluation framework
 - Tool-calling by the generation model
@@ -60,7 +62,8 @@ Success measures:
 - Coverage policy: branch-coverage-baseline-required-before-release
 - Product versioning: semver at 0.1.0
 - Version source: harness/project.yaml:engineering.versioning.current
-- Public contract: CLI commands, versioned HTTP/JSON result schemas, Docker Compose environment-variable contract
+- Public contract: CLI commands, versioned HTTP/JSON result schemas, versioned MCP tool argument,
+  result, and error contracts, Docker Compose environment-variable contract
 - Harness version: 0.5.0
 
 ## Authority

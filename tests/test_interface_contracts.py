@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import cast
 
@@ -256,4 +257,59 @@ def test_http_capability_is_active_with_exact_delivery_contract() -> None:
         "docs/research/scifact-rag-http-api.md",
         "docs/adr/0032-http-api-adapter.md",
         "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md",
+    }
+
+
+def test_compose_exposes_only_the_loopback_mcp_module() -> None:
+    completed = subprocess.run(
+        ["docker", "compose", "config", "--format", "json"],
+        cwd=_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    compose = json.loads(completed.stdout)
+    service = compose["services"]["mcp"]
+
+    assert service["entrypoint"] == ["uv", "run", "--no-dev", "python"]
+    assert service["command"] == ["-m", "scifact_rag.mcp_server"]
+    assert service["ports"] == [
+        {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 80,
+            "published": "8091",
+            "protocol": "tcp",
+        }
+    ]
+    assert service["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert service["environment"] == compose["services"]["api"]["environment"]
+    assert service["extra_hosts"] == compose["services"]["api"]["extra_hosts"]
+    assert [volume["target"] for volume in service["volumes"]] == [
+        "/app/data",
+        "/app/artifacts",
+        "/models/huggingface",
+    ]
+
+
+def test_mcp_capability_is_active_with_exact_delivery_contract() -> None:
+    catalog = json.loads((_ROOT / "harness/capabilities.json").read_text(encoding="utf-8"))
+    capability = next(item for item in catalog["capabilities"] if item["id"] == "mcp-interface")
+
+    assert capability["status"] == "active"
+    contract = capability["active_contract"]
+    assert contract["runtime_dependencies"] == ["mcp==2.2.0"]
+    assert contract["ci_checks"] == [
+        "uv run pytest tests/test_mcp_server.py tests/test_interface_contracts.py",
+        "docker compose config --quiet",
+        "make smoke",
+    ]
+    assert set(contract["implementation_paths"]) == {
+        "src/scifact_rag/mcp_server.py",
+        "tests/test_mcp_server.py",
+        "tests/test_interface_contracts.py",
+        "compose.yaml",
+        "docs/research/scifact-rag-mcp.md",
+        "docs/adr/0033-mcp-adapter.md",
+        "docs/superpowers/specs/2026-09-17-mcp-adapter-design.md",
     }

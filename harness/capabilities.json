@@ -472,7 +472,7 @@
         "mcp-adapter",
         "model-context-protocol-interface"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Expose proven application use cases as MCP tools or resources while preserving the common application layer and its authority boundaries.",
       "source_projects": [
         {
@@ -501,6 +501,26 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner for GitHub Issue #12 on 2026-09-17",
+        "runtime_dependencies": [
+          "mcp==2.2.0"
+        ],
+        "ci_checks": [
+          "uv run pytest tests/test_mcp_server.py tests/test_interface_contracts.py",
+          "docker compose config --quiet",
+          "make smoke"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/mcp_server.py",
+          "tests/test_mcp_server.py",
+          "tests/test_interface_contracts.py",
+          "compose.yaml",
+          "docs/research/scifact-rag-mcp.md",
+          "docs/adr/0033-mcp-adapter.md",
+          "docs/superpowers/specs/2026-09-17-mcp-adapter-design.md"
+        ]
       }
     },
     {

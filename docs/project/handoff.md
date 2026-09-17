@@ -12,8 +12,9 @@ strict Qwen extraction qualification. Issue #10 then accepted the CLI vertical s
 clean public build, isolated empty/no-op ingestion, retained four-case generation evidence, direct
 default-CLI smoke cases, and the complete repository gate. Issue #11 accepts the first Phase 6
 slice: a thin loopback HTTP adapter. Its full repository gate, three affected integrations, live
-supported case, exact insufficiency case, and parent-citation check passed. MCP and web remain
-inactive, and graph work is not currently earned.
+supported case, exact insufficiency case, and parent-citation check passed. Issue #12 now implements
+the separate two-tool loopback MCP adapter; its focused engineering checks pass, but bounded live
+DGX acceptance remains. Web is inactive, and graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -24,8 +25,8 @@ BEIR SciFact -> MiniLM -> PostgreSQL/pgvector -> retrieved evidence
                                Qwen NVFP4 -> cited answer or insufficient evidence
 ```
 
-The same dataclass application layer now serves CLI and HTTP. It remains the future composition
-root for MCP and a small web UI; those capabilities are not active.
+The same dataclass application layer now serves CLI, HTTP, and MCP. It remains the future
+composition root for a small web UI; that capability is not active.
 
 ## Accepted decisions
 
@@ -91,11 +92,14 @@ root for MCP and a small web UI; those capabilities are not active.
   comparison and completed blinded review retain whole-document as default and adaptive as the
   scalable opt-in without post-result tuning.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
-- `application-composition-root`, `cli-interface`, `http-api-interface`, and the bounded
-  `product-validation-challenges` corpus are active in `harness/capabilities.json`.
+- `application-composition-root`, `cli-interface`, `http-api-interface`, `mcp-interface`, and the
+  bounded `product-validation-challenges` corpus are active in `harness/capabilities.json`.
 - ADR-0032 adopts FastAPI/Uvicorn for three versioned read-only operations. Pydantic stays at the
   transport boundary; an injected resolver delegates cache misses to the existing composition
   root, and Compose publishes the service only at `127.0.0.1:8090`.
+- ADR-0033 adopts the pinned official MCP Python SDK v2.2.0 for exactly two read-only,
+  closed-corpus tools. A refusal-only validator rejects malformed recognized calls before SDK tool
+  dispatch; Compose publishes the service only at `127.0.0.1:8091/mcp`.
 
 See `docs/adr/0013-scifact-rag-composition-and-runtime.md`,
 `docs/adr/0015-modular-coreference-retrieval.md`,
@@ -132,6 +136,8 @@ see `docs/reports/phase-4-proposition-pair-qualification.md`.
 citation, provenance, limitation, and failure boundary for the CLI release decision.
 `docs/adr/0032-http-api-adapter.md` records the accepted HTTP framework, composition, validation,
 error, and loopback deployment boundary for Issue #11.
+`docs/adr/0033-mcp-adapter.md` records the accepted SDK, validation correction, two-tool contract,
+and loopback deployment boundary for Issue #12.
 
 ## Live environment observed 2026-08-27
 
@@ -173,6 +179,11 @@ error, and loopback deployment boundary for Issue #11.
   `13387a8234c2` on `spark-3a8f`: health returned in 0.004328 seconds, the exact supported case
   returned parent-valid citations in 7.638888 seconds, and the exact insufficiency case returned in
   1.038191 seconds. See `docs/reports/issue-11-http-api-acceptance.md`.
+- Issue #12's implementation exposes only `search_scifact` and `answer_scifact` through MCP
+  Streamable HTTP. The official in-memory client proves discovery, strict non-disclosing argument
+  rejection, structured result mapping, sanitized unexpected failures, exact insufficiency, and
+  normalized CLI parity. Compose topology is verified statically; the official URL-client live
+  run and retained acceptance report remain outstanding.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or
@@ -193,10 +204,11 @@ error, and loopback deployment boundary for Issue #11.
   not fused into retrieval or generation.
 - Local scaffold baseline: `703c8e5`.
 - Dataclass domain/ports, application services, SciFact/MiniLM/Postgres/generator adapters, Typer
-  CLI, Docker Compose, dependency contract, ADR, research note, and focused tests are authored.
+  CLI, HTTP, MCP, Docker Compose, dependency contract, ADRs, research notes, and focused tests are
+  authored.
 - Retrieval representation is now an application port. FastCoref is lazy-loaded only by
   coreference ingestion; titles and policy-specific sentences coexist with token windows in a
-  strategy-aware PostgreSQL table. The dependency lock resolves 122 packages.
+  strategy-aware PostgreSQL table. The dependency lock resolves 142 packages.
 - The official checksum-verified corpus contains 5,183 documents and 19,283 token windows. All were
   ingested. Actual pgvector evaluation over 300 BEIR test queries at cutoff 10 reports nDCG
   0.601929, MAP 0.556945, recall 0.727944, precision 0.081000, and MRR 0.568218. The original
