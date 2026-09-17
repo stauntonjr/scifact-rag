@@ -1,7 +1,7 @@
 # SciFact evidence-inspection web UI design
 
 Date: 2026-09-17  
-Status: proposed for written review  
+Status: accepted by the human owner  
 Governing issue: [#13](https://github.com/stauntonjr/scifact-rag/issues/13)  
 Human decider: repository owner
 
