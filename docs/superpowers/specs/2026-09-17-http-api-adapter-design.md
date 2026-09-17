@@ -229,9 +229,9 @@ adapter modules remain framework-neutral.
 ## Compose boundary
 
 Add an `api` service using the existing application image, environment, data/artifact mounts,
-model cache, host gateway, and PostgreSQL health dependency. Override only the command with the
-Uvicorn factory invocation. Publish `127.0.0.1:8090:80`; no wildcard host binding is exposed from
-Docker to the workstation network.
+model cache, host gateway, and PostgreSQL health dependency. Override the image's CLI entrypoint
+with `uv run --no-dev uvicorn` and supply the factory invocation as its command. Publish
+`127.0.0.1:8090:80`; no wildcard host binding is exposed from Docker to the workstation network.
 
 The container's internal `0.0.0.0` bind is required for Docker port forwarding and does not alter
 the loopback-only host publication. No CORS middleware is installed. Downstream reranker,
