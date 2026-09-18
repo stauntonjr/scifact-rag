@@ -207,6 +207,8 @@ services:
       RANK_LLM_BASE_URL: http://rankllm:80
       SCIENTIFIC_INFERENCE_BASE_URL: http://scientific-inference:80
       HF_HOME: /models/huggingface
+      SCIFACT_PUBLIC_DEMO_ENABLED: ${SCIFACT_PUBLIC_DEMO_ENABLED:-false}
+      SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN: ${SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN:-https://stauntonjr.github.io}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

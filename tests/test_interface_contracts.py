@@ -236,6 +236,27 @@ def test_compose_exposes_only_the_loopback_api_factory() -> None:
     assert "condition: service_healthy" in service
 
 
+def test_public_demo_is_opt_in_on_the_single_worker_api_only() -> None:
+    completed = subprocess.run(
+        ["docker", "compose", "config", "--format", "json"],
+        cwd=_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    compose = json.loads(completed.stdout)
+    api_environment = compose["services"]["api"]["environment"]
+
+    assert api_environment["SCIFACT_PUBLIC_DEMO_ENABLED"] == "false"
+    assert (
+        api_environment["SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN"]
+        == "https://stauntonjr.github.io"
+    )
+    assert "SCIFACT_PUBLIC_DEMO_ENABLED" not in compose["services"]["app"]["environment"]
+    assert "SCIFACT_PUBLIC_DEMO_ENABLED" not in compose["services"]["mcp"]["environment"]
+    assert compose["services"]["api"]["command"][-1] == "1"
+
+
 def test_http_capability_is_active_with_exact_delivery_contract() -> None:
     catalog = json.loads((_ROOT / "harness/capabilities.json").read_text(encoding="utf-8"))
     capability = next(
@@ -283,7 +304,10 @@ def test_compose_exposes_only_the_loopback_mcp_module() -> None:
         }
     ]
     assert service["depends_on"]["postgres"]["condition"] == "service_healthy"
-    assert service["environment"] == compose["services"]["api"]["environment"]
+    api_environment = dict(compose["services"]["api"]["environment"])
+    api_environment.pop("SCIFACT_PUBLIC_DEMO_ENABLED")
+    api_environment.pop("SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN")
+    assert service["environment"] == api_environment
     assert service["extra_hosts"] == compose["services"]["api"]["extra_hosts"]
     assert [volume["target"] for volume in service["volumes"]] == [
         "/app/data",

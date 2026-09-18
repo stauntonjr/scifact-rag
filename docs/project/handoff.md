@@ -89,6 +89,12 @@ ask endpoints from the same loopback origin. Issue #25 adds a documentation-only
 static showcase page derived from that accepted interface; the DGX application remains
 loopback-only.
 
+The public showcase is now a static GitHub Pages artifact with an optional readiness link to the
+owner-controlled live edge. The live setting is opt-in and API-only; the default Compose state is
+disabled, and the offline page makes no claim that a failed live request produced a result. The
+small VPS hosts only the planned edge and Tailscale connectivity; DGX hosts the application,
+database, and inference.
+
 ## Accepted decisions
 
 - Python 3.12, frozen dataclasses, Typer, SQLAlchemy Core, psycopg, and explicit constructor wiring.

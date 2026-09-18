@@ -6,6 +6,12 @@ All notable changes to the harness are recorded here. The harness version and a 
 
 ### Changed
 
+- Added an opt-in public showcase boundary. GitHub Pages serves the recorded UI, while the live
+  readiness link talks to the single-worker API only when explicitly enabled. The API-only Compose
+  environment keeps the default disabled; the static page has a bounded readiness check and an
+  honest offline fallback. Inference and storage remain on the DGX, and VPS edge deployment is
+  documented separately.
+
 - Added a linked README showcase and static GitHub Pages video captured from the real
   evidence-inspection UI. The recording uses the grammatically corrected claim `Side effects of
   antidepressants increase the risk of stroke.`, preserves the generated answer and parent

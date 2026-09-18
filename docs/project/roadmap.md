@@ -477,6 +477,12 @@ That acceptance is complete. The retained report records cited-answer rendering,
 insufficiency with evaluated evidence preserved, bounded validation and unavailable states,
 API-only restoration, packaged resources, accessibility markers, and explicit local-only limits.
 
+Issue #25 adds a static GitHub Pages showcase and an optional live-readiness link. The recording
+and offline fallback are public delivery artifacts; the live path is disabled by default and, when
+enabled, uses only the single-worker API while inference and storage remain on the DGX. VPS edge
+deployment is maintained in the separate `vps-srv` repository under its own plan and acceptance
+boundary.
+
 ## Handoff to the template program
 
 Template/Pi effectiveness belongs to `agentic-project-template`, not to a SciFact product phase.

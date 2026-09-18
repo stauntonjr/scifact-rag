@@ -20,8 +20,11 @@ the derived static media and explanatory page.
 
 The human owner supplied the native browser recording after the browser-control runtime could not
 attach to the visible in-app tab. The untouched source and edited high-resolution master remain
-outside Git; only the optimized GIF, MP4, poster, captions, and static page are committed. Public
-route verification remains pending until the branch is integrated and Pages is enabled.
+outside Git; only the optimized GIF, MP4, poster, captions, and static page are committed. The
+static page also performs one bounded readiness check against the optional live edge and falls
+back to a recorded-only message on timeout, non-ready status, or contract mismatch; it does not
+claim a live result from a failed request. Public route verification remains pending until the
+branch is integrated and Pages is enabled.
 
 ## Recorded-query authentication
 
@@ -101,6 +104,7 @@ recorded separately below when complete.
 | Repository harness | passed through `python3 tools/harness_check.py` |
 | Whitespace check | passed through `git diff --check` |
 | Public Pages routes | pending integration and Pages activation |
+| Static live-readiness fallback | passed; 3.5-second abort, exact readiness schema, explicit retry only |
 
 This evidence validates the assets and static publication shape, not cross-browser playback or a
 public deployment. Those claims require the integrated exact revision and live Pages responses.

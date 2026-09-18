@@ -48,6 +48,8 @@ loopback-only FastAPI adapter with explicit CLI parity. For Issue #12, the owner
 `mcp-interface` for exactly two read-only, closed-corpus tools over the same application layer,
 using the official SDK and a DGX-local loopback client path.
 
-Web, durable memory, architecture analysis, complexity review, and role parallelism remain
-inactive. The increase to 3.72 chunk vectors per document is below the accepted four-vector budget
-and does not yet justify activating a separate complexity-analysis capability.
+Durable memory, architecture analysis, complexity review, and role parallelism remain inactive.
+The web capability remains the owner of the packaged UI; the public showcase is a static delivery
+artifact and does not activate a second web or deployment capability. The increase to 3.72 chunk
+vectors per document is below the accepted four-vector budget and does not yet justify activating
+a separate complexity-analysis capability.
