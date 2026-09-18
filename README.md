@@ -142,9 +142,8 @@ docker compose run --rm app search \
 - Retrieval default: `pooled-coref-interval-content-max-colbert`.
 - Retrieval fallback: `bm25-token-window-rrf`.
 - Generation-context default: `whole-document`; `adaptive` is the scalable opt-in policy.
-- CLI, loopback HTTP, and DGX-local loopback MCP are accepted. The web UI implementation and
-  packaged-resource checks are complete; bounded DGX browser acceptance remains. Graph scoring
-  and agent-development evaluation remain downstream.
+- CLI, loopback HTTP, DGX-local loopback MCP, and the small evidence-inspection web UI are accepted.
+  Graph scoring and agent-development evaluation remain downstream.
 - The fixed blinded generation review is complete: all three recorded policy names scored 18/24
   grounded answers, which is expected on short abstracts and does not test long-document scaling.
 - The CLI release gate is accepted: a clean public branch builds, isolated empty/no-op ingests
@@ -172,6 +171,8 @@ docker compose run --rm app search \
   loopback, integration, supported-answer, insufficiency, and parent-citation evidence.
 - [Issue #12 MCP acceptance](docs/reports/issue-12-mcp-acceptance.md): official-client discovery,
   strict validation, parity, loopback topology, integration, citation, and insufficiency evidence.
+- [Issue #13 web UI acceptance](docs/reports/issue-13-web-ui-acceptance.md): packaged-resource,
+  browser-state, citation, insufficiency, failure, restoration, and local-only evidence.
 - [Project handoff](docs/project/handoff.md): current implementation and operating state.
 
 ## Development

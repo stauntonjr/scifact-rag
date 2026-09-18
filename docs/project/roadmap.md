@@ -52,7 +52,7 @@ retrieval benchmark plus a few plausible generated examples is not sufficient.
 | Generation | Corrected automatic validation and the completed 24-claim blinded review retain whole-document as default; adaptive is the canonical scalable opt-in | Phase 1 is complete; do not rerun or tune on SciFact validation |
 | Scientific reasoning | Synonymy, polarity, negation, contradiction, and cross-sentence inference are not explicit scores | Retrieval relevance must not be mistaken for support or contradiction |
 | Proposition/graph | A strict four-probe Qwen qualification stopped before pool extraction after two exact-span failures | The graph was not earned; retain the bounded code and do not build projection infrastructure |
-| Interfaces | CLI, loopback HTTP, and the two-tool DGX-local MCP adapter are accepted; Issue #13 implements the approved same-process evidence-inspection UI | Complete browser acceptance before closing Phase 6 |
+| Interfaces | CLI, loopback HTTP, two-tool DGX-local MCP, and the Issue #13 same-process evidence-inspection UI are accepted | Phase 6 is complete; preserve one application layer across adapters |
 | Planning | Public GitHub Project #17 tracks the bounded roadmap Issues; Issue #10 completed the CLI release gate | This document and accepted ADRs define sequence; each new architecture phase still needs a bounded Issue |
 
 The public test qrels have been inspected repeatedly. Their scores are descriptive historical
@@ -434,9 +434,8 @@ initial loopback-only ColBERT network failure remains retained rather than being
 
 ## Phase 6: add composition adapters
 
-Status: HTTP accepted under Issue #11 and MCP accepted under Issue #12 on 2026-09-17. The human
-owner activated the final small web adapter under Issue #13; implementation is complete and bounded
-DGX browser acceptance remains before Phase 6 closes.
+Status: complete. HTTP was accepted under Issue #11, MCP under Issue #12, and the final small web
+adapter under Issue #13 on 2026-09-17.
 
 After the CLI proof is accepted, expose the same application services through thin adapters in
 this order:
@@ -473,6 +472,10 @@ parent citations, ordered evidence, document IDs, scores, and complete supplied 
 exact insufficiency and bounded error states remain explicit. ADR-0034 records the same-process
 boundary. Issue #13 requires retained supported, insufficient-evidence, validation, unavailable,
 responsive, focus, and reduced-motion browser evidence before acceptance.
+
+That acceptance is complete. The retained report records cited-answer rendering, exact
+insufficiency with evaluated evidence preserved, bounded validation and unavailable states,
+API-only restoration, packaged resources, accessibility markers, and explicit local-only limits.
 
 ## Phase 7: evaluate the template and weaker-model development
 
@@ -526,8 +529,7 @@ To prevent activity from replacing progress:
 
 ## Remaining work items
 
-1. Complete Issue #13's bounded browser acceptance and close Phase 6.
-2. Decide whether to begin the separate template/Pi effectiveness program.
+1. Decide whether to begin the separate template/Pi effectiveness program.
 
 Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
 unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved

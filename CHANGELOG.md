@@ -12,7 +12,8 @@ All notable changes to the harness are recorded here. The harness version and a 
   passages, complete supplied text, exact insufficiency with its evaluated evidence retained, and
   bounded error states. The slice adds
   no frontend service, build system, runtime dependency, CORS policy, authentication, or retrieval
-  behavior; live DGX browser acceptance remains pending.
+  behavior. DGX browser acceptance passed cited-answer, retained-evidence insufficiency,
+  validation, unavailable-service, and restored-health states.
 - Implemented the owner-approved thin MCP adapter over the existing application layer using the
   pinned official Python SDK 2.2.0. The loopback Compose service exposes exactly
   `search_scifact` and `answer_scifact`; strict pre-dispatch validation rejects unknown or invalid

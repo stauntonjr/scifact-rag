@@ -15,10 +15,10 @@ slice: a thin loopback HTTP adapter. Its full repository gate, three affected in
 supported case, exact insufficiency case, and parent-citation check passed. Issue #12 accepts the
 separate two-tool loopback MCP adapter after its full repository gate, three affected integrations,
 official-client discovery, supported case, exact insufficiency case, parent-citation check, and
-invalid-input check passed. Issue #13 implements the final Phase 6 slice: a packaged,
-same-process evidence-inspection UI over the accepted HTTP contracts. Its focused checks pass;
-bounded DGX browser acceptance remains before the interface is accepted. Graph work is not
-currently earned.
+invalid-input check passed. Issue #13 accepts the final Phase 6 slice: a packaged, same-process
+evidence-inspection UI over the accepted HTTP contracts. Its supported-answer, retained-evidence
+insufficiency, validation, unavailable-service, restoration, package, and affected-integration
+checks passed. Final branch integration remains; graph work is not currently earned.
 
 Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
 
@@ -199,8 +199,9 @@ same-origin API reuse, and browser-acceptance requirements for Issue #13.
   `/` with fixed CSS and JavaScript assets. The UI renders active strategies, ordered parent
   evidence, scores, complete supplied text, citations, and exact insufficiency through the
   existing `/v1/search` and `/v1/ask` contracts. Focused route, HTTP/interface, formatting,
-  typing, and wheel-resource checks pass; live supported, insufficient, validation, unavailable,
-  responsive, focus, and reduced-motion browser acceptance is still pending.
+  typing, wheel-resource, affected-integration, supported-answer, retained-evidence insufficiency,
+  validation, unavailable-service, and restoration checks pass; see
+  `docs/reports/issue-13-web-ui-acceptance.md`.
 - Phase 0 Issue #3 governs generation-evaluation reproducibility. The versioned
   `generation-run-manifest/v1` contract and `generation-eval-dry-run` CLI command validate a
   complete run boundary without constructing the application or calling PostgreSQL, ColBERT, or
