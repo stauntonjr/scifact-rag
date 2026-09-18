@@ -1,5 +1,6 @@
 """Synthetic provenance cases; no publisher article text is committed."""
 
+import importlib.util
 import io
 import json
 import sys
@@ -9,7 +10,12 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
-import evidence_inference_provenance as provenance
+spec = importlib.util.spec_from_file_location(
+    "provenance", Path(__file__).parents[1] / "tools/evidence_inference_provenance.py"
+)
+assert spec and spec.loader
+provenance = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(provenance)
 
 
 def xml(license_text="", href="", pmcid="123"):

@@ -531,3 +531,16 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   add the exact URL to Project #17. No duplicate issue or unrelated label reconciliation.
 - Prevention: inspect live label identities before issue creation; desired configuration is not
   evidence that labels already exist.
+
+## EI-TEST-001: Runtime tool imports are not static import paths
+
+- Date: 2026-09-18. Evidence: PR #20, failed CI run `35341696584` at commit `4172131`.
+- Failed approach: mutate `sys.path` and directly import a standalone `tools/` audit from its
+  test. All 39 focused tests passed, but Pyright reported `reportMissingImports` at line 12.
+- Mutation status: only test loading was affected; the audit and retained result were unchanged.
+- Correction: use the explicit `importlib.util.spec_from_file_location` pattern already used by
+  adjacent audit tests, asserting the module specification and loader before execution.
+- Verification: focused tests and the full CI type-check boundary must both pass on the repaired
+  commit; runtime success alone is not evidence of static import resolution.
+- Durable prevention: reuse the adjacent explicit loader for standalone audit tests, and retain
+  the required CI type check rather than suppressing unresolved imports globally.
