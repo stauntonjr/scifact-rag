@@ -18,22 +18,26 @@ def _asset_text(name: str) -> str:
     return files("scifact_rag.web").joinpath(name).read_text(encoding="utf-8")
 
 
-def _configuration_json() -> str:
+def _configuration_json(*, public_demo_enabled: bool) -> str:
     value = json.dumps(
         {
             "retrieval_strategies": [strategy.value for strategy in RetrievalStrategyName],
             "default_retrieval_strategy": DEFAULT_RETRIEVAL_STRATEGY.value,
             "context_strategies": [strategy.value for strategy in GenerationContextStrategyName],
             "default_context_strategy": GenerationContextStrategyName.WHOLE_DOCUMENT.value,
+            "public_demo_enabled": public_demo_enabled,
         },
         separators=(",", ":"),
     )
     return value.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
 
 
-def create_web_router() -> APIRouter:
+def create_web_router(*, public_demo_enabled: bool = False) -> APIRouter:
     router = APIRouter(include_in_schema=False)
-    index = _asset_text("index.html").replace(_CONFIG_MARKER, _configuration_json())
+    index = _asset_text("index.html").replace(
+        _CONFIG_MARKER,
+        _configuration_json(public_demo_enabled=public_demo_enabled),
+    )
     stylesheet = _asset_text("scifact.css")
     script = _asset_text("scifact.js")
 

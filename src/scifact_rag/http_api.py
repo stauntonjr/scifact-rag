@@ -235,8 +235,8 @@ def create_http_app(
     public_demo: PublicDemoRuntime | None = None,
 ) -> FastAPI:
     app = FastAPI(title="SciFact RAG API", version="1.0.0")
-    app.include_router(create_web_router())
     runtime = public_demo if public_demo and public_demo.settings.enabled else None
+    app.include_router(create_web_router(public_demo_enabled=runtime is not None))
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(

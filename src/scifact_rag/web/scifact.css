@@ -263,6 +263,24 @@ button:disabled {
   color: var(--error);
 }
 
+.capability-status {
+  min-height: 1.4rem;
+  margin: 0.5rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.capability-status[data-state="error"] {
+  color: var(--warning);
+}
+
+.showcase-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
 .result-summary {
   margin-bottom: 1.25rem;
   padding: clamp(1.25rem, 4vw, 2.25rem);

@@ -46,6 +46,8 @@ async def test_web_resources_are_served_without_application_resolution() -> None
         'id="search-button"',
         'id="answer-button"',
         'id="request-status"',
+        'id="capability-status"',
+        'id="showcase-link"',
         'aria-live="polite"',
         'id="result-summary"',
         'id="evidence-list"',
@@ -82,4 +84,31 @@ async def test_web_configuration_matches_existing_strategy_contracts() -> None:
         "default_retrieval_strategy": DEFAULT_RETRIEVAL_STRATEGY.value,
         "context_strategies": [strategy.value for strategy in GenerationContextStrategyName],
         "default_context_strategy": GenerationContextStrategyName.WHOLE_DOCUMENT.value,
+        "public_demo_enabled": False,
     }
+
+
+def test_web_script_contains_public_failure_and_capability_boundaries() -> None:
+    transport = httpx.ASGITransport(app=create_http_app(fail_if_resolved))
+
+    async def read_script() -> str:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return (await client.get("/assets/scifact.js")).text
+
+    import asyncio
+
+    script = asyncio.run(read_script())
+    for marker in (
+        'fetch("/v1/capabilities"',
+        'payload.schema_version !== "capabilities/v1"',
+        "option.disabled = !available",
+        "effective_default",
+        'error.code === "busy"',
+        "status === 429",
+        "status === 503",
+        "status === 502",
+        "status === 504",
+        "textContent",
+    ):
+        assert marker in script
+    assert "innerHTML" not in script

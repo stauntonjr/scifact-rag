@@ -9,6 +9,8 @@ const limitInput = document.getElementById("result-limit");
 const searchButton = document.getElementById("search-button");
 const answerButton = document.getElementById("answer-button");
 const requestStatus = document.getElementById("request-status");
+const capabilityStatus = document.getElementById("capability-status");
+const showcaseLink = document.getElementById("showcase-link");
 const resultSummary = document.getElementById("result-summary");
 const resultKicker = document.getElementById("result-kicker");
 const resultTitle = document.getElementById("result-title");
@@ -20,9 +22,14 @@ const evidenceCount = document.getElementById("evidence-count");
 
 const messages = {
   validation: "Request validation failed. Check the claim and controls, then try again.",
-  unavailable: "The service is temporarily unavailable. Try again after it has recovered.",
+  busy: "Another live request is running. Try again shortly.",
+  rateLimited: "The anonymous request allowance is exhausted. Try again later.",
+  unavailable: "A required service is temporarily unavailable.",
+  offline: "The live demo is offline. View the recorded showcase instead.",
   contract: "The response did not match the expected contract.",
 };
+
+let capabilitySnapshot = null;
 
 function parseConfiguration() {
   try {
@@ -31,7 +38,8 @@ function parseConfiguration() {
       !Array.isArray(value.retrieval_strategies) ||
       !Array.isArray(value.context_strategies) ||
       typeof value.default_retrieval_strategy !== "string" ||
-      typeof value.default_context_strategy !== "string"
+      typeof value.default_context_strategy !== "string" ||
+      typeof value.public_demo_enabled !== "boolean"
     ) {
       throw new Error("invalid configuration");
     }
@@ -55,12 +63,140 @@ function addOptions(select, values, selectedValue) {
   });
 }
 
+function validCapabilityGroup(group, names) {
+  return (
+    group !== null &&
+    typeof group === "object" &&
+    typeof group.configured_default === "string" &&
+    (typeof group.effective_default === "string" || group.effective_default === null) &&
+    Array.isArray(group.strategies) &&
+    group.strategies.length === names.length &&
+    group.strategies.every(
+      (item, index) =>
+        item !== null &&
+        typeof item === "object" &&
+        item.name === names[index] &&
+        typeof item.available === "boolean" &&
+        (typeof item.reason === "string" || item.reason === null),
+    )
+  );
+}
+
+function applyCapabilityGroup(select, group) {
+  markUnavailableOptions(select, group);
+  if (typeof group.effective_default === "string") {
+    select.value = group.effective_default;
+  }
+}
+
+function markUnavailableOptions(select, group) {
+  const availableByName = new Map(
+    group.strategies.map((item) => [item.name, item.available]),
+  );
+  select.querySelectorAll("option").forEach((option) => {
+    const available = availableByName.get(option.value) === true;
+    option.disabled = !available;
+    option.title = available ? "" : "Unavailable for the current live services.";
+  });
+}
+
+function restoreCapabilityAvailability() {
+  if (capabilitySnapshot === null) {
+    return;
+  }
+  markUnavailableOptions(strategySelect, capabilitySnapshot.retrieval);
+  markUnavailableOptions(contextSelect, capabilitySnapshot.context);
+  answerButton.disabled = !capabilitySnapshot.answer.available;
+  searchButton.disabled = !capabilitySnapshot.search.available;
+}
+
+function applyCapabilities(payload, configuration) {
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    payload.schema_version !== "capabilities/v1" ||
+    !["ready", "degraded", "unavailable"].includes(payload.status) ||
+    payload.search === null ||
+    typeof payload.search !== "object" ||
+    typeof payload.search.available !== "boolean" ||
+    payload.answer === null ||
+    typeof payload.answer !== "object" ||
+    typeof payload.answer.available !== "boolean" ||
+    !validCapabilityGroup(payload.retrieval, configuration.retrieval_strategies) ||
+    !validCapabilityGroup(payload.context, configuration.context_strategies)
+  ) {
+    throw new Error("contract");
+  }
+  capabilitySnapshot = payload;
+  applyCapabilityGroup(strategySelect, payload.retrieval);
+  applyCapabilityGroup(contextSelect, payload.context);
+  const unavailable = payload.status === "unavailable";
+  setCapabilityStatus(
+    unavailable
+      ? "Live capabilities are unavailable."
+      : payload.status === "degraded"
+        ? "Live demo is available with a fallback strategy."
+        : "Live capabilities are ready.",
+    unavailable ? "error" : "ready",
+  );
+  if (!payload.answer.available) {
+    answerButton.disabled = true;
+  }
+  if (!payload.search.available) {
+    searchButton.disabled = true;
+  }
+}
+
+async function loadCapabilities(configuration) {
+  if (!configuration.public_demo_enabled) {
+    capabilityStatus.hidden = true;
+    return;
+  }
+  setShowcaseLink(true);
+  try {
+    const response = await fetch("/v1/capabilities", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error("unavailable");
+    }
+    const payload = await response.json();
+    applyCapabilities(payload, configuration);
+  } catch (error) {
+    setCapabilityStatus(
+      error instanceof Error && error.message === "contract"
+        ? messages.contract
+        : messages.unavailable,
+      "error",
+    );
+  }
+}
+
 function setBusy(busy, operation = "") {
-  form.querySelectorAll("button, input, select, textarea").forEach((control) => {
+  form.querySelectorAll("button, input, select").forEach((control) => {
     control.disabled = busy;
   });
+  if (!busy) {
+    restoreCapabilityAvailability();
+  }
   requestStatus.dataset.state = busy ? "loading" : "ready";
   requestStatus.textContent = busy ? `${operation} in progress…` : "Request complete.";
+}
+
+function setShowcaseLink(visible) {
+  if (!visible) {
+    showcaseLink.hidden = true;
+    return;
+  }
+  showcaseLink.href = "https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/";
+  showcaseLink.target = "_blank";
+  showcaseLink.rel = "noreferrer";
+  showcaseLink.hidden = false;
+}
+
+function setCapabilityStatus(message, state = "ready") {
+  capabilityStatus.dataset.state = state;
+  capabilityStatus.textContent = message;
 }
 
 function clearResult() {
@@ -253,6 +389,25 @@ async function readJsonResponse(response) {
   if (response.status === 422) {
     throw new Error("validation");
   }
+  if (response.status === 429) {
+    try {
+      const payload = await response.json();
+      if (payload && payload.error && payload.error.code === "busy") {
+        throw new Error("busy");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "busy") {
+        throw error;
+      }
+    }
+    throw new Error("rate_limited");
+  }
+  if (response.status === 503) {
+    throw new Error("unavailable");
+  }
+  if (response.status === 502 || response.status === 504) {
+    throw new Error("offline");
+  }
   if (!response.ok) {
     throw new Error("unavailable");
   }
@@ -301,9 +456,17 @@ async function submitRequest(operation) {
     setBusy(false);
     if (error instanceof Error && error.message === "validation") {
       setFailure(messages.validation);
+    } else if (error instanceof Error && error.message === "busy") {
+      setFailure(messages.busy);
+    } else if (error instanceof Error && error.message === "rate_limited") {
+      setFailure(messages.rateLimited);
+    } else if (error instanceof Error && error.message === "offline") {
+      setShowcaseLink(true);
+      setFailure(messages.offline);
     } else if (error instanceof Error && error.message === "contract") {
       setFailure(messages.contract);
     } else {
+      setShowcaseLink(true);
       setFailure(messages.unavailable);
     }
   }
@@ -321,6 +484,7 @@ if (configuration !== null) {
     configuration.context_strategies,
     configuration.default_context_strategy,
   );
+  void loadCapabilities(configuration);
 }
 
 searchButton.addEventListener("click", () => {
