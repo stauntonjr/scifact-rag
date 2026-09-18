@@ -6,6 +6,7 @@
     <meta name="description" content="A live demonstration of the SciFact RAG evidence-inspection UI.">
     <title>SciFact RAG · Live UI showcase</title>
     <link rel="stylesheet" href="./showcase.css">
+    <script src="./showcase.js" defer></script>
   </head>
   <body>
     <main>
@@ -16,6 +17,20 @@
         single NVIDIA DGX Spark: enter a claim, generate a qualified answer, and open the cited
         parent-document evidence.
       </p>
+
+      <section class="live-panel" aria-labelledby="live-title">
+        <p class="eyebrow">Optional live path</p>
+        <h2 id="live-title">Try the running evidence inspector</h2>
+        <p id="live-status" role="status" aria-live="polite">
+          Checking whether the live demo is available…
+        </p>
+        <div class="live-actions">
+          <a id="live-link" class="live-link" href="https://scifact.ediacarian.dedyn.io/" hidden>
+            Open live demo
+          </a>
+          <button id="live-retry" class="retry-button" type="button">Retry status check</button>
+        </div>
+      </section>
 
       <div class="player">
         <video controls preload="metadata" poster="./scifact-ui-poster.png">
@@ -62,7 +77,7 @@
         Recorded from application source
         <a href="https://github.com/stauntonjr/scifact-rag/commit/e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c"><code>e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c</code></a>
         and API image <code>sha256:03f52076e78d2359fe05f466843d7241a387cf5e0690c13e0271e9cbb305823c</code>.
-        The RAG services remain loopback-only; this page contains static media only.
+        The recorded media is static. The optional live link is best-effort and may be unavailable.
       </footer>
     </main>
   </body>

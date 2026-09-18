@@ -55,6 +55,67 @@ h1 {
   font-size: clamp(1.05rem, 2.2vw, 1.28rem);
 }
 
+.live-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1.5rem;
+  padding: 1.2rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.live-panel h2,
+.live-panel p {
+  margin: 0;
+}
+
+.live-panel #live-status[data-state="ready"] {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.live-panel #live-status[data-state="offline"] {
+  color: var(--muted);
+}
+
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.live-link,
+.retry-button {
+  display: inline-block;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--accent-dark);
+  border-radius: 999px;
+  background: var(--accent-dark);
+  color: #fffdf7;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.retry-button {
+  background: transparent;
+  color: var(--accent-dark);
+}
+
+.live-link:hover,
+.retry-button:hover {
+  background: var(--accent);
+  color: #fffdf7;
+}
+
+.retry-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .player {
   overflow: hidden;
   border: 1px solid var(--line);
