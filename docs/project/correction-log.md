@@ -608,3 +608,36 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   the five displayed parent IDs in order, and every visible answer citation belongs to that set.
 - Prevention: freeze the literal user-approved or actually captured text, not an assistant-authored
   semantic paraphrase, whenever media provenance depends on exact query identity.
+
+## SCIFACT-RAG-009: linked-worktree Git metadata was outside the writable mount
+
+- Date: 2026-09-18.
+- Workflow: create and commit the isolated generation-fidelity implementation worktree.
+- Failed approach: run ordinary linked-worktree Git mutations while the worktree content was
+  writable but its repository-owned metadata remained on a protected `.git` mount.
+- Error signature: Git could not create the worktree or index lock and reported a read-only file
+  system under the repository's worktree metadata.
+- Mutation check: the failed operations created no commit and did not alter tracked project files.
+- Corrected path: resolve the exact repository and worktree targets read-only, then rerun only the
+  repository-scoped Git mutation with approved host authority.
+- Verification: the isolated `codex/generation-fidelity-foundation` worktree and task-owned commits
+  were created while the source checkout and unrelated paths remained unchanged.
+- Prevention: when a linked worktree's content is writable but Git metadata is protected, escalate
+  the exact repository-scoped Git operation instead of broadening filesystem permissions.
+
+## SCIFACT-RAG-010: uv cache writes were denied inside the workspace sandbox
+
+- Date: 2026-09-18.
+- Workflow: synchronize and execute the locked project environment for generation-fidelity tests.
+- Failed approach: run `uv sync --locked` and `uv run` with workspace-only write authority even
+  though uv's existing cache and temporary directory live outside the writable workspace.
+- Error signature: uv reported a read-only filesystem while creating a temporary path beneath its
+  host cache; no project test had started.
+- Mutation check: the failure did not change source, test, protocol, model, service, or external
+  state.
+- Corrected path: rerun the exact repository-scoped uv command with approved access to the existing
+  package cache, retaining the locked dependency graph.
+- Verification: locked synchronization completed and the targeted/static generation-fidelity
+  checks passed in the project environment.
+- Prevention: treat host-cache denial as an execution-environment boundary; retain the lockfile and
+  escalate only the exact package/test command rather than changing cache ownership or dependencies.
