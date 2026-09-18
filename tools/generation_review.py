@@ -50,6 +50,16 @@ MATERIAL_ERROR_CATEGORIES = {
 SPAN_FIELDS = {"end", "start"}
 EVIDENCE_SPAN_FIELDS = {"end", "evidence_index", "start"}
 MATERIAL_ERROR_FIELDS = {"answer_span", "category", "evidence_absent", "evidence_spans"}
+MATERIAL_ERROR_CATEGORY_FIELDS = {
+    "causal_strengthening": "causal_strengthening",
+    "comparison_omission": "comparison_change",
+    "intervention_omission": "intervention_change",
+    "negation_omission": "negation_loss",
+    "outcome_omission": "outcome_change",
+    "population_generalization": "population_generalization",
+    "population_omission": "population_generalization",
+    "qualifier_omission": "qualifier_loss",
+}
 RESPONSE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -120,7 +130,7 @@ def _validate_v2_material_errors(
     evidence = row.get("evidence")
     evidence_items = evidence if isinstance(evidence, list) else []
     duplicate_keys: set[tuple[str, int, int]] = set()
-    valid_annotations = 0
+    valid_categories: set[str] = set()
     for annotation_index, annotation in enumerate(annotations):
         item_location = f"{annotation_location}[{annotation_index}]"
         error_count = len(errors)
@@ -178,32 +188,29 @@ def _validate_v2_material_errors(
             if duplicate_key in duplicate_keys:
                 errors.append(f"{item_location} is a duplicate material error")
             duplicate_keys.add(duplicate_key)
-        if len(errors) == error_count:
-            valid_annotations += 1
+        if len(errors) == error_count and isinstance(category, str):
+            valid_categories.add(category)
 
     if not require_complete:
         return
 
-    definite_material_error = (
-        review.get("grounded") == "no"
-        or review.get("material_overstatement") == "present"
-        or review.get("causal_strengthening") == "yes"
-        or review.get("population_generalization") == "yes"
-        or any(
-            review.get(field) == "yes"
-            for field in (
-                "comparison_omission",
-                "intervention_omission",
-                "negation_omission",
-                "outcome_omission",
-                "population_omission",
-                "qualifier_omission",
-            )
-        )
+    required_categories = {
+        category
+        for field, category in MATERIAL_ERROR_CATEGORY_FIELDS.items()
+        if review.get(field) == "yes"
+    }
+    summary_nonpass = (
+        review.get("grounded") == "no" or review.get("material_overstatement") == "present"
     )
-    if definite_material_error and valid_annotations == 0:
-        errors.append(f"{location}.review requires a material error annotation")
-    elif not definite_material_error and annotations:
+    if summary_nonpass and not required_categories:
+        required_categories.add("unsupported_claim")
+    missing_categories = required_categories - valid_categories
+    if missing_categories:
+        errors.append(
+            f"{location}.review requires a material error annotation; "
+            "missing matching material error categories: " + ", ".join(sorted(missing_categories))
+        )
+    elif not required_categories and annotations:
         errors.append(f"{location}.review clean pass must not contain material errors")
 
 
@@ -418,6 +425,7 @@ def _reviewer_config(schema_version: object) -> dict[str, object]:
         config["rubric"] = [*RUBRIC_V1, *RUBRIC_V2_ADDITIONS]
         config["material_error"] = {
             "categories": sorted(MATERIAL_ERROR_CATEGORIES),
+            "category_fields": MATERIAL_ERROR_CATEGORY_FIELDS,
             "labels": {
                 "add_error": "Add material error",
                 "add_evidence": "Add evidence span",
@@ -434,6 +442,77 @@ def _reviewer_config(schema_version: object) -> dict[str, object]:
         }
         config["export_filename"] = "generation-fidelity-v2-human-review.completed.json"
     return config
+
+
+BROWSER_VALIDATION_JAVASCRIPT = r"""
+    function validateMaterialErrors(row, review, config) {
+      if (!config) return [];
+      const errors = [];
+      const annotations = review.material_errors;
+      if (!Array.isArray(annotations)) return ['material_errors must be a list'];
+      const validCategories = new Set();
+      const duplicateKeys = new Set();
+      const boundedSpan = (span, text, location) => {
+        const textLength = typeof text === 'string' ? Array.from(text).length : -1;
+        if (!span || typeof span !== 'object'
+            || !Number.isInteger(span.start) || !Number.isInteger(span.end)
+            || span.start < 0 || span.start >= span.end || span.end > textLength) {
+          errors.push(`${location} is invalid`);
+          return false;
+        }
+        return true;
+      };
+      annotations.forEach((annotation, annotationIndex) => {
+        const initialErrorCount = errors.length;
+        const location = `material_errors[${annotationIndex}]`;
+        if (!annotation || typeof annotation !== 'object') {
+          errors.push(`${location} must be an object`);
+          return;
+        }
+        if (!config.categories.includes(annotation.category)) {
+          errors.push(`${location}.category is invalid`);
+        }
+        const answerValid = boundedSpan(annotation.answer_span, row.answer, `${location}.answer_span`);
+        if (typeof annotation.evidence_absent !== 'boolean') {
+          errors.push(`${location}.evidence_absent must be a boolean`);
+        }
+        const evidenceSpans = annotation.evidence_spans;
+        if (!Array.isArray(evidenceSpans)) {
+          errors.push(`${location}.evidence_spans must be a list`);
+        } else {
+          if ((evidenceSpans.length > 0) === (annotation.evidence_absent === true)) {
+            errors.push(`${location} must use exactly one evidence mode`);
+          }
+          evidenceSpans.forEach((span, spanIndex) => {
+            const spanLocation = `${location}.evidence_spans[${spanIndex}]`;
+            if (!span || typeof span !== 'object'
+                || !Number.isInteger(span.evidence_index)
+                || span.evidence_index < 0 || span.evidence_index >= row.evidence.length) {
+              errors.push(`${spanLocation}.evidence_index is invalid`);
+              return;
+            }
+            boundedSpan(span, row.evidence[span.evidence_index].text, spanLocation);
+          });
+        }
+        if (answerValid && typeof annotation.category === 'string') {
+          const key = `${annotation.category}:${annotation.answer_span.start}:${annotation.answer_span.end}`;
+          if (duplicateKeys.has(key)) errors.push(`${location} is a duplicate`);
+          duplicateKeys.add(key);
+        }
+        if (errors.length === initialErrorCount) validCategories.add(annotation.category);
+      });
+      const requiredCategories = new Set();
+      Object.entries(config.category_fields).forEach(([field, category]) => {
+        if (review[field] === 'yes') requiredCategories.add(category);
+      });
+      const summaryNonpass = review.grounded === 'no' || review.material_overstatement === 'present';
+      if (summaryNonpass && requiredCategories.size === 0) requiredCategories.add('unsupported_claim');
+      const missing = [...requiredCategories].filter(category => !validCategories.has(category));
+      if (missing.length) errors.push(`missing matching material error categories: ${missing.join(', ')}`);
+      if (!requiredCategories.size && annotations.length) errors.push('clean pass must not contain material errors');
+      return errors;
+    }
+"""
 
 
 HTML_TEMPLATE = r"""<!doctype html>
@@ -558,6 +637,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <script id="worksheet-data" type="application/json">__WORKSHEET_JSON__</script>
   <script>
     'use strict';
+__BROWSER_VALIDATION_JAVASCRIPT__
     const source = JSON.parse(document.getElementById('worksheet-data').textContent);
     const reviewConfig = __REVIEW_CONFIG__;
     const storageKey = '__STORAGE_KEY__';
@@ -648,7 +728,9 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
     function rowComplete(row) {
       const review = state.reviews[row.response_id] || {};
-      return categoricalFields.every(field => allowedByField[field].has(review[field]));
+      return categoricalFields.every(field => allowedByField[field].has(review[field]))
+        && (!materialErrorConfig
+          || validateMaterialErrors(row, review, materialErrorConfig).length === 0);
     }
     function updateProgress() {
       const complete = source.rows.filter(rowComplete).length;
@@ -854,15 +936,24 @@ def build_reviewer(
     reviewer_config = (
         reviewer_config.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
     )
+    browser_validation = (
+        BROWSER_VALIDATION_JAVASCRIPT if data["schema_version"] == SCHEMA_VERSION_V2 else ""
+    )
     html = (
         HTML_TEMPLATE.replace("__WORKSHEET_JSON__", embedded)
+        .replace("__BROWSER_VALIDATION_JAVASCRIPT__", browser_validation)
         .replace("__REVIEW_CONFIG__", reviewer_config)
         .replace("__STORAGE_KEY__", f"scifact-generation-human-review:{digest}")
         .replace("__SOURCE_DIGEST__", digest)
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
     staged = output.with_name(f".{output.name}.tmp")
-    staged.write_text(html, encoding="utf-8")
+    if os.path.lexists(output):
+        raise ReviewValidationError(f"output already exists: {output}")
+    if os.path.lexists(staged):
+        raise ReviewValidationError(f"staging output already exists: {staged}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with staged.open("x", encoding="utf-8") as stream:
+        stream.write(html)
     os.chmod(staged, 0o644)
     staged.replace(output)
     return {
