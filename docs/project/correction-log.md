@@ -1,5 +1,18 @@
 # Failure correction log
 
+## EI-TOKEN-001: Structured tokenizer return counted as fields
+
+- Date: 2026-09-18. Workflow: Issue #23, CPU-only reader preparation.
+- Failed approach: count `len(apply_chat_template(...))` without fixing the return format.
+  Transformers 5.15.1 returned a structured encoding; every input appeared to have two tokens.
+- Mutation status: an ignored diagnostic preparation was written; no model request was sent.
+- Correction: request `return_dict=False` explicitly and count token IDs. Preserve the failed
+  probe separately and regenerate acceptance artifacts at a fresh path after repair.
+- Verification: exact local tokenizer-version comparisons cover 202 full/oracle messages and
+  409 unique selector inputs. Correct full-context counts range from 977 to 14,052 tokens.
+- Durable prevention: a regression test exercises the structured default; actual-tokenizer
+  preparation must precede inference. Fake tokenizers alone do not establish production counts.
+
 This log retains sanitized, reusable corrections for agent or tooling mistakes that are likely to
 recur. It is not a transcript, retry counter, incident archive, or substitute for a regression
 test. Never record tokens, secrets, private prompts, hidden reasoning, or unnecessary user data.
