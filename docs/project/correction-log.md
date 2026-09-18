@@ -534,3 +534,20 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   supplied evidence records, and the intended evidence-insufficiency conclusion.
 - Prevention: measure the selected live path before freezing demonstration timestamps; define
   media timing around observable events when inference duration is inherently variable.
+
+## SCIFACT-RAG-008: showcase plan overconstrained a grammatical correction
+
+- Date: 2026-09-18.
+- Workflow: authenticate the live UI recording before GitHub Pages publication.
+- Failed approach: treated the planner-written phrase `associated with antidepressants` as an
+  exact capture requirement even though the owner had asked only to correct the source claim's
+  subject-verb agreement and the recording used the valid wording `of antidepressants`.
+- Error signature: independent review rejected the first media candidate because its visible query
+  and one retrieved parent differed from a preflight for the planner-written variant.
+- Mutation check: the finding occurred on an unmerged feature branch before the final gate, Pages
+  activation, Issue closure, or Project completion. No application or service changed.
+- Corrected path: the owner accepted the actual recorded query and result. Issue #25, the loop
+  contract, page, captions, and report now name that exact query; one read-only search reproduced
+  the five displayed parent IDs in order, and every visible answer citation belongs to that set.
+- Prevention: freeze the literal user-approved or actually captured text, not an assistant-authored
+  semantic paraphrase, whenever media provenance depends on exact query identity.

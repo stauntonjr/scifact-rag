@@ -20,14 +20,14 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 
 ## Global constraints
 
-- Use the corrected claim: `Side effects associated with antidepressants increase the risk of stroke.`
+- Use the owner-accepted recorded claim: `Side effects of antidepressants increase the risk of stroke.`
 - Record the actual running application; never mock, inject, or replace a response or citation.
 - Record one uninterrupted source at no less than 1280x720 and derive every published frame from it.
 - Retain the source and edited master outside Git and commit no more than 25 MB of optimized showcase media in total.
 - Produce one 960x540 GIF lasting 24 seconds and one 1280x720 MP4 preserving the disclosed master edit.
 - Keep the existing DGX services loopback-only; Pages contains static media only.
 - Add no frontend framework, application endpoint, Compose service, runtime dependency, or narration.
-- Stop if the corrected claim does not return a valid cited answer whose citation resolves to
+- Stop if the recorded claim does not return a valid cited answer whose citations resolve to
   displayed evidence.
 
 ---
@@ -48,11 +48,12 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
   image digest, `GET /healthz`, the ColBERT health endpoint, and Qwen `/v1/models`. Do not restart a
   healthy service.
 
-- [x] **Step 2: Preflight the corrected claim through the real answer endpoint**
+- [x] **Step 2: Authenticate the recorded claim and evidence boundary**
 
-  Submit one `ask-request/v1` with the accepted retrieval and whole-document context defaults.
-  Require `answer/v1`, non-empty citations, and every citation in the returned evidence ID set.
-  Record latency, citations, and evidence IDs. Stop on exact insufficiency or invalid citation.
+  Submit one `search-request/v1` with the exact recorded query and accepted retrieval default.
+  Require its ordered five-document result to equal the evidence identities visible in the
+  recording, then verify every recorded answer citation belongs to that set. Record latency,
+  response digest, citations, and evidence IDs.
 
 - [x] **Step 3: Confirm a recording surface**
 
@@ -74,7 +75,7 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 - Modify: `docs/reports/issue-25-ui-showcase.md`
 
 **Interfaces:**
-- Consumes: clean live page and validated corrected claim from Task 1.
+- Consumes: clean live page and authenticated recorded claim from Task 1.
 - Produces: one native-resolution source with the complete real interaction.
 
 - [x] **Step 1: Prepare the visible page**
@@ -86,7 +87,7 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 - [x] **Step 2: Record the fixed interaction sequence at live speed**
 
   - Hold on the clean page for two seconds.
-  - Enter the corrected claim over roughly three seconds, then click **Answer with evidence**.
+  - Enter the accepted claim over roughly three seconds, then click **Answer with evidence**.
   - Preserve the complete real loading interval without cutting or accelerating it.
   - Pause on the answer, model, strategies, and citations for six seconds.
   - Click the first citation, then pause on its parent evidence card for ten seconds.
@@ -159,7 +160,7 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 - [x] **Step 1: Write the self-contained showcase page**
 
   Use native HTML and CSS only. Include a `<video controls preload="metadata">` element, poster,
-  WebVTT captions, corrected claim, exact recording revision/date, repository link, public-corpus
+  WebVTT captions, recorded claim, exact recording revision/date, repository link, public-corpus
   description, and research-only/non-clinical limitation.
 
 - [x] **Step 2: Add the linked README hero**

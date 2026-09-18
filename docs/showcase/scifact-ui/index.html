@@ -30,7 +30,7 @@
         <article class="card">
           <h2>What happens</h2>
           <ol>
-            <li>The corrected claim is entered into the live evidence inspector.</li>
+            <li>The recorded claim is entered into the live evidence inspector.</li>
             <li>The selected retrieval pipeline ranks evidence from the public SciFact corpus.</li>
             <li>Local Qwen generation returns a qualified answer with parent-document citations.</li>
             <li>A citation moves directly to the complete evidence supplied to generation.</li>
@@ -39,12 +39,13 @@
         <aside class="card">
           <h2>Recording boundary</h2>
           <p>
-            Claim: <q>Side effects associated with antidepressants increase the risk of stroke.</q>
+            Claim: <q>Side effects of antidepressants increase the risk of stroke.</q>
           </p>
           <p>
             The source recording is continuous except for eight seconds of unchanged waiting
-            frames removed at source time 00:39–00:47. Results and citations are unmodified. The
-            README GIF is a 24-second excerpt from this same recording.
+            frames removed at source time 00:39–00:47, and source content after 01:50 is omitted.
+            Results and citations are unmodified. The README GIF is a 24-second excerpt from this
+            same recording.
           </p>
           <p>
             <a href="https://github.com/stauntonjr/scifact-rag">View the repository on GitHub</a>
@@ -58,8 +59,10 @@
       </p>
 
       <footer>
-        Recorded from API image <code>sha256:03f52076e78d…</code>. The RAG services remain
-        loopback-only; this page contains static media only.
+        Recorded from application source
+        <a href="https://github.com/stauntonjr/scifact-rag/commit/e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c"><code>e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c</code></a>
+        and API image <code>sha256:03f52076e78d2359fe05f466843d7241a387cf5e0690c13e0271e9cbb305823c</code>.
+        The RAG services remain loopback-only; this page contains static media only.
       </footer>
     </main>
   </body>
