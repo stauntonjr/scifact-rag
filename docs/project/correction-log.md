@@ -500,3 +500,23 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   differ. Independent review must confirm that public inputs no longer reconstruct the new IDs.
 - Prevention: reviewer-visible opaque identifiers must not be derived from published low-entropy
   inputs; frozen mappings remain separate and are not supplied during scoring.
+
+## GH-ACCESS-003: Dependency-review prerequisite and Projects OAuth scope
+
+- Date: 2026-09-17 (America/New_York).
+- Workflow: finish SciFact PR #14 and place template Issue #59 in Project #13.
+- Evidence: SciFact run `35302453139` reports unsupported dependency review with a request to
+  ensure Dependency graph is enabled. A subsequent dependency-diff read returns HTTP 403.
+  Network-enabled `gh auth status` identifies the Mac keyring login with `repo`, `read:org`, and
+  `gist`; `gh project view 13 --owner stauntonjr --format json` reports missing `read:project`.
+  No environment-token override was present. The browser settings page was signed out.
+- Failed approach: reported the graph as disabled without inspecting its live setting, and stopped
+  at the read-scope error without documenting the write scope required for membership.
+- Mutation status: Issue #59 exists; these diagnostics changed no credential, setting, or membership.
+- Correction: follow [GitHub access recovery](github-access-recovery.md). An administrator checks
+  the graph setting/eligibility; the account owner grants `project` for authorized membership work
+  on the execution host. Then rerun the failed check and resume the existing item URL through
+  `github_planning.py add-item`; verify both results.
+- Verification boundary: error classification and official recovery commands were checked; live
+  setting repair, OAuth refresh, and Project placement have not been completed by this entry.
+- Durable prevention: the planning entry point links the prerequisite and recovery runbook.
