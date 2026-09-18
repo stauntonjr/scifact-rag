@@ -23,29 +23,29 @@ attach to the visible in-app tab. The untouched source and edited high-resolutio
 outside Git; only the optimized GIF, MP4, poster, captions, and static page are committed. Public
 route verification remains pending until the branch is integrated and Pages is enabled.
 
-## Frozen live preflight
+## Recorded-query authentication
 
-| Field | Frozen value |
+| Field | Authenticated value |
 |---|---|
-| Corrected claim | `Side effects associated with antidepressants increase the risk of stroke.` |
-| Request | `ask-request/v1`; limit 5; `pooled-coref-interval-content-max-colbert`; `whole-document` |
-| Response | HTTP 200; `answer/v1` |
+| Recorded claim | `Side effects of antidepressants increase the risk of stroke.` |
+| Authentication request | `search-request/v1`; limit 5; `pooled-coref-interval-content-max-colbert` |
+| Authentication response | HTTP 200 in 2.162447 s; `search-response/v1`; SHA-256 `22bcdfb232ee97339c4c4f6524e191c1136db15ccb625fbc199306c21086cc1a` |
 | Model | `nvidia/Qwen3.6-35B-A3B-NVFP4` |
-| Citations | `5691302`, `37619697`, `10984005`, `14606752` |
-| Supplied evidence IDs | `5691302`, `10984005`, `23627419`, `14606752`, `37619697` |
-| Citation integrity | passed; every citation resolves to a supplied evidence ID |
+| Recorded citations | `5691302`, `14606752`, `24494539`, `37619697`, `10984005` |
+| Ordered evidence IDs | `5691302`, `24494539`, `14606752`, `37619697`, `10984005` |
+| Citation integrity | passed; every recorded citation resolves to one of the five displayed and independently reproduced parent IDs |
 | Answer boundary | concludes that the evidence is insufficient for the claim's causal wording |
-| Completion evidence | API access log recorded HTTP 200 at `2026-09-18T14:13:02.421691968Z` |
 
-The preflight client reached its 30-second command boundary after the complete response body had
-been written but before its timing footer was retained. The exact request duration is therefore
-not claimed. The API log shows that first-request model initialization began before completion.
-The supplied recording independently captures the visible warm request and matching result.
+The response text visible in the recording cites all five retrieved parents and distinguishes an
+association between antidepressant use and stroke from the unsupported mechanism claim that side
+effects cause that risk. The authentication request reproduces the exact displayed parent set and
+order without making a second generative request.
 
 ## Runtime provenance
 
 | Component | Evidence |
 |---|---|
+| Application source | `e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c`; GitHub and local history resolve it, and its 2026-09-18T01:57:56Z commit precedes the API image creation by about 78 seconds |
 | API | `health/v1`, `ok`; container image ID `sha256:03f52076e78d2359fe05f466843d7241a387cf5e0690c13e0271e9cbb305823c` |
 | API publication | `127.0.0.1:8090->80/tcp`; no public listener added |
 | PostgreSQL | `scifact-rag-postgres:pg17-pgvector0.8.6-vchord-bm250.3.0`; healthy |
@@ -80,12 +80,12 @@ runtime image changed.
 
 | Published file | Contract | Bytes | SHA-256 |
 |---|---|---:|---|
-| `docs/assets/showcase/scifact-ui-answer-evidence.gif` | 24.00 s; 960x540; 12 fps; actual segments 00:07–00:16, 00:28–00:32, 00:39–00:44, and 01:02–01:08 | 11,392,308 | `170acf25d886766a17ec61c9e4f7dae14d663b46237e4a707517bc678be339eb` |
+| `docs/assets/showcase/scifact-ui-answer-evidence.gif` | 24.00 s; 960x540; 12 fps; actual segments 00:07–00:16, 00:28–00:31, 00:39–00:44, and 01:09–01:16 | 12,820,727 | `cb21f7911ff5e20014feb5031366d2dbee21baffb71bef6912163a0881cde640` |
 | `docs/showcase/scifact-ui/scifact-ui-full.mp4` | complete edited master; 100.80 s; 1280x720; H.264 High; 30 fps; no audio | 12,713,699 | `8459520127d2e3cd0e6fb5047c0923fcbd78a397a7b780c2e99f1f02e48dc7bc` |
 | `docs/showcase/scifact-ui/scifact-ui-poster.png` | answer-state poster; 1280x720 | 441,047 | `dc13382b1d772408bb9521a96bddcb1ed349ebbd6c54df5f7687e7fd1a7c0c07` |
-| `docs/showcase/scifact-ui/scifact-ui-full.vtt` | five English descriptive cues with the time-edit disclosure | 780 | `ac2674b100486a873fd8f3c807455db74c308420d2d922b5c4b850d5b3e13532` |
+| `docs/showcase/scifact-ui/scifact-ui-full.vtt` | five English descriptive cues with both edit boundaries and the research-only limitation | 989 | `a9633c4c1896f52739e1b2eb522959f219052176caa50d75c37a7ba024d2692a` |
 
-The combined committed media is 24,547,054 bytes (23.41 MiB), below the frozen 25 MiB ceiling.
+The combined committed media is 25,976,462 bytes (24.77 MiB), below the frozen 25 MiB ceiling.
 The GIF further condenses idle and scrolling intervals but uses only frames from the edited master.
 The Pages copy and captions disclose both boundaries. Mechanical and public route verification are
 recorded separately below when complete.
@@ -95,7 +95,7 @@ recorded separately below when complete.
 | Check | Result |
 |---|---|
 | Cut-transition contact sheet | passed; unchanged waiting is followed by the actual completed answer |
-| Poster and GIF frame inspection | passed; corrected claim/result remain legible at published dimensions |
+| Poster and GIF frame inspection | passed; the recorded claim/result remain legible and the GIF holds on parent evidence document `5691302` for its final seven seconds |
 | Static reference parser | passed; all four local page references resolve to committed files |
 | Local HTTP routes | passed; page, CSS, GIF, MP4, poster, and VTT returned HTTP 200 with exact byte counts |
 | Repository harness | passed through `python3 tools/harness_check.py` |
@@ -105,17 +105,16 @@ recorded separately below when complete.
 This evidence validates the assets and static publication shape, not cross-browser playback or a
 public deployment. Those claims require the integrated exact revision and live Pages responses.
 
-## Attempt 1 independent review
+## Independent review and owner disposition
 
-Independent review rejected commit `8f23f6c` before the final gate or publication. Frame-level
-inspection showed that the recorded UI actually submitted `Side effects of antidepressants
-increase the risk of stroke.`, omitting the required words `associated with`. The recording also
-shows evidence document `24494539`, while the corrected-claim preflight supplied `23627419` in its
-place. The media therefore cannot be relabeled as the corrected request and is not eligible for
-integration or Pages publication.
+Independent review of commit `8f23f6c` correctly found that its page described a different planned
+query than the one visibly recorded. The owner clarified that the actual wording is grammatically
+correct, materially suitable for the showcase, and should be accepted rather than rerecorded.
+Issue #25 and the engineering-loop contract now name the actual request, result, and owner-selected
+source edit. A fresh exact-query search reproduced all five recorded evidence parents in order.
 
-The same review found that the GIF ended at the `Supplied evidence` heading before the cited parent
-card became visible, the MP4 exceeded Issue #25's retained 45-60 second boundary, the public edit
-copy omitted the source endpoint trim, the page lacked an authenticated exact source revision, and
-the VTT lacked a final research-only cue. Attempt 2 requires a replacement live capture and new
-derivatives. The existing files remain only as preserved failed-attempt evidence until replacement.
+The same review found four independent presentation defects: the GIF ended before the cited parent
+card became visible, public copy omitted the 01:50 source endpoint, the page lacked the exact source
+revision, and the VTT lacked a final research-only cue. Revision 2 repairs each defect without
+changing the recording, answer, application, runtime, or publication topology. It remains pending
+fresh independent review, the final repository gate, and public Pages verification.
