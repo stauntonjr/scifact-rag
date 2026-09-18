@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import math
 import os
@@ -58,6 +59,16 @@ def preflight_ids(prompts):
 def arm_order(index):
     shift = index % 3
     return ARMS[shift:] + ARMS[:shift]
+
+
+class ReceivedResponseError(ValueError):
+    """A complete HTTP response was received but cannot satisfy the wire contract."""
+
+    def __init__(self, reason, status, body):
+        super().__init__(reason)
+        self.reason = reason
+        self.status = status
+        self.body = body
 
 
 class Coordinator:
@@ -118,7 +129,35 @@ class Coordinator:
             seconds = self.clock() - start
             if seconds >= 60 or self.elapsed() > min(5400, ceiling):
                 raise TimeoutError("total request deadline")
-            terminal = {**event, "status": "completed", "response": response, "seconds": seconds}
+            reason = None
+            if kind == "reader":
+                if not isinstance(response, dict) or response.get("model") != READER:
+                    reason = "reader_model_mismatch"
+                elif (
+                    not isinstance(response.get("usage"), dict)
+                    or type(response["usage"].get("prompt_tokens")) is not int
+                    or response["usage"]["prompt_tokens"] != metadata.get("input_tokens")
+                ):
+                    reason = "reader_prompt_tokens_mismatch"
+            terminal = {
+                **event,
+                "status": "failed" if reason else "completed",
+                "response": response,
+                "seconds": seconds,
+            }
+            if reason:
+                self.halted = True
+                terminal["failure_reason"] = reason
+        except ReceivedResponseError as exc:
+            self.halted = True
+            terminal = {
+                **event,
+                "status": "failed",
+                "failure_reason": exc.reason,
+                "http_status": exc.status,
+                "raw_body_base64": base64.b64encode(exc.body).decode("ascii"),
+                "seconds": self.clock() - start,
+            }
         except Exception as exc:  # noqa: BLE001 - any uncertain transport outcome halts dispatch
             self.halted = True
             terminal = {
@@ -154,8 +193,16 @@ class HttpTransport:
                 response = client.post(
                     self.runtime[role]["base_url"].rstrip("/") + suffix, json=payload
                 )
-                response.raise_for_status()
-                return response.json()
+                if not response.is_success:
+                    raise ReceivedResponseError(
+                        "http_status", response.status_code, response.content
+                    )
+                try:
+                    return response.json()
+                except (ValueError, UnicodeDecodeError) as exc:
+                    raise ReceivedResponseError(
+                        "http_json_decode", response.status_code, response.content
+                    ) from exc
         finally:
             signal.setitimer(signal.ITIMER_REAL, 0)
             signal.signal(signal.SIGALRM, previous)
@@ -295,13 +342,7 @@ def run(
             )
             reader_seconds.append(event["seconds"])
             if event["status"] != "completed":
-                raise RuntimeError("reader uncertainty")
-            response = event["response"]
-            if (
-                response.get("model") != READER
-                or response.get("usage", {}).get("prompt_tokens") != request["input_tokens"]
-            ):
-                raise RuntimeError("live identity or token accounting mismatch")
+                raise RuntimeError(event.get("failure_reason", "reader uncertainty"))
 
     try:
         for pid in preflight:

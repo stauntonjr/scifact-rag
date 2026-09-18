@@ -74,7 +74,7 @@ def test_no_dispatch_with_less_than_sixty_seconds_remaining(tmp_path):
     assert not (tmp_path / "ledger.jsonl").exists()
 
 
-def synthetic_run(tmp_path, monkeypatch, *, fail=False):
+def synthetic_run(tmp_path, monkeypatch, *, fail=False, reader_failure=None):
     import importlib
 
     reader = importlib.import_module("evidence_inference_reader")
@@ -150,11 +150,14 @@ def synthetic_run(tmp_path, monkeypatch, *, fail=False):
                     {"index": i, "relevance_score": 1} for i in range(len(payload["documents"]))
                 ]
             }
+        third_reader = sum(k == "reader" for k, _ in calls) == 3
         return {
-            "model": reader.READER,
+            "model": "wrong-model" if third_reader and reader_failure == "model" else reader.READER,
             "choices": [{"message": {"content": '{"label":"decreased"}'}}],
             "usage": {
-                "prompt_tokens": sum(len(m["content"]) for m in payload["messages"]) + 10,
+                "prompt_tokens": sum(len(m["content"]) for m in payload["messages"])
+                + 10
+                + int(third_reader and reader_failure == "tokens"),
                 "completion_tokens": 6,
             },
         }
@@ -296,3 +299,65 @@ def test_evaluator_rejects_tampered_selected_coordinates(tmp_path, monkeypatch):
     reader.write_jsonl(ledger, events)
     with pytest.raises(ValueError, match="selected"):
         reader.evaluate(prepared, ledger, tmp_path / "evaluation")
+
+
+@pytest.mark.parametrize(
+    "failure,reason",
+    [("model", "reader_model_mismatch"), ("tokens", "reader_prompt_tokens_mismatch")],
+)
+def test_reader_identity_failure_on_third_arm_cannot_be_scored_as_triplet(
+    tmp_path, monkeypatch, failure, reason
+):
+    reader, prepared, _, output, calls, result = synthetic_run(
+        tmp_path, monkeypatch, reader_failure=failure
+    )
+    assert len(calls) == 4  # one selector and three reader calls; no second prompt
+    assert result["status"] == "partial"
+    events = reader.read_jsonl(output / "ledger.jsonl")
+    assert events[-1]["status"] == "failed"
+    assert events[-1]["failure_reason"] == reason
+    assert events[-1]["response"]["choices"][0]["message"]["content"] == '{"label":"decreased"}'
+    report = reader.evaluate(prepared, output / "ledger.jsonl", tmp_path / "evaluation")
+    assert report["complete_triplets"] == 0
+    assert report["arms"]["oracle"]["count"] == 1
+    assert report["arms"]["oracle"]["failed"] == 1
+    assert report["arms"]["oracle"]["classes"]["decreased"]["false_negative"] == 1
+    assert report["arms"]["oracle"]["accuracy"] == 0
+
+
+@pytest.mark.parametrize(
+    "status,body,reason",
+    [
+        (503, b"synthetic service unavailable", "http_status"),
+        (200, b"synthetic invalid JSON", "http_json_decode"),
+    ],
+)
+def test_received_http_failure_is_retained_and_halts_without_retry(
+    tmp_path, monkeypatch, status, body, reason
+):
+    import base64
+
+    import httpx
+
+    calls = []
+
+    def post(*args, **kwargs):
+        calls.append(1)
+        return httpx.Response(
+            status, content=body, request=httpx.Request("POST", "http://invalid.test")
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", post)
+    coordinator = runner.Coordinator(
+        tmp_path / "ledger.jsonl",
+        runner.HttpTransport({"reader": {"base_url": "http://invalid.test"}}),
+    )
+    event = coordinator.dispatch("reader", {}, "p", "a", "full", input_tokens=1)
+    assert event["status"] == "failed"
+    assert event["failure_reason"] == reason
+    assert event["http_status"] == status
+    assert base64.b64decode(event["raw_body_base64"]) == body
+    assert runner.read_jsonl(tmp_path / "ledger.jsonl")[-1] == event
+    with pytest.raises(RuntimeError, match="halted"):
+        coordinator.dispatch("reader", {}, "q", "a", "full", input_tokens=1)
+    assert len(calls) == 1
