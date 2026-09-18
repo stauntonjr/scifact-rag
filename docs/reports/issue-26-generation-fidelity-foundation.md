@@ -89,6 +89,12 @@ revision.
 No criterion is waived. Independent review and the revision-bound verdict remain engineering-loop
 evidence and must precede integration.
 
+The first independent review reproduced three AC2 defects: category-mismatched annotations were
+accepted, browser completion did not apply annotation invariants, and the HTML builder overwrote a
+retained destination. Attempt 2 repairs all three with focused Python and executable JavaScript
+regressions plus v1/v2 retained-path tests. A fresh independent verdict on the repaired candidate
+is still required; the superseded revise verdict remains preserved in the loop record.
+
 ## 8. Baseline-relative write scope and violations
 
 `VERIFIED`: The loop began at clean commit `0c23bbc2` in isolated branch
