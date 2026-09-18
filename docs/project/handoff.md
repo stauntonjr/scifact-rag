@@ -1,5 +1,16 @@
 # Project handoff
 
+## Fixed-reader protocol
+
+[Issue #21](https://github.com/stauntonjr/scifact-rag/issues/21) prepares the
+[prospective protocol](../research/evidence-inference-reader-protocol.md), frozen 101-prompt
+cohort and [implementation plan](../superpowers/plans/2026-09-18-evidence-inference-reader.md).
+It specifies three context arms and ceilings of 303 reader requests, 101 selector requests and
+90 minutes including preflight. These are allocation limits, not measured throughput. DGX read-only
+inspection found Lattice's native fit active, so no inference was attempted. Next is model-free
+adapter implementation; execution still requires exact runtime identity, a free GPU allocation and
+the bounded latency preflight. No model result or Lattice change is claimed.
+
 ## Source and rights qualification followup
 
 [Issue #19](https://github.com/stauntonjr/scifact-rag/issues/19) screens the same 45 candidate

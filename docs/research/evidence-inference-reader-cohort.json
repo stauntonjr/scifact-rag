@@ -1,0 +1,335 @@
+{
+  "archive_sha256": "6abe0d4ec0d331834981c0171c3c79d47515761867f82f1dc6066e43863a1586",
+  "article_count": 20,
+  "articles": [
+    {
+      "archive_source_sha256": "4a882ee0213fb15d95e0bef49fb2a2426ce25fe18d0f8de9fa189351d6a605cd",
+      "article_id": "2762857",
+      "pinned_txt_sha256": "7dc698ced0240832bf156398936c741fa842835a23e2df1646bdc2bc42c82318",
+      "pinned_xml_sha256": "79a12f0690850768422c5c83aaa35703df9cc05fbbee9fad23ab48f1f0b7476b",
+      "prompt_ids": [
+        "8173",
+        "8174",
+        "8175",
+        "8176",
+        "8177",
+        "8178",
+        "8179"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "e4df13814844b873f577cc452cfd563402678d8da53aa1d8a89df73df38db9d0",
+      "article_id": "3292461",
+      "pinned_txt_sha256": "dca06a99242486c8bd54c32471286cc538283ff6ea46c624dbce62feabed9e48",
+      "pinned_xml_sha256": "b8d7da0b5488e6cf345f12ec6790eab908c8ce3be659cc50707d922febccebd6",
+      "prompt_ids": [
+        "7758",
+        "7759",
+        "7760",
+        "7761",
+        "7762"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "1ae76f2c17e1980d2ece05add713d7f3e241e304268d1a5cedb0725d5069122b",
+      "article_id": "3685599",
+      "pinned_txt_sha256": "95a0f9b00ee09f7310b03e4be3e521e526a63be1d318599b30de42b87187a3d4",
+      "pinned_xml_sha256": "b63bf3667fb21ab41c17f396c671078df2a5fffdd36c34b915e77e48e983b5f5",
+      "prompt_ids": [
+        "9000",
+        "9001",
+        "9002",
+        "9004",
+        "9005",
+        "9006",
+        "9007",
+        "9008",
+        "9009",
+        "9010",
+        "9011"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "a12dc9011a3e843ba322c123eb28de8c610e320ddf7820d03c799982c1cc7f55",
+      "article_id": "3712961",
+      "pinned_txt_sha256": "5f9e38582618ec5752f0de77f4ec49b1ece3336fb3440c1dacc3d6f4511f15cc",
+      "pinned_xml_sha256": "ac9231e5f140a2d19578165587492fc56ab9f5798b3982b85360d235560411ab",
+      "prompt_ids": [
+        "3586"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "df6b3c4532e8b42caa67603a4f7e47b668ae1da00c5b2c41dd110836e47c7059",
+      "article_id": "3848942",
+      "pinned_txt_sha256": "cece58539ec44ad87ba1210eb410c6f5fdde607afb4794d32161a9b8f3c7cb5d",
+      "pinned_xml_sha256": "b0abd81413ea2d68a21fe879333c6673042cb4f5590d91db7741f03e8908cd31",
+      "prompt_ids": [
+        "8354",
+        "8355",
+        "8356",
+        "8357",
+        "8358",
+        "8359"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "1e03a651bb36573f1614e1a370d4349b7e13a97000d1ef74ced3565fbd2403c7",
+      "article_id": "3994324",
+      "pinned_txt_sha256": "e0a5e28f2f616e5ceecbccfd362119ee2a63ecba86486255bcc310598ba5a42e",
+      "pinned_xml_sha256": "57a01c11a93b01e3bae6b1103f2727c260de5829d62cb28cd100c1208dc96e40",
+      "prompt_ids": [
+        "3218",
+        "3219",
+        "3220",
+        "3221"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "e5df40315a8b23222cbbdd28f59e4f12751b72d8f07c0ce2055f4e22719cb1bc",
+      "article_id": "4056784",
+      "pinned_txt_sha256": "00950525b786d6b6c36dbf7eacc9ec05d67750f5adca0bff8de7eb83aa04d934",
+      "pinned_xml_sha256": "18bd129843711222b1f007b992f714059d35797477b25af31ce3716d1d733681",
+      "prompt_ids": [
+        "7678",
+        "7681",
+        "7683"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "1da9e30966769b943543883bfcb68b7de0ede5ef0bc78332b29ac16c51669875",
+      "article_id": "4081799",
+      "pinned_txt_sha256": "c904f74cc62b4b57b6216a3537f7ae9904771b46f4f4647378c49583538d7956",
+      "pinned_xml_sha256": "3514bbd01d0f4220d87c967d5cbafd0abd11b662b3c32105e6099e04956a4836",
+      "prompt_ids": [
+        "8696",
+        "8697",
+        "8698",
+        "8699",
+        "8700"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "7992f9a84c46927e34fe57b44c7a007443cf28704bd7da6d77af69c74f223b48",
+      "article_id": "4220866",
+      "pinned_txt_sha256": "c58d562010c46780d00a4cd5a078b67337d236e9a262865659b7c93b70fce7ca",
+      "pinned_xml_sha256": "a7d301537a95a41fa562774de3de1c6b42360ddfa7a2959b08e28b03cd8d7eb9",
+      "prompt_ids": [
+        "6027",
+        "6028"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "27820696bdf1d2d9888102ce72005a8a991ada3db214a6aba200a88063a129a6",
+      "article_id": "4230312",
+      "pinned_txt_sha256": "fe5549588de53f8e402e8dbb0d828f09dea52b5e1328dff04d19ce946d3ea9da",
+      "pinned_xml_sha256": "99bf558c3291f4ff3b3f5f5fb2042c0099ffccd9c1c4af812df742588ce5e80a",
+      "prompt_ids": [
+        "7829",
+        "7830"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "df9403446562fa5f6fee31f77f167751d6033a7ea4529b8e93148944645673bf",
+      "article_id": "4590893",
+      "pinned_txt_sha256": "4e7129633e27f96fa46f9a86cc4e57574558b7817217861b95c677a8aee0db3f",
+      "pinned_xml_sha256": "a1d082738de8fda6c17473891a79b2a4b1d547b620e3849f1ce575dd89464ef4",
+      "prompt_ids": [
+        "10128",
+        "10129",
+        "10130",
+        "10131",
+        "10132",
+        "10133"
+      ],
+      "recognized_cc_licenses": [
+        "by/3.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "28a7686702817fce70b5a4ceb681f268a668910b70c6688431be8f4631888488",
+      "article_id": "4620004",
+      "pinned_txt_sha256": "6e952bd1d957242888a7485fdcdfb358e1e2b651834209bb6bb3920a4e65b289",
+      "pinned_xml_sha256": "00a41bdaedb8856856b3edf5aa34b2463d4da84ecd90cd7f336aa88569f724aa",
+      "prompt_ids": [
+        "6490",
+        "6491",
+        "6493",
+        "6495"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "4d23d399cc05fb1f8b53c47f2ebfeef3b0c9ab211c4452dda9f319cc84a24e2c",
+      "article_id": "4737200",
+      "pinned_txt_sha256": "1d2a725a9f908a88e7bdbf3a6bd10fda6776a7f315d138c1240e4a9c2d5f7814",
+      "pinned_xml_sha256": "63f4ba0ea22aa80de459e71440fd1c1b5b555130f63ceccd1f71f03527959295",
+      "prompt_ids": [
+        "1674",
+        "1675",
+        "1676",
+        "1677",
+        "1678",
+        "1679",
+        "1680",
+        "1681",
+        "1682",
+        "1683",
+        "1684",
+        "1685",
+        "1686",
+        "1687"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "328dcc3821eeaf1f22177285d98953caa4800e803cd483f88e9f819180470494",
+      "article_id": "4844154",
+      "pinned_txt_sha256": "5f4999b3bdbbbaa1ff23ff1755d61c2de3a9e0ff668eaeac76864046a9299dbc",
+      "pinned_xml_sha256": "bc1918f22779aabfd3821e386a85b681067a74d7f94ba8109d303c470e01738a",
+      "prompt_ids": [
+        "3952",
+        "3953",
+        "3954",
+        "3955"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "b3ab099a1ab9cb96ea6e389bb078f10c1154e4525b2d84b32b442c210d25c9b2",
+      "article_id": "4899895",
+      "pinned_txt_sha256": "31f666b8c931b4e6872f92fc4e22f1683f32aa9c275dd079ee5502e2bb5d42e7",
+      "pinned_xml_sha256": "b5033885cba292fff267a1046c6293cf39244a29f46a4fc6d769f0c5f2568541",
+      "prompt_ids": [
+        "5411",
+        "5412",
+        "5413",
+        "5414",
+        "5415",
+        "5416"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "cfe0478cc98e9070d0a8980533ba0c13f4e7a0c3e11cb93dbd0c0eb015b559bf",
+      "article_id": "5054611",
+      "pinned_txt_sha256": "0cb937f9b616c32ba0cdd14d25e42dc3436cdcbb246532abfe3572104e8435fa",
+      "pinned_xml_sha256": "a4a16b2543ba0a78a0f762c24f76ad289be10e24f356b1667b64167563b33086",
+      "prompt_ids": [
+        "2429",
+        "2430",
+        "2431",
+        "2432",
+        "2433",
+        "2434",
+        "2435"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "e78f4658243f7f7c6d09f95b08f0b3c44d7d91f65e361d6d44b88a1e4fa96221",
+      "article_id": "522822",
+      "pinned_txt_sha256": "acd9cf6a593a387bd3d523cb5f8709382461550ee38baa045282c157389804dc",
+      "pinned_xml_sha256": "1b4732364a01a5620669a2691769f57243cacfb0f31f7871b615bebd45a0ccc6",
+      "prompt_ids": [
+        "3549"
+      ],
+      "recognized_cc_licenses": [
+        "by/2.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "56818bca78af9a56aef4da3e1717cf9f3627028715cdee83e942c78cb3a24c0d",
+      "article_id": "5440538",
+      "pinned_txt_sha256": "f9a3c62c3d2465e636d11189e7466e36dff05c576f6d4b66d4365c8fb332a974",
+      "pinned_xml_sha256": "0a3d22a7c12ff35d4dd139fb885a38e9240254871adfb2507afd88408e1051a3",
+      "prompt_ids": [
+        "5564",
+        "5565",
+        "5566",
+        "5567",
+        "5569"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "28bf85043f7bde643987fd27c0c1596c99b782a2b96d8e771b2eca4651422d1d",
+      "article_id": "5672307",
+      "pinned_txt_sha256": "1e980c8251e42e137d2655a7605275554a3e25377f9b0be607964a564992635f",
+      "pinned_xml_sha256": "7be7bb4a63da8727d97595cb302b2798d4e3995ecda6aee935359a4d825270fc",
+      "prompt_ids": [
+        "9850",
+        "9851",
+        "9852",
+        "9853"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    },
+    {
+      "archive_source_sha256": "6b7c37e43691a7265d7c063d1cda8f47fbc098272afd9c4347fbb238351d5495",
+      "article_id": "5742644",
+      "pinned_txt_sha256": "89832484fb0f27aa5da6cbe69cb1638fae3f191a2eebd29ba4da7a1906bbaeb1",
+      "pinned_xml_sha256": "b3eeb5de064b6b5ca7b81c3de00fe187acf2826f52949d89f82c507c7b42963e",
+      "prompt_ids": [
+        "1708",
+        "1710",
+        "1711",
+        "1712"
+      ],
+      "recognized_cc_licenses": [
+        "by/4.0"
+      ]
+    }
+  ],
+  "coordinate_manifest_sha256": "0565254b5faff2bd0b6fad630f800a85cb37939c7f93b3baf5cb8f389d2a4ced",
+  "decision": "prospective_cohort_no_execution",
+  "prompt_count": 101,
+  "protocol_id": "ei-fixed-reader-v1",
+  "provenance_manifest_sha256": "6f5d95c44c468c64520c5c6ae43e51ed7bf43ad548b0e20915e5bb42c498f41f",
+  "provenance_summary_sha256": "685119f55eb8204bbbc72364120b881b1fa2382938ba7e71a77df30121227e81",
+  "schema_version": 1,
+  "source_commit": "9fd7a311f2dee69b48f079d7bb37e561c64010d3"
+}
