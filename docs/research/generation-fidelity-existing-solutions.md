@@ -57,4 +57,3 @@ statistical power remain unknown because no source pool or hidden cases were ope
 
 Reopen this decision if the owner changes the target task, accepts a public benchmark as
 confirmation, selects a source corpus, changes the rights boundary, or authorizes model execution.
-

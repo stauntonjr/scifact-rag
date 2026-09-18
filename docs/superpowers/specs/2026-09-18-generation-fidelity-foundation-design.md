@@ -274,4 +274,3 @@ collected as one batch before any repair.
 6. Record release impact, run the one final full gate, and stabilize the candidate.
 7. Obtain independent review and reconcile findings under the engineering-loop contract.
 8. Update handoff/report and finish the loop without starting candidate or confirmation work.
-
