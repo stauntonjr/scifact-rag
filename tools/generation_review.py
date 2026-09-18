@@ -13,7 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "generation-human-review/v1"
+SCHEMA_VERSION_V1 = "generation-human-review/v1"
+SCHEMA_VERSION_V2 = "generation-human-review/v2"
+SCHEMA_VERSION = SCHEMA_VERSION_V1
 FROZEN_WORKSHEET_SHA256 = "f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2"
 TOP_LEVEL_FIELDS = {"completed_at", "reviewer", "rows", "schema_version", "selection_protocol"}
 ROW_FIELDS = {"answer", "claim", "evidence", "response_id", "review"}
@@ -29,6 +31,25 @@ REVIEW_OPTIONS = {
     "qualifier_omission": {"yes", "no", "not_applicable", "uncertain"},
 }
 REVIEW_FIELDS = set(REVIEW_OPTIONS) | {"notes"}
+REVIEW_OPTIONS_V2 = {
+    **REVIEW_OPTIONS,
+    "causal_strengthening": {"yes", "no", "not_applicable", "uncertain"},
+    "population_generalization": {"yes", "no", "not_applicable", "uncertain"},
+}
+REVIEW_FIELDS_V2 = set(REVIEW_OPTIONS_V2) | {"material_errors", "notes"}
+MATERIAL_ERROR_CATEGORIES = {
+    "causal_strengthening",
+    "comparison_change",
+    "intervention_change",
+    "negation_loss",
+    "outcome_change",
+    "population_generalization",
+    "qualifier_loss",
+    "unsupported_claim",
+}
+SPAN_FIELDS = {"end", "start"}
+EVIDENCE_SPAN_FIELDS = {"end", "evidence_index", "start"}
+MATERIAL_ERROR_FIELDS = {"answer_span", "category", "evidence_absent", "evidence_spans"}
 RESPONSE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -53,14 +74,156 @@ def _nonempty_text(value: object, location: str, errors: list[str]) -> None:
         errors.append(f"{location} must be non-empty text")
 
 
+def _validate_span(
+    value: object,
+    text: object,
+    location: str,
+    errors: list[str],
+    *,
+    expected_fields: set[str] = SPAN_FIELDS,
+) -> tuple[int, int] | None:
+    _unexpected(value, expected_fields, location, errors)
+    if not isinstance(value, dict):
+        return None
+    start = value.get("start")
+    end = value.get("end")
+    if (
+        isinstance(start, bool)
+        or not isinstance(start, int)
+        or isinstance(end, bool)
+        or not isinstance(end, int)
+    ):
+        errors.append(f"{location} offsets must be integers")
+        return None
+    if not isinstance(text, str) or not 0 <= start < end <= len(text):
+        errors.append(f"{location} must satisfy 0 <= start < end <= text length")
+        return None
+    return start, end
+
+
+def _validate_v2_material_errors(
+    row: dict[str, Any],
+    review: dict[str, Any],
+    location: str,
+    errors: list[str],
+    *,
+    require_complete: bool,
+) -> None:
+    annotations = review.get("material_errors")
+    annotation_location = f"{location}.review.material_errors"
+    if not isinstance(annotations, list):
+        errors.append(f"{annotation_location} must be a list")
+        return
+    if not require_complete and annotations:
+        errors.append(f"{annotation_location} must be empty in build input")
+
+    evidence = row.get("evidence")
+    evidence_items = evidence if isinstance(evidence, list) else []
+    duplicate_keys: set[tuple[str, int, int]] = set()
+    valid_annotations = 0
+    for annotation_index, annotation in enumerate(annotations):
+        item_location = f"{annotation_location}[{annotation_index}]"
+        error_count = len(errors)
+        _unexpected(annotation, MATERIAL_ERROR_FIELDS, item_location, errors)
+        if not isinstance(annotation, dict):
+            continue
+
+        category = annotation.get("category")
+        if category not in MATERIAL_ERROR_CATEGORIES:
+            errors.append(f"{item_location}.category is invalid")
+        answer_span = _validate_span(
+            annotation.get("answer_span"),
+            row.get("answer"),
+            f"{item_location}.answer_span",
+            errors,
+        )
+
+        evidence_absent = annotation.get("evidence_absent")
+        if not isinstance(evidence_absent, bool):
+            errors.append(f"{item_location}.evidence_absent must be a boolean")
+        evidence_spans = annotation.get("evidence_spans")
+        if not isinstance(evidence_spans, list):
+            errors.append(f"{item_location}.evidence_spans must be a list")
+            evidence_spans = []
+        elif bool(evidence_spans) == (evidence_absent is True):
+            errors.append(
+                f"{item_location} must use exactly one of evidence_spans or evidence_absent=true"
+            )
+
+        for span_index, span in enumerate(evidence_spans):
+            span_location = f"{item_location}.evidence_spans[{span_index}]"
+            _unexpected(span, EVIDENCE_SPAN_FIELDS, span_location, errors)
+            if not isinstance(span, dict):
+                continue
+            evidence_index = span.get("evidence_index")
+            if (
+                isinstance(evidence_index, bool)
+                or not isinstance(evidence_index, int)
+                or not 0 <= evidence_index < len(evidence_items)
+            ):
+                errors.append(f"{span_location}.evidence_index is out of bounds")
+                continue
+            evidence_item = evidence_items[evidence_index]
+            evidence_text = evidence_item.get("text") if isinstance(evidence_item, dict) else None
+            _validate_span(
+                span,
+                evidence_text,
+                span_location,
+                errors,
+                expected_fields=EVIDENCE_SPAN_FIELDS,
+            )
+
+        if isinstance(category, str) and answer_span is not None:
+            duplicate_key = (category, *answer_span)
+            if duplicate_key in duplicate_keys:
+                errors.append(f"{item_location} is a duplicate material error")
+            duplicate_keys.add(duplicate_key)
+        if len(errors) == error_count:
+            valid_annotations += 1
+
+    if not require_complete:
+        return
+
+    definite_material_error = (
+        review.get("grounded") == "no"
+        or review.get("material_overstatement") == "present"
+        or review.get("causal_strengthening") == "yes"
+        or review.get("population_generalization") == "yes"
+        or any(
+            review.get(field) == "yes"
+            for field in (
+                "comparison_omission",
+                "intervention_omission",
+                "negation_omission",
+                "outcome_omission",
+                "population_omission",
+                "qualifier_omission",
+            )
+        )
+    )
+    if definite_material_error and valid_annotations == 0:
+        errors.append(f"{location}.review requires a material error annotation")
+    elif not definite_material_error and annotations:
+        errors.append(f"{location}.review clean pass must not contain material errors")
+
+
 def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any]:
     """Validate a frozen blank worksheet or a completed human-review export."""
     errors: list[str] = []
     _unexpected(data, TOP_LEVEL_FIELDS, "worksheet", errors)
     if not isinstance(data, dict):
         raise ReviewValidationError("; ".join(errors))
-    if data.get("schema_version") != SCHEMA_VERSION:
-        errors.append(f"schema_version must be {SCHEMA_VERSION}")
+    schema_version = data.get("schema_version")
+    if schema_version == SCHEMA_VERSION_V1:
+        review_options = REVIEW_OPTIONS
+        review_fields = REVIEW_FIELDS
+    elif schema_version == SCHEMA_VERSION_V2:
+        review_options = REVIEW_OPTIONS_V2
+        review_fields = REVIEW_FIELDS_V2
+    else:
+        errors.append(f"schema_version must be {SCHEMA_VERSION_V1} or {SCHEMA_VERSION_V2}")
+        review_options = REVIEW_OPTIONS
+        review_fields = REVIEW_FIELDS
     _nonempty_text(data.get("selection_protocol"), "selection_protocol", errors)
     rows = data.get("rows")
     if not isinstance(rows, list) or not rows:
@@ -112,11 +275,11 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
                     _nonempty_text(item.get(field), f"{evidence_location}.{field}", errors)
 
         review = row.get("review")
-        _unexpected(review, REVIEW_FIELDS, f"{location}.review", errors)
+        _unexpected(review, review_fields, f"{location}.review", errors)
         if not isinstance(review, dict):
             continue
         row_incomplete = False
-        for field, allowed in REVIEW_OPTIONS.items():
+        for field, allowed in review_options.items():
             value = review.get(field)
             if require_complete:
                 if value not in allowed:
@@ -129,6 +292,14 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
                 row_incomplete = True
         elif notes is not None:
             errors.append(f"{location}.review.notes must be null in build input")
+        if schema_version == SCHEMA_VERSION_V2:
+            _validate_v2_material_errors(
+                row,
+                review,
+                location,
+                errors,
+                require_complete=require_complete,
+            )
         if row_incomplete:
             incomplete_rows.append(index)
 

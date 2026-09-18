@@ -73,6 +73,44 @@ def _worksheet(*, complete: bool = False) -> dict[str, object]:
     }
 
 
+def _v2_review_values(*, complete: bool, material_error: bool = False) -> dict[str, object]:
+    values: dict[str, object] = {
+        **_review_values("complete" if complete else None),
+        "causal_strengthening": (
+            "yes" if complete and material_error else ("no" if complete else None)
+        ),
+        "population_generalization": "no" if complete else None,
+        "material_errors": [],
+    }
+    if complete and material_error:
+        values["grounded"] = "no"
+        values["material_overstatement"] = "present"
+        values["material_errors"] = [
+            {
+                "category": "causal_strengthening",
+                "answer_span": {"start": 0, "end": 3},
+                "evidence_spans": [{"evidence_index": 0, "start": 0, "end": 3}],
+                "evidence_absent": False,
+            }
+        ]
+    return values
+
+
+def _v2_worksheet(*, complete: bool = False, material_error: bool = False) -> dict[str, object]:
+    data = _worksheet(complete=complete)
+    data["schema_version"] = "generation-human-review/v2"
+    data["selection_protocol"] = "docs/project/generation-fidelity-v1.md"
+    rows = data["rows"]
+    assert isinstance(rows, list)
+    for row in rows:
+        assert isinstance(row, dict)
+        row["review"] = _v2_review_values(
+            complete=complete,
+            material_error=material_error,
+        )
+    return data
+
+
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(TOOL), *args],
@@ -257,4 +295,157 @@ def test_validator_reports_the_32_character_response_id_contract() -> None:
         module.ReviewValidationError,
         match=r"response_id must be 32 lowercase hexadecimal characters",
     ):
+        module.validate_worksheet(data, require_complete=False)
+
+
+def test_v2_accepts_blank_and_bounded_material_error_annotations() -> None:
+    module = _tool_module()
+
+    blank = module.validate_worksheet(_v2_worksheet(), require_complete=False)
+    completed = module.validate_worksheet(
+        _v2_worksheet(complete=True, material_error=True),
+        require_complete=True,
+    )
+
+    assert blank["schema_version"] == "generation-human-review/v2"
+    assert completed["schema_version"] == "generation-human-review/v2"
+
+
+def test_v2_rejects_material_nonpass_without_annotation() -> None:
+    module = _tool_module()
+    data = _v2_worksheet(complete=True)
+    rows = data["rows"]
+    assert isinstance(rows, list) and isinstance(rows[0], dict)
+    review = rows[0]["review"]
+    assert isinstance(review, dict)
+    review["grounded"] = "no"
+
+    with pytest.raises(module.ReviewValidationError, match="requires a material error annotation"):
+        module.validate_worksheet(data, require_complete=True)
+
+
+def test_v2_rejects_annotation_on_a_clean_pass() -> None:
+    module = _tool_module()
+    data = _v2_worksheet(complete=True, material_error=True)
+    rows = data["rows"]
+    assert isinstance(rows, list) and isinstance(rows[0], dict)
+    review = rows[0]["review"]
+    assert isinstance(review, dict)
+    review.update(
+        {
+            "causal_strengthening": "no",
+            "grounded": "yes",
+            "material_overstatement": "none",
+        }
+    )
+
+    with pytest.raises(module.ReviewValidationError, match="clean pass must not contain"):
+        module.validate_worksheet(data, require_complete=True)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("causal_strengthening", None, "review fields are incomplete"),
+        ("population_generalization", "invented", "review fields are incomplete"),
+    ],
+)
+def test_v2_requires_complete_new_categorical_fields(
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    module = _tool_module()
+    data = _v2_worksheet(complete=True)
+    rows = data["rows"]
+    assert isinstance(rows, list) and isinstance(rows[0], dict)
+    review = rows[0]["review"]
+    assert isinstance(review, dict)
+    review[field] = value
+
+    with pytest.raises(module.ReviewValidationError, match=message):
+        module.validate_worksheet(data, require_complete=True)
+
+
+def test_v2_rejects_unblinding_fields() -> None:
+    module = _tool_module()
+    for location in ("top", "row", "review"):
+        data = _v2_worksheet()
+        rows = data["rows"]
+        assert isinstance(rows, list) and isinstance(rows[0], dict)
+        review = rows[0]["review"]
+        assert isinstance(review, dict)
+        if location == "top":
+            data["candidate_id"] = "candidate-v1"
+        elif location == "row":
+            rows[0]["candidate_id"] = "candidate-v1"
+        else:
+            review["candidate_id"] = "candidate-v1"
+        with pytest.raises(module.ReviewValidationError, match="unexpected fields"):
+            module.validate_worksheet(data, require_complete=False)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("answer-out-of-bounds", "answer_span"),
+        ("evidence-index", "evidence_index"),
+        ("evidence-out-of-bounds", r"evidence_spans\[0\]"),
+        ("both-evidence-modes", "exactly one"),
+        ("neither-evidence-mode", "exactly one"),
+        ("duplicate", "duplicate material error"),
+    ],
+)
+def test_v2_rejects_invalid_material_error_spans(mutation: str, message: str) -> None:
+    module = _tool_module()
+    data = _v2_worksheet(complete=True, material_error=True)
+    rows = data["rows"]
+    assert isinstance(rows, list) and isinstance(rows[0], dict)
+    review = rows[0]["review"]
+    assert isinstance(review, dict)
+    material_errors = review["material_errors"]
+    assert isinstance(material_errors, list) and isinstance(material_errors[0], dict)
+    error = material_errors[0]
+    evidence_spans = error["evidence_spans"]
+    assert isinstance(evidence_spans, list) and isinstance(evidence_spans[0], dict)
+    if mutation == "answer-out-of-bounds":
+        error["answer_span"] = {"start": 0, "end": 999}
+    elif mutation == "evidence-index":
+        evidence_spans[0]["evidence_index"] = 99
+    elif mutation == "evidence-out-of-bounds":
+        evidence_spans[0]["end"] = 999
+    elif mutation == "both-evidence-modes":
+        error["evidence_absent"] = True
+    elif mutation == "neither-evidence-mode":
+        error["evidence_spans"] = []
+    else:
+        material_errors.append(dict(error))
+
+    with pytest.raises(module.ReviewValidationError, match=message):
+        module.validate_worksheet(data, require_complete=True)
+
+
+def test_v2_accepts_explicit_evidence_absence() -> None:
+    module = _tool_module()
+    data = _v2_worksheet(complete=True, material_error=True)
+    rows = data["rows"]
+    assert isinstance(rows, list) and isinstance(rows[0], dict)
+    review = rows[0]["review"]
+    assert isinstance(review, dict)
+    material_errors = review["material_errors"]
+    assert isinstance(material_errors, list) and isinstance(material_errors[0], dict)
+    material_errors[0]["evidence_spans"] = []
+    material_errors[0]["evidence_absent"] = True
+
+    validated = module.validate_worksheet(data, require_complete=True)
+
+    assert validated["schema_version"] == "generation-human-review/v2"
+
+
+def test_review_validator_rejects_unknown_schema_version() -> None:
+    module = _tool_module()
+    data = _v2_worksheet()
+    data["schema_version"] = "generation-human-review/v3"
+
+    with pytest.raises(module.ReviewValidationError, match="schema_version"):
         module.validate_worksheet(data, require_complete=False)
