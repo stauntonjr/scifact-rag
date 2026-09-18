@@ -1,5 +1,14 @@
 # Project handoff
 
+## Coordinate qualification followup
+
+[Issue #17](https://github.com/stauntonjr/scifact-rag/issues/17) qualifies an explicit LF-view,
+half-open coordinate map on the same 64 training articles. The
+[report](../research/evidence-inference-coordinates.md) retains 357 exact mapped spans,
+17 residual mismatches and 16 unavailable spans; all failures remain rejected. Label and
+verification checks leave 195 conditionally eligible prompts before rights/provenance admission.
+Original admission evidence below is unchanged. No model or Lattice work was run; Step 2 is inactive.
+
 ## Successor admission result
 
 [Issue #15](https://github.com/stauntonjr/scifact-rag/issues/15) executed the model-free

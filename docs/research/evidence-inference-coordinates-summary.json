@@ -1,0 +1,46 @@
+{
+  "archive_sha256": "6abe0d4ec0d331834981c0171c3c79d47515761867f82f1dc6066e43863a1586",
+  "coordinate_policy": "Strict UTF-8 decode; CRLF and lone CR to LF; half-open character spans; exact unchanged evidence; unique canonical boundary mapping to original characters and UTF-8 bytes; mapped raw bytes must roundtrip through same newline transformation. No heuristic repairs admitted.",
+  "decision": "coordinate_subset_qualified_not_admitted_pending_provenance",
+  "eligible_articles_before_license": 45,
+  "eligible_prompts_before_license": 195,
+  "eligible_rows_in_eligible_prompts_before_license": 351,
+  "inclusion_policy": "Original label, verification, ICO, publisher caveat and disagreement rules unchanged; exact_mapped replaces inclusive raw span only. Rights remain unresolved; Step 2 inactive.",
+  "limitations": [
+    "Frozen development subset only; not a corpus-wide estimate.",
+    "Mapping is conditional on exact equality, not proof of a universal publisher offset convention.",
+    "Residual diagnostic equality and shifted occurrences are not repairs or causal proof.",
+    "Normalization alone is lossy; retained original bytes and boundary maps preserve source recovery."
+  ],
+  "prompts_with_verified_label_disagreement": 0,
+  "residual_categories": {
+    "exact_text_elsewhere_nonmatching_coordinates": 4,
+    "html_entity_at_supplied_span": 4,
+    "html_entity_text_elsewhere_nonmatching_coordinates": 1,
+    "whitespace_only_at_supplied_span": 8
+  },
+  "residual_classification": "Exclusive first match: whitespace equality, HTML entity equality, combined HTML/whitespace equality at supplied span, unchanged evidence elsewhere, HTML-decoded evidence elsewhere, unexplained. Per-row diagnostic flags may overlap; all residuals rejected.",
+  "row_failure_counts_nonexclusive": {
+    "non_exact_span": 33,
+    "undocumented_label_text": 4,
+    "valid_label_not_true": 2,
+    "valid_reasoning_not_true": 1
+  },
+  "schema_version": 1,
+  "scope": {
+    "annotation_rows": 390,
+    "csv_access": "merged CSV traversed; nonselected rows discarded on PMCID",
+    "heldout_outcomes_inspected": false,
+    "heldout_text_decoded": false,
+    "model_calls": 0,
+    "prompts": 209,
+    "selected_training_articles": 64
+  },
+  "selected_ids_file_sha256": "8aee2a757b3e914036c9750b14d3870c4ceb174a389cd5b480d280d80f7d5021",
+  "span_counts": {
+    "exact_mapped": 357,
+    "mismatch": 17,
+    "publisher_unavailable": 16
+  },
+  "tool_sha256": "0a52e2c17ff24c61a59f2d4d47af6b283bd170d7c2635a1de9fd2e24acbe8f92"
+}
