@@ -2,9 +2,9 @@
 
 Date: 2026-09-17  
 Governing issue: [#13](https://github.com/stauntonjr/scifact-rag/issues/13)  
-Candidate before this report: `d04fda5882aec67d1e2712701545e3c5272e04a5`  
+Deployed repair candidate: `e3bf3b3df4eb0211483fac4b1ec650af3bda36ae`
 Host: `spark-3a8f`, AArch64 NVIDIA DGX Spark  
-API image: `00e659ada1b7` (`linux/arm64`, 11.8 GB)  
+API image: `03f52076e78d` (`linux/arm64`)
 Publication: `127.0.0.1:8090->80/tcp`  
 Browser path: Codex in-app browser proxy `http://localhost:61266/` to the DGX loopback service
 
@@ -26,13 +26,15 @@ unavailable browser automation for those presentation contracts.
 
 ## Candidate and package evidence
 
-The source checkout was clean at `d04fda5` before this report was written. The API image was built
-from that candidate by replacing only the existing `api` container. PostgreSQL remained the same
-healthy container; MCP and GPU model services were not restarted.
+The source checkout was clean at `e3bf3b3` before the repaired image was built. The API image was
+built from that candidate by replacing only the existing `api` container. PostgreSQL remained the
+same healthy container; MCP and GPU model services were not restarted. The deployed JavaScript and
+the candidate source both have SHA-256
+`3263685d9802a700d2290903d3ef7a5f183b35e61234ff0e30c1834ea263699e`.
 
 | Check | Result | Elapsed |
 |---|---|---:|
-| Focused web, HTTP, and interface contracts | 34 passed | 1.44 s |
+| Focused web, HTTP, and interface contracts | 34 passed | 0.63 s |
 | Isolated source/wheel build and installation | passed as `scifact-rag 0.1.0` | 2.47 s |
 | Compose configuration | passed; no new service or publication | 0.05 s |
 | Live affected integrations | 3 passed, 333 deselected | 14.49 s |
