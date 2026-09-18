@@ -500,3 +500,20 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   differ. Independent review must confirm that public inputs no longer reconstruct the new IDs.
 - Prevention: reviewer-visible opaque identifiers must not be derived from published low-entropy
   inputs; frozen mappings remain separate and are not supplied during scoring.
+
+## SCIFACT-RAG-006: Project field update used the item ID as a field ID
+
+- Date: 2026-09-18.
+- Workflow: mark UI showcase Issue #25 active and populate its GitHub Project #17 fields.
+- Failed approach: passed the Issue's Project item node ID to the final `--field-id` argument while
+  setting `Evidence Required`, after the preceding field updates had succeeded.
+- Error signature: `Could not resolve to a node with the global id` for the item ID in
+  `updateProjectV2ItemFieldValue`.
+- Mutation check: Status, Area, Agentability, Risk, Work Type, and Priority were already updated;
+  the failed final call did not change `Evidence Required` or create another item.
+- Corrected path: resolve the live field list, use the `Evidence Required` field ID with its `Yes`
+  option ID, and re-read the exact Project item after the write.
+- Verification: the re-read item reports In Progress, UX, Ready, Low, Feature, P2, and Evidence
+  Required Yes with one exact Issue #25 item.
+- Prevention: never reuse an item node ID as a field ID; copy each field and option ID from the
+  immediately preceding live `gh project field-list` response and verify the complete item once.
