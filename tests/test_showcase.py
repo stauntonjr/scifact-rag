@@ -40,11 +40,11 @@ def test_showcase_script_is_one_shot_and_fails_closed() -> None:
     for marker in (
         "/readyz",
         "AbortController",
-        'response.status === 200',
+        "response.status === 200",
         'payload.schema_version === "readiness/v1"',
         'payload.status === "ready"',
         "live-retry",
-        "credentials: \"omit\"",
+        'credentials: "omit"',
     ):
         assert marker in script
     assert "setInterval" not in script

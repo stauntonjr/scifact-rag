@@ -248,10 +248,7 @@ def test_public_demo_is_opt_in_on_the_single_worker_api_only() -> None:
     api_environment = compose["services"]["api"]["environment"]
 
     assert api_environment["SCIFACT_PUBLIC_DEMO_ENABLED"] == "false"
-    assert (
-        api_environment["SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN"]
-        == "https://stauntonjr.github.io"
-    )
+    assert api_environment["SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN"] == "https://stauntonjr.github.io"
     assert "SCIFACT_PUBLIC_DEMO_ENABLED" not in compose["services"]["app"]["environment"]
     assert "SCIFACT_PUBLIC_DEMO_ENABLED" not in compose["services"]["mcp"]["environment"]
     assert compose["services"]["api"]["command"][-1] == "1"
