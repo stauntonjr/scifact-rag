@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A live demonstration of the SciFact RAG evidence-inspection UI.">
+    <title>SciFact RAG · Live UI showcase</title>
+    <link rel="stylesheet" href="./showcase.css">
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Live application recording · September 18, 2026</p>
+      <h1>From scientific claim to inspectable evidence.</h1>
+      <p class="lede">
+        This recording follows one request through the actual SciFact RAG interface running on a
+        single NVIDIA DGX Spark: enter a claim, generate a qualified answer, and open the cited
+        parent-document evidence.
+      </p>
+
+      <div class="player">
+        <video controls preload="metadata" poster="./scifact-ui-poster.png">
+          <source src="./scifact-ui-full.mp4" type="video/mp4">
+          <track kind="captions" srclang="en" label="English" src="./scifact-ui-full.vtt" default>
+          Your browser does not support embedded video. Download the
+          <a href="./scifact-ui-full.mp4">MP4 recording</a> instead.
+        </video>
+      </div>
+
+      <section class="grid" aria-label="Showcase details">
+        <article class="card">
+          <h2>What happens</h2>
+          <ol>
+            <li>The corrected claim is entered into the live evidence inspector.</li>
+            <li>The selected retrieval pipeline ranks evidence from the public SciFact corpus.</li>
+            <li>Local Qwen generation returns a qualified answer with parent-document citations.</li>
+            <li>A citation moves directly to the complete evidence supplied to generation.</li>
+          </ol>
+        </article>
+        <aside class="card">
+          <h2>Recording boundary</h2>
+          <p>
+            Claim: <q>Side effects associated with antidepressants increase the risk of stroke.</q>
+          </p>
+          <p>
+            The source recording is continuous except for eight seconds of unchanged waiting
+            frames removed at source time 00:39–00:47. Results and citations are unmodified. The
+            README GIF is a 24-second excerpt from this same recording.
+          </p>
+          <p>
+            <a href="https://github.com/stauntonjr/scifact-rag">View the repository on GitHub</a>
+          </p>
+        </aside>
+      </section>
+
+      <p class="boundary">
+        Research demonstration only. This closed-corpus prototype is not a clinical decision
+        system, and its generated answer is not medical advice.
+      </p>
+
+      <footer>
+        Recorded from API image <code>sha256:03f52076e78d…</code>. The RAG services remain
+        loopback-only; this page contains static media only.
+      </footer>
+    </main>
+  </body>
+</html>

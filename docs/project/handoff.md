@@ -85,7 +85,9 @@ BEIR SciFact -> MiniLM -> PostgreSQL/pgvector -> retrieved evidence
 
 The same dataclass application layer now serves CLI, HTTP, MCP, and the web presentation adapter.
 The UI adds no second application implementation: it calls the existing versioned HTTP search and
-ask endpoints from the same loopback origin.
+ask endpoints from the same loopback origin. Issue #25 adds a documentation-only UI recording and
+static showcase page derived from that accepted interface; the DGX application remains
+loopback-only.
 
 ## Accepted decisions
 
@@ -163,6 +165,11 @@ ask endpoints from the same loopback origin.
 - ADR-0034 serves packaged HTML, CSS, and JavaScript from the existing FastAPI process at `/` and
   fixed `/assets/` routes. Browser calls remain same-origin at `127.0.0.1:8090`; there is no new
   service, port, runtime dependency, CORS policy, or application behavior.
+- The Issue #25 showcase publishes only optimized static media from `docs/`. Its longer video
+  removes source time 00:39–00:47 to shorten an unchanged loading interval, the README GIF further
+  condenses idle and scrolling, and both retain the live answer and evidence identities. GitHub
+  Pages publication does not make the loopback API, MCP server, PostgreSQL, or model endpoints
+  public.
 
 See `docs/adr/0013-scifact-rag-composition-and-runtime.md`,
 `docs/adr/0015-modular-coreference-retrieval.md`,

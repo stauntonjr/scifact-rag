@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00.000 --> 00:07.000
+The live SciFact Evidence Inspector is ready for a scientific claim.
+
+00:07.000 --> 00:28.000
+The claim is entered: “Side effects associated with antidepressants increase the risk of stroke.”
+
+00:28.000 --> 00:41.000
+The existing retrieval and whole-document context defaults submit a live request. Eight seconds of unchanged waiting frames from the source recording were removed between 00:39 and 00:47.
+
+00:41.000 --> 01:02.000
+The local Qwen model returns a qualified answer, its active strategies, parent-document citations, and an insufficient-evidence conclusion for the claim’s causal wording.
+
+01:02.000 --> 01:40.800
+A citation opens the supplied parent-document evidence, including its document identity and complete abstract text.
