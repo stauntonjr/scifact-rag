@@ -1,0 +1,185 @@
+{
+  "archive_sha256": "6abe0d4ec0d331834981c0171c3c79d47515761867f82f1dc6066e43863a1586",
+  "decision": "not_admitted_grounding_contract_failure_and_unresolved_provenance",
+  "inclusion_policy": "Training only; nonempty ICO; documented label text/code; both native verification flags True; exact inclusive span; exclude all README caveat categories and any verified-label-disputed prompt. At least one eligible native row required, without inventing majority labels. License remains separate prerequisite.",
+  "inventory": {
+    "archive_members": 4469,
+    "article_texts": 4454,
+    "embedded_license_files": [],
+    "prompt_articles_missing_text": 24,
+    "prompt_bearing_articles": 3372,
+    "regular_files": 4467,
+    "text_articles_without_prompts": 1106,
+    "xml_files": 0
+  },
+  "limitations": [
+    "Sample counts are development evidence only, not corpus-wide quality estimates.",
+    "Supplied ICO roles do not establish role induction or population supervision.",
+    "Archive README documents v1.1 patches and contains no per-article license metadata.",
+    "4454 text articles and actual prompt-bearing article count require reconciliation to publication; text inventory is not annotated-corpus size."
+  ],
+  "model_calls": 0,
+  "offset_policy": "Release README specifies inclusive start/end; compare unchanged UTF-8 text[start:end+1] to unchanged Annotations. No normalization, search, fuzzy repair or delimiter splitting.",
+  "partitions": {
+    "annotation_identity_failures": {},
+    "annotation_rows": {
+      "test": 2408,
+      "train": 19887,
+      "validation": 2391
+    },
+    "article_ids": {
+      "test": 449,
+      "train": 3562,
+      "validation": 443
+    },
+    "duplicate_ids": {
+      "test": 0,
+      "train": 0,
+      "validation": 0
+    },
+    "duplicate_prompt_ids": 0,
+    "overlap_counts": {
+      "train/test": 0,
+      "train/validation": 0,
+      "validation/test": 0
+    },
+    "prompt_rows": {
+      "test": 1252,
+      "train": 10326,
+      "validation": 1258
+    },
+    "prompt_rows_outside_splits": 29
+  },
+  "schema_version": 1,
+  "scope": {
+    "all_file_hashing": true,
+    "article_limit": 64,
+    "csv_access": "merged CSV parsed; nonselected records discarded after identity and membership counts; no nonselected outcomes aggregated or displayed",
+    "heldout_outcomes_inspected": false,
+    "heldout_text_decoded": false,
+    "selected_articles": 64,
+    "selection": "lowest SHA256 of UTF-8 ei-admission-v1:<native numeric PMCID>"
+  },
+  "source_url": "https://evidence-inference.ebm-nlp.com/v2.0.tar.gz",
+  "train_sample": {
+    "annotation_rows": 390,
+    "article_character_lengths": {
+      "count": 64,
+      "max": 53298,
+      "median": 25193.0,
+      "min": 1117,
+      "total": 1664901
+    },
+    "article_whitespace_word_lengths": {
+      "count": 64,
+      "max": 8208,
+      "median": 3724.0,
+      "min": 176,
+      "total": 249250
+    },
+    "articles_with_prompts": 47,
+    "articles_without_prompts": 17,
+    "distinct_roles_per_article": {
+      "Comparator": {
+        "count": 64,
+        "max": 6,
+        "median": 1.0,
+        "min": 0,
+        "total": 68
+      },
+      "Intervention": {
+        "count": 64,
+        "max": 9,
+        "median": 1.0,
+        "min": 0,
+        "total": 75
+      },
+      "Outcome": {
+        "count": 64,
+        "max": 13,
+        "median": 2.0,
+        "min": 0,
+        "total": 188
+      }
+    },
+    "eligible_articles_before_license": 0,
+    "eligible_prompts_before_license": 0,
+    "evidence_character_lengths": {
+      "count": 390,
+      "max": 607,
+      "median": 169.0,
+      "min": 7,
+      "total": 73596
+    },
+    "label_code_counts": {
+      "-1": 128,
+      "0": 171,
+      "1": 91
+    },
+    "label_pairs": [
+      {
+        "code": "-1",
+        "count": 128,
+        "text": "significantly decreased"
+      },
+      {
+        "code": "0",
+        "count": 171,
+        "text": "no significant difference"
+      },
+      {
+        "code": "1",
+        "count": 4,
+        "text": "significantly increase"
+      },
+      {
+        "code": "1",
+        "count": 87,
+        "text": "significantly increased"
+      }
+    ],
+    "label_text_counts": {
+      "no significant difference": 171,
+      "significantly decreased": 128,
+      "significantly increase": 4,
+      "significantly increased": 87
+    },
+    "missing_role_fields": 0,
+    "prompt_rows": 209,
+    "prompts_per_article": {
+      "count": 64,
+      "max": 14,
+      "median": 3.0,
+      "min": 0,
+      "total": 209
+    },
+    "prompts_with_verified_label_disagreement": 0,
+    "prompts_without_annotations": 2,
+    "repeated_doctor_prompt_rows": 19,
+    "row_failure_counts_nonexclusive": {
+      "non_exact_span": 390,
+      "undocumented_label_text": 4,
+      "valid_label_not_true": 2,
+      "valid_reasoning_not_true": 1
+    },
+    "span_counts": {
+      "mismatch": 374,
+      "publisher_unavailable": 16
+    },
+    "unapproved_offset_diagnostics_not_inclusion": {
+      "documents_containing_CRLF": 64,
+      "raw_exclusive_exact": 0,
+      "raw_inclusive_exact": 0,
+      "universal_newline_exclusive_exact": 357,
+      "universal_newline_inclusive_exact": 0
+    },
+    "verification_flags": {
+      "In Abstract=False": 255,
+      "In Abstract=True": 135,
+      "Valid Label=False": 2,
+      "Valid Label=True": 388,
+      "Valid Reasoning=False": 1,
+      "Valid Reasoning=True": 389
+    }
+  }
+}

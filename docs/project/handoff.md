@@ -1,5 +1,12 @@
 # Project handoff
 
+## Successor admission result
+
+[Issue #15](https://github.com/stauntonjr/scifact-rag/issues/15) executed the model-free
+Evidence Inference 2.0 admission step. The [admission report](../research/evidence-inference-admission.md)
+records a negative decision under the unchanged exact-span contract; Step 2 remains inactive.
+No model, deployment, or Lattice changes were made. The completed prototype boundary below remains intact.
+
 ## Completed prototype
 
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
