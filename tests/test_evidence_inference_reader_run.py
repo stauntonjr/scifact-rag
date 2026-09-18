@@ -74,7 +74,7 @@ def test_no_dispatch_with_less_than_sixty_seconds_remaining(tmp_path):
     assert not (tmp_path / "ledger.jsonl").exists()
 
 
-def synthetic_run(tmp_path, monkeypatch, *, fail=False, reader_failure=None):
+def synthetic_run(tmp_path, monkeypatch, *, fail=False, reader_failure=None, third_response=None):
     import importlib
 
     reader = importlib.import_module("evidence_inference_reader")
@@ -151,7 +151,7 @@ def synthetic_run(tmp_path, monkeypatch, *, fail=False, reader_failure=None):
                 ]
             }
         third_reader = sum(k == "reader" for k, _ in calls) == 3
-        return {
+        response = {
             "model": "wrong-model" if third_reader and reader_failure == "model" else reader.READER,
             "choices": [{"message": {"content": '{"label":"decreased"}'}}],
             "usage": {
@@ -161,6 +161,7 @@ def synthetic_run(tmp_path, monkeypatch, *, fail=False, reader_failure=None):
                 "completion_tokens": 6,
             },
         }
+        return third_response(response) if third_reader and third_response else response
 
     result = runner.run(
         prepared,
@@ -361,3 +362,62 @@ def test_received_http_failure_is_retained_and_halts_without_retry(
     with pytest.raises(RuntimeError, match="halted"):
         coordinator.dispatch("reader", {}, "q", "a", "full", input_tokens=1)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "null_response",
+        "list_response",
+        "string_response",
+        "null_usage",
+        "list_usage",
+        "string_usage",
+    ],
+)
+def test_failed_response_shapes_do_not_break_optional_token_accounting(
+    tmp_path, monkeypatch, shape
+):
+    def malformed(response):
+        value = {"null": None, "list": [], "string": "synthetic"}[shape.split("_")[0]]
+        return value if shape.endswith("response") else {**response, "usage": value}
+
+    reader, prepared, _, output, calls, result = synthetic_run(
+        tmp_path, monkeypatch, third_response=malformed
+    )
+    assert len(calls) == 4
+    assert result["status"] == "partial"
+    before = (output / "ledger.jsonl").read_bytes()
+    event = reader.read_jsonl(output / "ledger.jsonl")[-1]
+    assert event["status"] == "failed"
+    report = reader.evaluate(prepared, output / "ledger.jsonl", tmp_path / "evaluation")
+    assert (output / "ledger.jsonl").read_bytes() == before
+    assert report["complete_triplets"] == 0
+    oracle = report["arms"]["oracle"]
+    assert oracle["count"] == oracle["failed"] == 1
+    assert oracle["classes"]["decreased"]["false_negative"] == 1
+    assert oracle["input_tokens"] == oracle["output_tokens"] == 0
+
+
+@pytest.mark.parametrize(
+    "prompt_tokens,completion_tokens,expected_output",
+    [(True, 7, 7), (1.5, -1, 0), ("12", False, 0), (-1, "x", 0), (None, None, 0)],
+)
+def test_optional_token_counts_accept_only_nonnegative_integers(
+    tmp_path, monkeypatch, prompt_tokens, completion_tokens, expected_output
+):
+    def malformed(response):
+        return {
+            **response,
+            "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens},
+        }
+
+    reader, prepared, _, output, _, _ = synthetic_run(
+        tmp_path, monkeypatch, third_response=malformed
+    )
+    report = reader.evaluate(prepared, output / "ledger.jsonl", tmp_path / "evaluation")
+    oracle = report["arms"]["oracle"]
+    assert oracle["count"] == oracle["failed"] == 1
+    assert oracle["input_tokens"] == 0
+    assert oracle["output_tokens"] == expected_output
+    assert report["complete_triplets"] == 0

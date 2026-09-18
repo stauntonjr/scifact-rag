@@ -597,8 +597,15 @@ def evaluate(prepared, ledger, output):
             if key in started:
                 results.append((ref["target"], prediction))
             predictions[key] = prediction
-            input_tokens += event.get("response", {}).get("usage", {}).get("prompt_tokens", 0)
-            output_tokens += event.get("response", {}).get("usage", {}).get("completion_tokens", 0)
+            response = event.get("response")
+            usage = response.get("usage") if isinstance(response, dict) else None
+            if isinstance(usage, dict):
+                reported_input = usage.get("prompt_tokens")
+                reported_output = usage.get("completion_tokens")
+                if type(reported_input) is int and reported_input >= 0:
+                    input_tokens += reported_input
+                if type(reported_output) is int and reported_output >= 0:
+                    output_tokens += reported_output
             seconds += event.get("seconds", 0)
         arms[arm] = {
             **native_metrics(results),
