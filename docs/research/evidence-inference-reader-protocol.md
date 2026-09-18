@@ -143,7 +143,10 @@ Preparation writes separate reader requests and evaluator references. `full` and
 builders never receive reference rows; only `oracle` receives reference intervals. The writer
 process sends only the stored messages/decoding payload, never the joined evaluator record.
 Use fresh ignored `artifacts/evidence-inference-v2/reader-v1/<run_id>/` paths. Freeze protocol,
-cohort, code, model/template identities, exact input hashes and request order before preflight.
+cohort, code, model/template identities, source windows, selector requests, full/oracle input hashes,
+selection rules and request order before preflight. Selected-reader content depends on the counted
+selector response: freeze its exact payload and hash after that response is durably recorded and
+before dispatching the selected-reader request. This staged freeze permits no uncounted selection.
 Record `started` durably before each network call, then `completed`, `failed` or `unknown` with
 request ID, arm, prompt/article ID, context hash, elapsed time and token usage. Persist selector
 costs separately and include them in selected-arm totals. Never infer completion from silence.
