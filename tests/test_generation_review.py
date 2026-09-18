@@ -449,3 +449,48 @@ def test_review_validator_rejects_unknown_schema_version() -> None:
 
     with pytest.raises(module.ReviewValidationError, match="schema_version"):
         module.validate_worksheet(data, require_complete=False)
+
+
+def test_v2_builder_renders_blinded_structured_fidelity_controls(tmp_path: Path) -> None:
+    module = _tool_module()
+    worksheet = tmp_path / "worksheet-v2.json"
+    output = tmp_path / "review-v2.html"
+    digest = _write_json(worksheet, _v2_worksheet())
+
+    result = module.build_reviewer(
+        worksheet,
+        output,
+        expected_sha256=digest,
+        expected_rows=2,
+    )
+
+    rendered = output.read_text(encoding="utf-8")
+    assert result["schema_version"] == "generation-human-review/v2"
+    assert "Causal strengthening" in rendered
+    assert "Population generalization" in rendered
+    assert "Material error spans" in rendered
+    assert "Answer span start" in rendered
+    assert "Evidence absent" in rendered
+    assert "default-src 'none'" in rendered
+    assert "candidate_id" not in rendered
+    assert "context_strategy" not in rendered
+
+
+def test_v1_builder_does_not_render_v2_fidelity_controls(tmp_path: Path) -> None:
+    module = _tool_module()
+    worksheet = tmp_path / "worksheet-v1.json"
+    output = tmp_path / "review-v1.html"
+    digest = _write_json(worksheet, _worksheet())
+
+    result = module.build_reviewer(
+        worksheet,
+        output,
+        expected_sha256=digest,
+        expected_rows=2,
+    )
+
+    rendered = output.read_text(encoding="utf-8")
+    assert result["schema_version"] == "generation-human-review/v1"
+    assert "Causal strengthening" not in rendered
+    assert "Population generalization" not in rendered
+    assert "Material error spans" not in rendered
