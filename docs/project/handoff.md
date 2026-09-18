@@ -1,5 +1,17 @@
 # Project handoff
 
+## Fixed-reader implementation and pending execution
+
+[Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) implements the standalone
+preparation, finite request runner and evaluator. The
+[readiness report](../research/evidence-inference-reader-readiness.md) records 101 prepared prompts,
+1,599 selector pairs, all full/oracle inputs fitting, and local tokenizer-version parity.
+The owner authorizes the bounded diagnostic and transfer to the owner's DGX after Lattice finishes.
+Lattice's fit and other audit processes were still active at the last resource inspection; no
+reader or selector inference has run. Keep Issue #23 open until the authorized execution is
+completed or a specific runtime/budget stop is reported. Do not infer resource release from a
+running container's exit-code field or silently expand the frozen budget.
+
 ## Fixed-reader protocol
 
 [Issue #21](https://github.com/stauntonjr/scifact-rag/issues/21) prepares the
