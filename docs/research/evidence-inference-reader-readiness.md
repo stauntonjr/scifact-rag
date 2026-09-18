@@ -44,14 +44,14 @@ performance or latency estimates.
 
 ## Verification and live gate
 
-All 75 focused audit/reader tests pass, including 36 new preparation/runner/evaluation tests.
+All 86 focused audit/reader tests pass, including 47 new preparation/runner/evaluation tests.
 Fresh preparation with the committed implementation reproduced the counts above. Its manifest
-SHA-256 is `89e785efa43d3979305d9186dc05e6bc0e4ce03d77fc8e4bd07d4274747ed329`.
+SHA-256 is `888834d7ff034b391f6d90edb9cc819f88e8265823fdf25579f35fce6c88fc20`.
 Independent review and the final repository gate are required before live execution.
 Live latency remains unmeasured. The original CPU
 probe exposed a structured-tokenizer-return counting error before any inference; that probe is
 diagnostic evidence only and cannot authorize execution. Final preparation must use the repaired,
-independently reviewed code at a fresh output path; `prepared-001` replaces that diagnostic probe.
+independently reviewed code at a fresh output path; `prepared-002` is the current qualified preparation.
 
 The two standalone tools expose `--help`: `tools/evidence_inference_reader.py` has `prepare` and
 `evaluate` commands; `tools/evidence_inference_reader_run.py` defaults to network-disabled runtime
@@ -67,10 +67,12 @@ and native task remain separate from the product's public `ask` behavior.
 Independent review found and repaired two failure-path defects before inference: reader model or
 token-accounting mismatch now records a failed experimental request rather than a scored completion;
 HTTP errors and malformed JSON retain received status and exact body bytes. These failures halt
-dispatch without retry. Deadline/transport uncertainty remains explicitly unknown.
+dispatch without retry. Optional malformed response/usage metadata cannot crash the partial-report
+writer; only nonnegative integer token counts are aggregated. Deadline/transport uncertainty
+remains explicitly unknown.
 
 The latest read-only resource observation found the Lattice native fit and two Lattice audit
-containers still running, with GPU utilization 94%. A running container's zero `ExitCode` field
+containers still running, with GPU utilization 92%. A running container's zero `ExitCode` field
 is not successful completion. Do not infer a free device from that field or from low utilization.
 Inspect actual process completion and any successor evaluation before issuing GPU requests.
 
