@@ -1,5 +1,15 @@
 # Project handoff
 
+## Source and rights qualification followup
+
+[Issue #19](https://github.com/stauntonjr/scifact-rag/issues/19) screens the same 45 candidate
+articles and 195 prompts. The [report](../research/evidence-inference-provenance.md) identifies
+20 articles/101 prompts with versioned CC BY terms and publisher-paired source provenance.
+38 texts match in the qualified LF view; seven source mismatches and the remaining rights
+conditions stay explicit. Exact historical PMC versions and XML extraction are not established.
+The next boundary is a prospective fixed-reader protocol for that smaller pool, not automatic
+model execution. Step 2 remains inactive; prior evidence and Lattice work are unchanged.
+
 ## Coordinate qualification followup
 
 [Issue #17](https://github.com/stauntonjr/scifact-rag/issues/17) qualifies an explicit LF-view,
