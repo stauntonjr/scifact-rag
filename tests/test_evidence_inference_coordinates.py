@@ -15,6 +15,7 @@ coordinates = importlib.util.module_from_spec(spec)
 
 
 def setup_module():
+    assert spec is not None and spec.loader is not None and spec.origin is not None
     assert Path(spec.origin).exists(), "coordinate qualification implementation missing"
     spec.loader.exec_module(coordinates)
 
