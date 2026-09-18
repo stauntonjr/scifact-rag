@@ -10,6 +10,11 @@ are measured, failure cases remain visible, evaluation component revisions are r
 images and checkpoints are pinned, and experimental strategies stay modular rather than
 accumulating in the production score.
 
+**Status: completed DGX-local prototype.** CLI, HTTP, MCP, and web interfaces are accepted.
+The [roadmap](docs/project/roadmap.md) records completed and stopped experiments. Template/Pi
+evaluation now belongs to [agentic-project-template #59](https://github.com/stauntonjr/agentic-project-template/issues/59);
+further scientific research or deployed-service work requires a new scope decision.
+
 ## Measured result
 
 The selected retrieval architecture builds a broad six-channel candidate pool and ranks each

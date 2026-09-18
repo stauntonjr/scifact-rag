@@ -1,16 +1,16 @@
 # SciFact RAG roadmap
 
-Date: 2026-09-14
+Date: 2026-09-17
 
 Owner: Jack Rory Staunton
 
-Status: active
+Status: completed prototype at the accepted DGX-local boundary
 
 ## Purpose
 
-This roadmap turns the working SciFact RAG prototype into a measured, inspectable scientific
-evidence application before adding more interfaces or agent-development evaluation. It orders work
-by product value:
+This roadmap records the completed SciFact RAG prototype. Phases 1–6 reached their accepted
+completion or explicit stop decisions; no additional implementation is owed within this scope.
+The retained delivery sequence was:
 
 1. prove which evidence context should reach generation;
 2. select a retrieval-default recommendation through one frozen comparison with its previously
@@ -107,7 +107,6 @@ multi-step recovery that cannot remain clear in ordinary application services.
 | 4 | Test grounded proposition pairs | Determine whether explicit structure merits graph work | Stopped at the frozen extraction qualification; graph work is not earned |
 | 5 | Harden and release the CLI proof | Completed: reproducible end-to-end CLI application acceptance | Clean DGX run and retained acceptance report passed |
 | 6 | Add composition adapters | API, MCP, and small web UI reuse the same application services | CLI semantics remain unchanged across adapters |
-| 7 | Evaluate the template and weaker models | Separate evidence about agent-development effectiveness | Product proof is already accepted |
 
 Only one phase is active at a time unless work items are demonstrably independent and do not share
 an evaluation boundary.
@@ -478,19 +477,14 @@ That acceptance is complete. The retained report records cited-answer rendering,
 insufficiency with evaluated evidence preserved, bounded validation and unavailable states,
 API-only restoration, packaged resources, accessibility markers, and explicit local-only limits.
 
-## Phase 7: evaluate the template and weaker-model development
+## Handoff to the template program
 
-This is a separate program-level goal and cannot delay the SciFact product proof.
-
-After the CLI release gate passes:
-
-- record which template capabilities were activated and why;
-- compare actual delivery friction with the earlier greenfield observations;
-- define a bounded with-template versus without-template evaluation only if an existing framework
-  can be adopted cheaply;
-- evaluate whether a weaker model in Pi becomes more effective with the accepted template;
-- keep Pi adapter development, additional harness tests, and template-security expansion outside
-  the SciFact application roadmap unless a concrete application failure activates them.
+Template/Pi effectiveness belongs to `agentic-project-template`, not to a SciFact product phase.
+The original sequencing guard is satisfied by the completed prototype. The receiving
+[program roadmap](https://github.com/stauntonjr/agentic-project-template/blob/docs/scifact-program-handoff/docs/project/roadmap.md)
+and [Issue #59](https://github.com/stauntonjr/agentic-project-template/issues/59) own the retrospective,
+matched template comparison, and any later smaller-model Pi evaluation. SciFact contributes its
+retained acceptance evidence; no SciFact feature, harness expansion, or model run is required.
 
 ## Explicit deferrals
 
@@ -528,14 +522,18 @@ To prevent activity from replacing progress:
 - Stop a phase when its exit gate is met or its hypothesis fails; record the decision before
   beginning another architecture branch.
 
-## Remaining work items
+## Completion and optional successors
 
-1. Decide whether to begin the separate template/Pi effectiveness program.
+There are no remaining implementation obligations for the accepted prototype. CLI, HTTP, MCP,
+and web acceptance are complete under Issues #10–#13; the repository's main branch contains that
+work. Completion is not a claim of production readiness, general scientific reasoning, or clean
+generalization from the repeatedly inspected SciFact evaluation data.
 
-Corpus proposition extraction, PostgreSQL projection, and induced-graph scoring are deferred and
-unauthorized after the Phase 4 qualification stop. Reopening them requires a new owner-approved
-issue with a fresh extraction-method hypothesis and decision boundary; they are not implied by this
-ordered list.
+Future scientific research and deployed-service requirements are new scope. The
+[dataset assessment](../research/2026-09-17-lattice-evidence-data.md) and
+[proposed research plan](../superpowers/plans/2026-09-17-scientific-evidence-successor.md) explore a
+separate Lattice-informed direction; they do not reopen Phase 4 or authorize experiments.
+Corpus proposition extraction, PostgreSQL projection, and graph scoring remain deferred.
 
 ## Evidence and decision artifacts
 
