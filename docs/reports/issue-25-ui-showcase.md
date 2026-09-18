@@ -104,3 +104,18 @@ recorded separately below when complete.
 
 This evidence validates the assets and static publication shape, not cross-browser playback or a
 public deployment. Those claims require the integrated exact revision and live Pages responses.
+
+## Attempt 1 independent review
+
+Independent review rejected commit `8f23f6c` before the final gate or publication. Frame-level
+inspection showed that the recorded UI actually submitted `Side effects of antidepressants
+increase the risk of stroke.`, omitting the required words `associated with`. The recording also
+shows evidence document `24494539`, while the corrected-claim preflight supplied `23627419` in its
+place. The media therefore cannot be relabeled as the corrected request and is not eligible for
+integration or Pages publication.
+
+The same review found that the GIF ended at the `Supplied evidence` heading before the cited parent
+card became visible, the MP4 exceeded Issue #25's retained 45-60 second boundary, the public edit
+copy omitted the source endpoint trim, the page lacked an authenticated exact source revision, and
+the VTT lacked a final research-only cue. Attempt 2 requires a replacement live capture and new
+derivatives. The existing files remain only as preserved failed-attempt evidence until replacement.
