@@ -29,6 +29,10 @@ The managed saved views are:
 | Decisions | Table | `"Work Type":Decision` | Human and architecture decisions |
 | High risk | Table | `Risk:High` | Explicit risk-review queue |
 
+Before live planning or the first PR, follow the [GitHub access and dependency-review
+preflight](github-access-recovery.md). It covers repository security prerequisites, host-specific
+OAuth scopes, and recovery without duplicate issues or bypassed checks.
+
 ## Safe operating sequence
 
 ```bash

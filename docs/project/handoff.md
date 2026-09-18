@@ -1,6 +1,6 @@
 # Project handoff
 
-## Current objective
+## Completed prototype
 
 The governing delivery sequence is `docs/project/roadmap.md`. The automatic generation-context
 comparison, fixed retrieval-default comparison, and Phase 3 scientific-inference diagnostic are
@@ -18,9 +18,14 @@ official-client discovery, supported case, exact insufficiency case, parent-cita
 invalid-input check passed. Issue #13 accepts the final Phase 6 slice: a packaged, same-process
 evidence-inspection UI over the accepted HTTP contracts. Its supported-answer, retained-evidence
 insufficiency, validation, unavailable-service, restoration, package, and affected-integration
-checks passed. Final branch integration remains; graph work is not currently earned.
+checks passed. All four interfaces are integrated on main; graph work is not currently earned.
 
-Deliver the first working CLI-first SciFact RAG vertical slice on one DGX Spark:
+The accepted DGX-local prototype is complete. No additional implementation is required.
+Template/Pi evaluation is handed to [agentic-project-template Issue #59](https://github.com/stauntonjr/agentic-project-template/issues/59).
+The [optional research plan](../superpowers/plans/2026-09-17-scientific-evidence-successor.md) is a
+proposal, not active product work or authorization to run a scientific experiment.
+
+The delivered application on one DGX Spark is:
 
 ```text
 BEIR SciFact -> MiniLM -> PostgreSQL/pgvector -> retrieved evidence

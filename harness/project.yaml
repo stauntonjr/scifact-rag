@@ -7,7 +7,7 @@
     "summary": "A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, loopback MCP, and a small evidence-inspection web interface over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
     "lifecycle": "new",
     "profile": "python-data",
-    "status": "active",
+    "status": "completed-prototype",
     "repository": "stauntonjr/scifact-rag"
   },
   "intent": {
