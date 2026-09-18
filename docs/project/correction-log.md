@@ -520,3 +520,14 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
 - Verification boundary: error classification and official recovery commands were checked; live
   setting repair, OAuth refresh, and Project placement have not been completed by this entry.
 - Durable prevention: the planning entry point links the prerequisite and recovery runbook.
+
+## EI-PLANNING-001: Desired label absent from live repository
+
+- Date: 2026-09-17.
+- Failed approach: issue creation requested the configured `type:chore` label without confirming
+  the live label list; GitHub returned `could not add label`.
+- Mutation check: the open-issue list remained empty; no issue was created.
+- Correction: read live labels/milestones, then create Issue #15 with existing `enhancement` and
+  add the exact URL to Project #17. No duplicate issue or unrelated label reconciliation.
+- Prevention: inspect live label identities before issue creation; desired configuration is not
+  evidence that labels already exist.
