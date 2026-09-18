@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +15,8 @@ from scifact_rag.generation_fidelity import (
     FidelityPhase,
     GenerationFidelityManifest,
 )
+
+FIXTURE = Path(__file__).parent / "fixtures" / "generation_fidelity_challenges.json"
 
 
 def _candidate(role: CandidateRole) -> FidelityCandidate:
@@ -259,3 +262,37 @@ def test_manifest_requires_exact_prompt_hash_mapping() -> None:
                 "candidate": ("b" * 64, "f" * 64),
             }
         )
+
+
+def test_generation_fidelity_challenges_are_complete_and_development_only() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+    assert set(payload) == {"cases", "phase", "schema_version", "synthetic"}
+    assert payload["schema_version"] == "generation-fidelity-challenges/v1"
+    assert payload["phase"] == "development"
+    assert payload["synthetic"] is True
+    cases = payload["cases"]
+    assert len({case["challenge_id"] for case in cases}) == len(cases)
+    assert {case["distinction"] for case in cases} == {
+        "qualifier-restriction",
+        "population-species-boundary",
+        "observational-association",
+        "non-significant-difference",
+        "surrogate-outcome",
+        "conflicting-incomplete-evidence",
+        "insufficient-evidence",
+        "supported-control",
+    }
+    assert sum(case["distinction"] == "supported-control" for case in cases) >= 2
+    for case in cases:
+        assert set(case) == {
+            "challenge_id",
+            "distinction",
+            "evidence",
+            "expected_disposition",
+            "forbidden_behavior",
+            "question",
+            "required_behavior",
+        }
+        assert case["expected_disposition"] in {"answer", "insufficient-evidence"}
+        assert case["evidence"] and all(item.strip() for item in case["evidence"])
