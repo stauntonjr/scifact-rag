@@ -44,7 +44,7 @@ performance or latency estimates.
 
 ## Verification and live gate
 
-All 71 focused audit/reader tests pass, including 32 new preparation/runner/evaluation tests.
+All 75 focused audit/reader tests pass, including 36 new preparation/runner/evaluation tests.
 Fresh preparation with the committed implementation reproduced the counts above. Its manifest
 SHA-256 is `89e785efa43d3979305d9186dc05e6bc0e4ce03d77fc8e4bd07d4274747ed329`.
 Independent review and the final repository gate are required before live execution.
@@ -64,6 +64,10 @@ The runner adapts the existing ColBERT request and indexed-response contract ins
 so it can retain raw payload/response evidence and enforce a total deadline. It does not alter the
 product adapter or call its network-owning `score()` method. The scientific class parser, evaluator
 and native task remain separate from the product's public `ask` behavior.
+Independent review found and repaired two failure-path defects before inference: reader model or
+token-accounting mismatch now records a failed experimental request rather than a scored completion;
+HTTP errors and malformed JSON retain received status and exact body bytes. These failures halt
+dispatch without retry. Deadline/transport uncertainty remains explicitly unknown.
 
 The latest read-only resource observation found the Lattice native fit and two Lattice audit
 containers still running, with GPU utilization 94%. A running container's zero `ExitCode` field
