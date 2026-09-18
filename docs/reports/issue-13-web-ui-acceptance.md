@@ -1,11 +1,11 @@
 # Issue #13 web UI acceptance
 
-Date: 2026-09-17  
-Governing issue: [#13](https://github.com/stauntonjr/scifact-rag/issues/13)  
+Date: 2026-09-17
+Governing issue: [#13](https://github.com/stauntonjr/scifact-rag/issues/13)
 Deployed repair candidate: `e3bf3b3df4eb0211483fac4b1ec650af3bda36ae`
-Host: `spark-3a8f`, AArch64 NVIDIA DGX Spark  
+Host: `spark-3a8f`, AArch64 NVIDIA DGX Spark
 API image: `03f52076e78d` (`linux/arm64`)
-Publication: `127.0.0.1:8090->80/tcp`  
+Publication: `127.0.0.1:8090->80/tcp`
 Browser path: Codex in-app browser proxy `http://localhost:61266/` to the DGX loopback service
 
 ## Boundary
