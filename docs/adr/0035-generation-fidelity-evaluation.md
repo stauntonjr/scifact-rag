@@ -1,9 +1,11 @@
 # ADR-0035: Sealed generation-fidelity evaluation boundary
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-18
 - Decider: Jack Rory Staunton, human owner
 - Governing issue: [#26](https://github.com/stauntonjr/scifact-rag/issues/26)
+
+Owner acceptance: confirmed in the Issue #26 implementation task on 2026-09-18.
 
 ## Context
 
@@ -106,4 +108,3 @@ Revisit through a superseding ADR before changing the phase/access model, storin
 payloads in the manifest, replacing human review, changing the paired comparison, or promoting a
 candidate. Model execution and confirmation access require separate accepted issues even if this
 ADR is accepted.
-
