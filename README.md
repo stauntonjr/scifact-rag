@@ -77,6 +77,14 @@ The CLI, loopback HTTP API, loopback MCP service, and small evidence-inspection 
 application services. The browser calls the existing HTTP contracts rather than implementing a
 second retrieval or generation path.
 
+## Live UI showcase
+
+[![SciFact RAG live UI: enter a scientific claim, inspect the generated answer, and open cited evidence](docs/assets/showcase/scifact-ui-answer-evidence.gif)](https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/)
+
+[Watch the full recording with captions](https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/).
+It captures the actual loopback application and local model services; the public page contains
+static media only. The short GIF condenses waiting and scrolling from the disclosed longer edit.
+
 ## Try it
 
 Requirements are Docker Compose, access to an NVIDIA DGX Spark, and the required model assets. The
