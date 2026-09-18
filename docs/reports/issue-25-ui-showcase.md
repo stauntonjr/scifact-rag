@@ -80,12 +80,12 @@ runtime image changed.
 
 | Published file | Contract | Bytes | SHA-256 |
 |---|---|---:|---|
-| `docs/assets/showcase/scifact-ui-answer-evidence.gif` | 24.00 s; 960x540; 12 fps; actual segments 00:07–00:16, 00:28–00:31, 00:39–00:44, and 01:09–01:16 | 12,820,727 | `cb21f7911ff5e20014feb5031366d2dbee21baffb71bef6912163a0881cde640` |
+| `docs/assets/showcase/scifact-ui-answer-evidence.gif` | 24.00 s; 960x540; 12 fps; actual segments 00:07–00:15, 00:28–00:31, 00:39–00:44, and 01:03–01:11 | 11,679,794 | `bc03164b72dc0beb4456ef5bab648961cbb87471a61ed1b292f3789a4ea9abba` |
 | `docs/showcase/scifact-ui/scifact-ui-full.mp4` | complete edited master; 100.80 s; 1280x720; H.264 High; 30 fps; no audio | 12,713,699 | `8459520127d2e3cd0e6fb5047c0923fcbd78a397a7b780c2e99f1f02e48dc7bc` |
 | `docs/showcase/scifact-ui/scifact-ui-poster.png` | answer-state poster; 1280x720 | 441,047 | `dc13382b1d772408bb9521a96bddcb1ed349ebbd6c54df5f7687e7fd1a7c0c07` |
-| `docs/showcase/scifact-ui/scifact-ui-full.vtt` | five English descriptive cues with both edit boundaries and the research-only limitation | 989 | `a9633c4c1896f52739e1b2eb522959f219052176caa50d75c37a7ba024d2692a` |
+| `docs/showcase/scifact-ui/scifact-ui-full.vtt` | six English descriptive cues with both edit boundaries and the research-only limitation | 989 | `a9633c4c1896f52739e1b2eb522959f219052176caa50d75c37a7ba024d2692a` |
 
-The combined committed media is 25,976,462 bytes (24.77 MiB), below the frozen 25 MiB ceiling.
+The combined committed media is 24,835,529 bytes (23.68 MiB), below the frozen 25 MiB ceiling.
 The GIF further condenses idle and scrolling intervals but uses only frames from the edited master.
 The Pages copy and captions disclose both boundaries. Mechanical and public route verification are
 recorded separately below when complete.
@@ -95,7 +95,7 @@ recorded separately below when complete.
 | Check | Result |
 |---|---|
 | Cut-transition contact sheet | passed; unchanged waiting is followed by the actual completed answer |
-| Poster and GIF frame inspection | passed; the recorded claim/result remain legible and the GIF holds on parent evidence document `5691302` for its final seven seconds |
+| Poster and GIF frame inspection | passed; the recorded claim/result remain legible and the GIF visibly follows citation `5691302` into its parent evidence card before holding on the evidence |
 | Static reference parser | passed; all four local page references resolve to committed files |
 | Local HTTP routes | passed; page, CSS, GIF, MP4, poster, and VTT returned HTTP 200 with exact byte counts |
 | Repository harness | passed through `python3 tools/harness_check.py` |
@@ -113,8 +113,11 @@ correct, materially suitable for the showcase, and should be accepted rather tha
 Issue #25 and the engineering-loop contract now name the actual request, result, and owner-selected
 source edit. A fresh exact-query search reproduced all five recorded evidence parents in order.
 
-The same review found four independent presentation defects: the GIF ended before the cited parent
+The first review found four independent presentation defects: the GIF ended before the cited parent
 card became visible, public copy omitted the 01:50 source endpoint, the page lacked the exact source
 revision, and the VTT lacked a final research-only cue. Revision 2 repairs each defect without
-changing the recording, answer, application, runtime, or publication topology. It remains pending
-fresh independent review, the final repository gate, and public Pages verification.
+changing the recording, answer, application, runtime, or publication topology. A second review
+found that the GIF jumped directly from the answer to already-visible evidence and that this report
+understated the caption cue count. Attempt 2 repairs both by retaining the real citation activation
+and anchor scroll from the same master and by recording all six cues. It remains pending fresh
+independent review, the final repository gate, and public Pages verification.
