@@ -1,0 +1,66 @@
+{
+  "acquisition_manifest_sha256": "e093482c773fc2e37ca870db02b4628bcd3a6355c800c441aeed0f4db2072eaf",
+  "archive_sha256": "6abe0d4ec0d331834981c0171c3c79d47515761867f82f1dc6066e43863a1586",
+  "candidate_counts": {
+    "attribution_research_candidate": {
+      "articles": 20,
+      "prompts": 101,
+      "rows": 181
+    },
+    "noncommercial_research_conditional": {
+      "articles": 12,
+      "prompts": 47,
+      "rows": 91
+    },
+    "unresolved_custom_or_missing": {
+      "articles": 4,
+      "prompts": 26,
+      "rows": 48
+    },
+    "unresolved_no_derivatives": {
+      "articles": 2,
+      "prompts": 7,
+      "rows": 11
+    },
+    "unresolved_source_linkage": {
+      "articles": 7,
+      "prompts": 14,
+      "rows": 20
+    }
+  },
+  "candidate_ids_sha256": "3daf9898086bf5107d85a52f60e033655bb161a0a7e43134acc5d678c6cff8e9",
+  "coordinate_manifest_sha256": "0565254b5faff2bd0b6fad630f800a85cb37939c7f93b3baf5cb8f389d2a4ced",
+  "decision": "bounded_rights_candidates_not_step2_admission",
+  "lf_coordinate_equal_articles": 38,
+  "limitations": [
+    "Candidate rights categories are evidence-supported research screening, not legal certainty or Step 2 admission.",
+    "Attribution and applicable notices must be preserved; third-party exclusions require separate handling.",
+    "Noncommercial candidates are conditional on an explicitly noncommercial local research scope; ShareAlike obligations remain applicable.",
+    "ND, conflicting, custom and missing terms remain unresolved under this bounded screen.",
+    "Publisher-declared XML/TXT pairing plus pinned release and LF-coordinate identity do not prove exact XML extraction or historical PMC version identity.",
+    "Repository MIT license does not establish article rights. Raw articles and detailed attribution/license records remain local ignored artifacts."
+  ],
+  "pmcid_matching_articles": 45,
+  "raw_byte_equal_articles": 0,
+  "recognized_license_article_counts": {
+    "by-nc-nd/3.0": 1,
+    "by-nc-nd/4.0": 1,
+    "by-nc-sa/3.0": 5,
+    "by-nc-sa/4.0": 1,
+    "by-nc/3.0": 7,
+    "by-nc/4.0": 1,
+    "by/2.0": 11,
+    "by/3.0": 2,
+    "by/4.0": 12
+  },
+  "schema_version": 1,
+  "scope": {
+    "articles": 45,
+    "model_calls": 0,
+    "new_sample": false,
+    "prompts": 195,
+    "rows": 351
+  },
+  "source_revision": "a661e8c14f973398380c8865cf2f27a535aaaf6d",
+  "tool_sha256": "f9a572db83958377cc58099f293361112b7ee46cf1348961a6cef2ea0340a093"
+}
