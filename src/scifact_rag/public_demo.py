@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
+from threading import BoundedSemaphore
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
@@ -138,6 +140,27 @@ class CapabilitySnapshot:
 
 class CapabilityProvider(Protocol):
     def snapshot(self) -> CapabilitySnapshot: ...
+
+
+class InferenceGate:
+    def __init__(self) -> None:
+        self._semaphore = BoundedSemaphore(1)
+
+    @contextmanager
+    def acquire(self) -> Iterator[bool]:
+        acquired = self._semaphore.acquire(blocking=False)
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                self._semaphore.release()
+
+
+@dataclass(frozen=True, slots=True)
+class PublicDemoRuntime:
+    settings: PublicDemoSettings
+    capabilities: CapabilityProvider
+    gate: InferenceGate
 
 
 _REASON_BY_DEPENDENCY = {

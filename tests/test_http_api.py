@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 from typing import cast
 
 import httpx
@@ -10,6 +12,14 @@ from scifact_rag.application import RagApplication
 from scifact_rag.domain import Answer, SearchHit
 from scifact_rag.generation import GenerationContextStrategyName
 from scifact_rag.http_api import create_http_app
+from scifact_rag.public_demo import (
+    DependencyName,
+    DependencyProbe,
+    InferenceGate,
+    PublicDemoCapabilityService,
+    PublicDemoRuntime,
+    PublicDemoSettings,
+)
 from scifact_rag.strategies import DEFAULT_RETRIEVAL_STRATEGY, RetrievalStrategyName
 
 
@@ -368,3 +378,153 @@ async def test_runtime_factory_caches_composed_applications_by_strategy_pair(
         (RetrievalStrategyName.BM25, GenerationContextStrategyName.WHOLE_DOCUMENT),
         (RetrievalStrategyName.BM25, GenerationContextStrategyName.ADAPTIVE),
     ]
+
+
+def public_runtime() -> PublicDemoRuntime:
+    probes: dict[DependencyName, DependencyProbe] = {
+        dependency: _AlwaysAvailableProbe() for dependency in DependencyName
+    }
+    return PublicDemoRuntime(
+        settings=PublicDemoSettings(enabled=True, pages_origin="https://stauntonjr.github.io"),
+        capabilities=PublicDemoCapabilityService(probes),
+        gate=InferenceGate(),
+    )
+
+
+class _AlwaysAvailableProbe:
+    def available(self) -> bool:
+        return True
+
+
+@pytest.mark.anyio
+async def test_public_readiness_and_capabilities_do_not_resolve_application() -> None:
+    application = RecordingApplication()
+    runtime = public_runtime()
+    transport = httpx.ASGITransport(
+        app=create_http_app(recording_resolver(application, []), public_demo=runtime)
+    )
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        ready = await client.get(
+            "/readyz",
+            headers={"origin": "https://stauntonjr.github.io"},
+        )
+        capabilities = await client.get("/v1/capabilities")
+
+    assert ready.status_code == 200
+    assert ready.json() == {"schema_version": "readiness/v1", "status": "ready"}
+    assert ready.headers["access-control-allow-origin"] == "https://stauntonjr.github.io"
+    assert ready.headers["vary"] == "Origin"
+    assert capabilities.status_code == 200
+    assert capabilities.json()["schema_version"] == "capabilities/v1"
+    assert application.calls == []
+
+
+@pytest.mark.anyio
+async def test_public_readiness_rejects_arbitrary_origin_without_cors() -> None:
+    runtime = public_runtime()
+
+    def fail_if_resolved(
+        retrieval_strategy: RetrievalStrategyName,
+        generation_context_strategy: GenerationContextStrategyName,
+    ) -> RagApplication:
+        raise AssertionError("readiness must not resolve an application")
+
+    transport = httpx.ASGITransport(app=create_http_app(fail_if_resolved, public_demo=runtime))
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/readyz", headers={"origin": "https://evil.example"})
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers
+    assert response.headers["vary"] == "Origin"
+
+
+@pytest.mark.anyio
+async def test_public_unavailable_strategy_returns_fixed_503_without_resolution() -> None:
+    probes: dict[DependencyName, DependencyProbe] = {
+        dependency: _AlwaysAvailableProbe() for dependency in DependencyName
+    }
+    probes[DependencyName.LATE_INTERACTION] = _UnavailableProbe()
+    runtime = PublicDemoRuntime(
+        settings=PublicDemoSettings(enabled=True, pages_origin="https://stauntonjr.github.io"),
+        capabilities=PublicDemoCapabilityService(probes),
+        gate=InferenceGate(),
+    )
+    resolutions: list[tuple[RetrievalStrategyName, GenerationContextStrategyName]] = []
+    transport = httpx.ASGITransport(
+        app=create_http_app(
+            recording_resolver(RecordingApplication(), resolutions), public_demo=runtime
+        )
+    )
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/v1/search",
+            json={
+                "schema_version": "search-request/v1",
+                "query": "claim",
+                "strategy": DEFAULT_RETRIEVAL_STRATEGY.value,
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "schema_version": "error/v1",
+        "error": {
+            "code": "unavailable",
+            "message": "The selected live capability is unavailable",
+        },
+    }
+    assert resolutions == []
+
+
+class _UnavailableProbe:
+    def available(self) -> bool:
+        return False
+
+
+class BlockingApplication(RecordingApplication):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def ask(self, query: str, *, limit: int = 5) -> Answer:
+        self.started.set()
+        self.release.wait(timeout=3)
+        return super().ask(query, limit=limit)
+
+
+@pytest.mark.anyio
+async def test_public_search_and_answer_share_one_nonblocking_slot() -> None:
+    application = BlockingApplication()
+    resolutions: list[tuple[RetrievalStrategyName, GenerationContextStrategyName]] = []
+    runtime = public_runtime()
+    transport = httpx.ASGITransport(
+        app=create_http_app(recording_resolver(application, resolutions), public_demo=runtime)
+    )
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        first = asyncio.create_task(
+            client.post(
+                "/v1/ask",
+                json={"schema_version": "ask-request/v1", "query": "claim"},
+            )
+        )
+        await asyncio.to_thread(application.started.wait, 2)
+        second = await client.post(
+            "/v1/search",
+            json={"schema_version": "search-request/v1", "query": "claim"},
+        )
+        application.release.set()
+        first_response = await first
+
+    assert second.status_code == 429
+    assert second.json() == {
+        "schema_version": "error/v1",
+        "error": {"code": "busy", "message": "Another live request is in progress"},
+    }
+    assert first_response.status_code == 200
+    assert application.calls == [("ask", "claim", 5)]
+    assert len(resolutions) == 1
