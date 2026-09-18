@@ -127,9 +127,12 @@ uses the browser's constraint validation before a request. Buttons and controls 
 while one request is active.
 
 Response data is inserted with DOM text properties, never interpreted as HTML. Search results and
-answer evidence preserve server order. Answer citations are rendered only when their document IDs
-occur in supplied evidence. If the server ever returns a citation outside that evidence, the UI
-shows a bounded response-contract error rather than inventing or linking evidence.
+answer evidence preserve server order. When adaptive assembly returns multiple passages from one
+parent document, the UI groups those passages under one parent card, preserves their supplied
+order, and creates one stable citation target for that `doc_id`. Answer citations are rendered only
+when their document IDs occur in supplied evidence. If the server ever returns a citation outside
+that evidence, the UI shows a bounded response-contract error rather than inventing or linking
+evidence.
 
 Exact `text == "insufficient evidence"` with empty citations produces the dedicated insufficient
 state while preserving any valid retrieved evidence returned by the application. A non-insufficient
@@ -159,8 +162,8 @@ models, response models, exception handlers, composition caching, and defaults r
 | Idle | Invitation to enter a scientific claim | Empty |
 | Loading | Names Search or Answer operation | Previous result cleared |
 | Search success | Result count and active retrieval strategy | Ordered hit cards |
-| Supported/contradicted answer | Answer text, model, citations, active strategies | Ordered evidence cards |
-| Insufficient evidence | Exact insufficiency message and active strategies | Explicitly empty |
+| Supported/contradicted answer | Answer text, model, citations, active strategies | Ordered parent groups containing all supplied passages |
+| Insufficient evidence | Exact insufficiency message and active strategies | Valid returned evidence retained in ordered parent groups |
 | Validation error | Fixed request-validation explanation | Empty |
 | Unavailable/error | Fixed retryable failure explanation | Empty |
 | Contract mismatch | Fixed response-contract explanation | Empty |
@@ -202,10 +205,14 @@ One focused `tests/test_web_ui.py` module will verify through the real ASGI appl
 - the delivered document has no external asset reference.
 
 Existing HTTP and interface-contract tests continue to prove the application behavior behind the
-UI. Real-browser acceptance executes the search, answer, citation, insufficiency, bounded-error,
-keyboard-focus, responsive-layout, and reduced-motion behaviors; these are not replaced by tests
-that merely search asset source text. A wheel build/install/resource probe proves packaged
-operation. Compose validation proves that no topology expansion occurred.
+UI. One bounded DOM behavior probe executes the shipped renderer with repeated adaptive contexts
+and requires one unique parent card, one citation target, accurate parent/passage counts, and
+preserved passage order. It does not introduce a Node project dependency or browser-testing
+framework. Human-operated real-browser acceptance executes the four result/failure states.
+Deterministic delivered-document and CSS checks establish semantic controls, focus-visible
+styling, the sub-760 pixel layout rule, and reduced-motion behavior; they do not claim
+assistive-technology or broad cross-browser certification. A wheel build/install/resource probe
+proves packaged operation. Compose validation proves that no topology expansion occurred.
 
 ### Live browser acceptance
 
@@ -217,6 +224,10 @@ Against the rebuilt loopback `api` service, retain four observations:
 3. an invalid client value is rejected and rendered as a bounded validation state;
 4. after the loaded page loses its API connection in a controlled reversible probe, a request
    renders the fixed unavailable state, and the service is restored and rechecked.
+
+The human owner operates these four states in the real browser. Semantic structure, focus-visible,
+responsive, and reduced-motion acceptance is deterministic against the exact delivered HTML and
+CSS when browser automation cannot attach to the visible tab.
 
 The acceptance report records the commit, image, host, browser path, queries, output boundaries,
 latency, and restoration evidence. These observations prove local UI operation only.

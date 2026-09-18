@@ -9,7 +9,8 @@ All notable changes to the harness are recorded here. The harness version and a 
 - Implemented the owner-approved evidence-inspection web adapter inside the existing loopback API
   service. Packaged HTML, CSS, and JavaScript call only the versioned same-origin search and ask
   endpoints and render active strategies, citations, ordered parent evidence, scores, matching
-  passages, complete supplied text, exact insufficiency with its evaluated evidence retained, and
+  passages, complete supplied text, repeated adaptive contexts grouped under one unique parent
+  target, exact insufficiency with its evaluated evidence retained, and
   bounded error states. The slice adds
   no frontend service, build system, runtime dependency, CORS policy, authentication, or retrieval
   behavior. DGX browser acceptance passed cited-answer, retained-evidence insufficiency,

@@ -229,7 +229,9 @@ The result view shows the active retrieval and generation-context strategies, an
 model when applicable, ordered parent-document evidence, document IDs, scores, matching passages,
 complete supplied evidence text, and citation links. Exact `insufficient evidence` is displayed
 only when the answer has no citations; any valid retrieved evidence remains visible as the context
-the application evaluated. Validation, unavailable-service, and contract-mismatch states use fixed
+the application evaluated. When adaptive assembly supplies multiple contexts from one document,
+the browser groups them under one unique parent card and citation target while preserving every
+passage in supplied order. Validation, unavailable-service, and contract-mismatch states use fixed
 bounded messages rather than raw server responses.
 
 The UI is a single-user loopback inspection surface. It adds no authentication, TLS, CORS,

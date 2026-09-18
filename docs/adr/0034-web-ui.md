@@ -26,13 +26,14 @@ application resolver and owns no retrieval, ranking, context-selection, generati
 evidence, or citation behavior.
 
 The server derives the browser's retrieval and context-strategy choices and defaults from the
-existing enums. The browser renders response data only as text, preserves evidence order, and
-requires each answer citation to resolve to a supplied evidence document. Exact insufficiency is
-presented only when the answer text is `insufficient evidence` and citations are empty; valid
-retrieved evidence remains visible because the application retains the context it evaluated. A
-non-insufficient answer requires at least one evidence-resolving citation. Response-shape
-mismatches and request failures produce fixed presentation errors without raw exception or
-response-body text.
+existing enums. The browser renders response data only as text and preserves supplied order.
+Multiple adaptive contexts with the same `doc_id` are grouped under one parent card with one stable
+citation target while every supplied passage remains visible in order. Each answer citation must
+resolve to a supplied parent document. Exact insufficiency is presented only when the answer text
+is `insufficient evidence` and citations are empty; valid retrieved evidence remains visible
+because the application retains the context it evaluated. A non-insufficient answer requires at
+least one evidence-resolving citation. Response-shape mismatches and request failures produce fixed
+presentation errors without raw exception or response-body text.
 
 Keep the current `api` Compose service, image, one-worker runtime, and
 `127.0.0.1:8090:80` publication. Add no frontend framework, Node build, external browser asset,
@@ -63,8 +64,9 @@ consumes configured model compute.
 
 - **A second application architecture:** the browser calls only the existing versioned HTTP
   operations; the presentation router cannot resolve an application.
-- **Citation drift:** browser acceptance and rendering logic require all citations to occur in the
-  returned evidence IDs.
+- **Citation drift or duplicate targets:** rendering groups repeated contexts by parent ID and
+  creates exactly one target per returned evidence ID; acceptance requires every citation to
+  resolve to that target.
 - **Untrusted text becoming markup:** corpus and model fields are assigned through DOM text
   properties rather than interpreted as HTML.
 - **Misleading failure detail:** validation, unavailable, and response-contract states use fixed
@@ -87,9 +89,12 @@ consumes configured model compute.
 Focused ASGI tests cover resource delivery, media types, resolver isolation, complete page
 controls, self-contained assets, and exact strategy configuration. Existing HTTP/interface tests
 continue to cover application behavior. A wheel build/install probe covers packaged resources.
-Live browser acceptance covers supported, exact-insufficiency, validation, unavailable, citation,
-keyboard-focus, responsive-layout, and reduced-motion states on the loopback service. The full
-repository gate and affected integrations must pass before integration.
+Human-operated live browser acceptance covers supported, exact-insufficiency, validation, and
+unavailable states on the loopback service. A bounded DOM probe covers repeated adaptive contexts
+and unique citation targets. Deterministic delivered-document and CSS checks cover semantic
+controls, keyboard-focus styling, responsive layout, and reduced motion without claiming broad
+browser or assistive-technology certification. The full repository gate and affected integrations
+must pass before integration.
 
 Revisit before adding multiple pages, persistent browser state, streaming, a frontend build system,
 an independent deployment cadence, non-loopback users, authentication, or any browser-owned

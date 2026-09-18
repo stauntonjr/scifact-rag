@@ -470,8 +470,9 @@ uses same-origin calls to the accepted search and answer endpoints. It adds no r
 service, port, CORS policy, or application semantics. The page shows answers, active strategies,
 parent citations, ordered evidence, document IDs, scores, and complete supplied evidence text;
 exact insufficiency and bounded error states remain explicit. ADR-0034 records the same-process
-boundary. Issue #13 requires retained supported, insufficient-evidence, validation, unavailable,
-responsive, focus, and reduced-motion browser evidence before acceptance.
+boundary. Issue #13 requires retained supported, insufficient-evidence, validation, and unavailable
+browser evidence plus deterministic delivered-document and CSS checks for responsive, focus, and
+reduced-motion behavior before acceptance.
 
 That acceptance is complete. The retained report records cited-answer rendering, exact
 insufficiency with evaluated evidence preserved, bounded validation and unavailable states,

@@ -20,6 +20,9 @@ The browser-control runtime could not attach to the visible in-app tab, so the h
 performed and reported the visible interactions while the agent controlled and verified the API
 container, endpoint, candidate, and restoration boundary. API responses below corroborate the
 same deployed endpoint but are not represented as captured browser network traces.
+The owner also approved deterministic delivered-document and CSS verification for semantic
+structure, focus-visible styling, the sub-760 pixel layout, and reduced motion in place of
+unavailable browser automation for those presentation contracts.
 
 ## Candidate and package evidence
 
@@ -55,12 +58,20 @@ evidence array. Commit `6089dee` aligned the validator with the accepted applica
 Commit `d04fda5` added `no-store` to packaged assets so the repaired JavaScript is not stale after
 an API-image replacement.
 
+Independent review then found that adaptive evidence containing two contexts from one parent
+created two DOM cards with the same ID and reported them as two documents. The bounded renderer
+probe reproduced the defect as two `evidence-123` cards and `2 documents`. After repair, the same
+probe returns one `evidence-123` parent card, two ordered passage sections, and
+`1 document · 2 supplied passages`. The repair adds no browser framework or Node project
+dependency.
+
 ## Accessibility and responsive boundary
 
-The delivered document contains a main landmark, explicit labels, native form controls, and a
-polite live status region. Focus-visible styling is explicit, the controls stack below 760 pixels,
-and the reduced-motion media query removes transitions. These are deterministic source and route
-checks; no claim is made about assistive-technology certification or broad cross-browser coverage.
+The exact delivered document contains a main landmark, explicit labels, native form controls, and
+a polite live status region. The exact delivered CSS contains explicit focus-visible styling, a
+sub-760 pixel stacking rule, and a reduced-motion media query that removes transitions. These are
+the owner-approved deterministic checks because automation could not attach to the visible browser;
+no claim is made about assistive-technology certification or broad cross-browser coverage.
 
 ## Decision and limitations
 

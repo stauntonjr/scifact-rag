@@ -112,32 +112,75 @@ function validHit(hit) {
   );
 }
 
+function groupEvidenceByParent(evidence) {
+  const groups = new Map();
+  evidence.forEach((hit) => {
+    if (!groups.has(hit.doc_id)) {
+      groups.set(hit.doc_id, {
+        docId: hit.doc_id,
+        title: hit.title,
+        passages: [],
+      });
+    }
+    groups.get(hit.doc_id).passages.push(hit);
+  });
+  return Array.from(groups.values());
+}
+
+function appendEvidencePassage(card, hit, index, passageCount) {
+  const passage = document.createElement(passageCount === 1 ? "div" : "section");
+  passage.className = "evidence-passage";
+  if (passageCount > 1) {
+    const heading = document.createElement("h4");
+    heading.textContent = `Supplied passage ${index + 1}`;
+    passage.append(heading);
+  }
+
+  const score = document.createElement("p");
+  score.className = "score";
+  score.textContent = `Score ${hit.score.toFixed(6)}`;
+  const text = document.createElement("p");
+  text.className = "evidence-text";
+  text.textContent = hit.text;
+  passage.append(score, text);
+  card.append(passage);
+}
+
 function renderEvidence(evidence) {
   evidenceList.replaceChildren();
-  evidence.forEach((hit, index) => {
+  const groups = groupEvidenceByParent(evidence);
+  groups.forEach((group, index) => {
     const card = document.createElement("article");
     card.className = "evidence-card";
-    card.id = evidenceAnchorId(hit.doc_id);
+    card.id = evidenceAnchorId(group.docId);
 
     const heading = document.createElement("div");
     heading.className = "evidence-heading";
     const title = document.createElement("h3");
-    title.textContent = `${index + 1}. ${hit.title || "Untitled document"}`;
+    title.textContent = `${index + 1}. ${group.title || "Untitled document"}`;
     const identity = document.createElement("span");
     identity.className = "document-id";
-    identity.textContent = `Document ${hit.doc_id}`;
+    identity.textContent = `Document ${group.docId}`;
     heading.append(title, identity);
+    card.append(heading);
 
-    const score = document.createElement("p");
-    score.className = "score";
-    score.textContent = `Score ${hit.score.toFixed(6)}`;
-    const text = document.createElement("p");
-    text.className = "evidence-text";
-    text.textContent = hit.text;
-    card.append(heading, score, text);
+    if (group.passages.length > 1) {
+      const contextCount = document.createElement("p");
+      contextCount.className = "context-count";
+      contextCount.textContent = `${group.passages.length} supplied passages`;
+      card.append(contextCount);
+    }
+    group.passages.forEach((hit, passageIndex) => {
+      appendEvidencePassage(card, hit, passageIndex, group.passages.length);
+    });
     evidenceList.append(card);
   });
-  evidenceCount.textContent = evidence.length === 1 ? "1 document" : `${evidence.length} documents`;
+
+  const documentLabel = groups.length === 1 ? "1 document" : `${groups.length} documents`;
+  evidenceCount.textContent =
+    groups.length === evidence.length
+      ? documentLabel
+      : `${documentLabel} · ${evidence.length} supplied passages`;
 }
 
 function renderSearch(payload, strategy) {

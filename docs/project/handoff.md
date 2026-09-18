@@ -97,8 +97,9 @@ ask endpoints from the same loopback origin.
   comparison and completed blinded review retain whole-document as default and adaptive as the
   scalable opt-in without post-result tuning.
 - BEIR SciFact qrels evaluate retrieval. The original SciFact hidden test labels are not claimed.
-- `application-composition-root`, `cli-interface`, `http-api-interface`, `mcp-interface`, and the
-  bounded `product-validation-challenges` corpus are active in `harness/capabilities.json`.
+- `application-composition-root`, `cli-interface`, `http-api-interface`, `mcp-interface`,
+  `web-interface`, and the bounded `product-validation-challenges` corpus are active in
+  `harness/capabilities.json`.
 - ADR-0032 adopts FastAPI/Uvicorn for three versioned read-only operations. Pydantic stays at the
   transport boundary; an injected resolver delegates cache misses to the existing composition
   root, and Compose publishes the service only at `127.0.0.1:8090`.
