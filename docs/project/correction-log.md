@@ -574,3 +574,20 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   Required Yes with one exact Issue #25 item.
 - Prevention: never reuse an item node ID as a field ID; copy each field and option ID from the
   immediately preceding live `gh project field-list` response and verify the complete item once.
+
+## SCIFACT-RAG-007: fixed showcase timing preceded live latency evidence
+
+- Date: 2026-09-18.
+- Workflow: plan an animated recording of the existing SciFact evidence inspector.
+- Failed approach: froze a 52-second master and assumed five seconds of loading before running the
+  selected corrected claim through the live application.
+- Error signature: the authorized preflight wrote a valid response body near the client's
+  30-second command boundary; the API log also showed first-request model initialization.
+- Mutation check: the preflight made one read-only answer request and changed no corpus, model,
+  application, container, or configuration state.
+- Corrected path: keep the longer video continuous and milestone-based. Retain the 22-second GIF,
+  but if needed remove only unchanged middle loading frames and disclose the elapsed-time edit.
+- Verification: the preflight returned `answer/v1`, four citations all belonging to the five
+  supplied evidence records, and the intended evidence-insufficiency conclusion.
+- Prevention: measure the selected live path before freezing demonstration timestamps; define
+  media timing around observable events when inference duration is inherently variable.

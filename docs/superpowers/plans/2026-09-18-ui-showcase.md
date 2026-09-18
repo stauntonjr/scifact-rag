@@ -4,7 +4,7 @@
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Publish one honest 22-second animated GIF of the live SciFact UI, linked to a 52-second
+**Goal:** Publish one honest 22-second animated GIF of the live SciFact UI, linked to a full-length
 GitHub Pages video derived from the same uninterrupted master recording.
 
 **Architecture:** Record the existing loopback UI as a fixed 1280x720 region while it calls the
@@ -22,9 +22,9 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 
 - Use the corrected claim: `Side effects associated with antidepressants increase the risk of stroke.`
 - Record the actual running application; never mock, inject, or replace a response or citation.
-- Record one uninterrupted 1280x720, 52-second master and derive every published asset from it.
+- Record one uninterrupted 1280x720 master and derive every published asset from it.
 - Keep the master outside Git and commit no more than 25 MB of optimized showcase media in total.
-- Produce one 960x540 GIF lasting 22 seconds and one 1280x720 MP4 lasting 52 seconds.
+- Produce one 960x540 GIF lasting 22 seconds and one 1280x720 MP4 preserving the complete master.
 - Keep the existing DGX services loopback-only; Pages contains static media only.
 - Add no frontend framework, application endpoint, Compose service, runtime dependency, or narration.
 - Stop if the corrected claim does not return a valid cited answer whose citation resolves to
@@ -74,31 +74,27 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 
 **Interfaces:**
 - Consumes: clean live page and validated corrected claim from Task 1.
-- Produces: one 1280x720, 52-second master with the complete real interaction.
+- Produces: one 1280x720 master with the complete real interaction.
 
 - [ ] **Step 1: Prepare the visible page**
 
   Use 150% browser zoom, collapse Advanced controls, hide unrelated browser chrome, and define an
   exact 1280x720 recording region. Reload `/` so the page begins at `Ready for a claim.`
 
-- [ ] **Step 2: Record the fixed interaction timeline**
+- [ ] **Step 2: Record the fixed interaction sequence at live speed**
 
-  - 00:00-00:02: hold on the clean page.
-  - 00:02-00:05: enter the corrected claim.
-  - 00:05-00:06: click **Answer with evidence**.
-  - 00:06-00:11: preserve the real loading state without cutting or accelerating it.
-  - 00:11-00:17: pause on answer, model, strategies, and citations.
-  - 00:17-00:18: click the first citation.
-  - 00:18-00:27: pause on its parent evidence card.
-  - 00:27-00:32: return to the answer and click the second citation.
-  - 00:32-00:48: inspect the second parent evidence card and supplied text.
-  - 00:48-00:52: hold on the evidence boundary.
+  - Hold on the clean page for two seconds.
+  - Enter the corrected claim over roughly three seconds, then click **Answer with evidence**.
+  - Preserve the complete real loading interval without cutting or accelerating it.
+  - Pause on the answer, model, strategies, and citations for six seconds.
+  - Click the first citation, then pause on its parent evidence card for ten seconds.
+  - Hold on the evidence boundary for four seconds, then end the recording.
 
 - [ ] **Step 3: Validate the master before editing**
 
-  Require one continuous file, 1280x720 dimensions, duration from 50 through 54 seconds, readable
+  Require one continuous file, 1280x720 dimensions, the complete live loading interval, readable
   answer/evidence text, visible first-citation click, and no unrelated desktop content. Compute its
-  SHA-256 and record it without committing the master.
+  duration and SHA-256 and record both without committing the master.
 
 ### Task 3: Derive the optimized media
 
@@ -111,7 +107,7 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 
 **Interfaces:**
 - Consumes: exact master SHA-256 from Task 2 and a recorded FFmpeg authoring version.
-- Produces: 22-second GIF, 52-second H.264 MP4, 1280x720 poster, and matching captions.
+- Produces: 22-second GIF, full-length H.264 MP4, 1280x720 poster, and matching captions.
 
 - [ ] **Step 1: Resolve one pinned ephemeral FFmpeg authoring binary**
 
@@ -121,18 +117,21 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
 - [ ] **Step 2: Encode the full video**
 
   Re-encode the complete master to 1280x720 H.264, `yuv420p`, web-optimized MP4 with no audio,
-  preserving the exact 52-second timeline. Target 10-15 MB.
+  preserving its exact timeline. Target 10-15 MB.
 
 - [ ] **Step 3: Encode the GIF from master seconds 0-22**
 
   Scale to 960x540 at 12 fps, generate one optimized palette, apply that palette with bounded
-  dithering, and loop continuously. Do not accelerate inference or reconstruct frames. Target
-  8-10 MB.
+  dithering, and loop continuously. Preserve claim entry, submission, the start of the real loading
+  state, the answer pause, and the first-citation evidence reveal. If the live loading interval
+  prevents those events from fitting in 22 seconds, remove only a middle section of unchanged
+  loading frames and disclose the elapsed-time edit in the GIF and page captions. Do not accelerate
+  inference, alter result frames, or reconstruct application behavior. Target 8-10 MB.
 
 - [ ] **Step 4: Extract the poster and write captions**
 
-  Extract the poster at 00:13 from the master. Write WebVTT cues for claim entry, live answer
-  generation, answer/citations, first evidence, second evidence, and the research-only boundary.
+  Extract the poster from the answer-pause interval. Write WebVTT cues for claim entry, live answer
+  generation, answer/citations, first evidence, and the research-only boundary.
 
 - [ ] **Step 5: Verify media mechanically and visually**
 
@@ -217,4 +216,3 @@ recording; ephemeral pinned FFmpeg authoring tool; static HTML/CSS; GitHub Pages
   Update the report with public URLs and deployment evidence, reconcile Issue #25 and Project #17
   to Done, then remove the clean worktree and local feature branch. Preserve a protected remote
   branch if repository rules refuse deletion.
-
