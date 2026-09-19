@@ -177,3 +177,52 @@ process.stdout.write(JSON.stringify(outcomes));
         "contract",
         "ok",
     ]
+
+
+def test_web_submission_preserves_claim_and_distinguishes_network_from_dependency_failure() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is required for the browser submission contract")
+
+    script = (Path(__file__).resolve().parents[1] / "src/scifact_rag/web/scifact.js").read_text(
+        encoding="utf-8"
+    )
+    start = script.index("async function readJsonResponse")
+    end = script.index("\nconst configuration = parseConfiguration();", start)
+    submission = script[start:end]
+    probe = f"""
+const form = {{ reportValidity: () => true }};
+const queryInput = {{ value: "unchanged fixture claim" }};
+const limitInput = {{ value: "5" }};
+const strategySelect = {{ value: "bm25-token-window-rrf" }};
+const contextSelect = {{ value: "whole-document" }};
+const messages = {{ offline: "offline", unavailable: "unavailable", contract: "contract" }};
+let state;
+const clearResult = () => {{}};
+const setBusy = value => state.busy.push(value);
+const setShowcaseLink = value => {{ state.link = value; }};
+const setFailure = value => {{ state.failure = value; }};
+{submission}
+const outcomes = [];
+for (const mode of ["network", "dependency", "upstream"]) {{
+  state = {{ busy: [], link: false }};
+  globalThis.fetch = async () => {{
+    if (mode === "network") throw new TypeError("PRIVATE_NETWORK_DETAIL");
+    return {{ status: mode === "dependency" ? 503 : 502 }};
+  }};
+  await submitRequest("search");
+  outcomes.push({{ ...state, claim: queryInput.value }});
+}}
+process.stdout.write(JSON.stringify(outcomes));
+"""
+    completed = subprocess.run(
+        [node, "--input-type=module", "-e", probe],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    outcomes = json.loads(completed.stdout)
+    assert [item["failure"] for item in outcomes] == ["offline", "unavailable", "offline"]
+    assert all(item["busy"] == [True, False] and item["link"] for item in outcomes)
+    assert all(item["claim"] == "unchanged fixture claim" for item in outcomes)
+    assert "PRIVATE_NETWORK_DETAIL" not in completed.stdout

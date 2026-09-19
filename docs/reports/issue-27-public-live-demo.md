@@ -194,3 +194,17 @@ not re-inspected in this browser-only session; the earlier frozen deployment ide
 the authoritative release evidence. Latest repository main was `c72c4f0566718046445b3da74aec091a05e38cad`,
 whose Harness, CodeQL and Pages checks passed; that is not a fresh deployed-image attestation.
 Issue #27 remains open with its twelve-row closure gate unchanged.
+
+## Closure repair checkpoint — 2026-09-19
+
+The next bounded acceptance pass found two UI defects: a rejected network fetch used the dependency
+unavailable message instead of the offline message, and showcase button styling overrode the live
+link's `hidden` attribute. The narrow repairs preserve HTTP 503 handling, submitted claims, and
+readiness-driven link visibility. Nine focused tests passed with Node enabled, and an independent
+review approved the four-file repair. Fourteen intercepted browser failure cases across 1440px and
+390px widths retained claims, restored controls, hid raw details, and avoided horizontal overflow.
+Those intercepted cases are deterministic UI evidence, not successful live inference evidence.
+
+The real outage returned HTTP 502 with the Pages offline body, then failed the hidden-link browser
+assertion. Its recovery restored the identical Serve mapping and public readiness. This failed
+attempt is not M09 acceptance. Repeat the browser exercise after the stylesheet is deployed.

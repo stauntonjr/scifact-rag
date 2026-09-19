@@ -749,3 +749,14 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
 - Verification: the same help command succeeded and the showcase evidence loop started.
 - Prevention: follow the configured-runtime requirement when running repository tools; do not
   interpret an incompatible host Python as a project defect.
+
+## 2026-09-19 — Public-demo offline browser acceptance
+
+A real upstream interruption returned the expected HTTP 502 and Pages fallback body, but browser
+acceptance failed because the showcase link remained visible. JavaScript correctly set `hidden`;
+the author stylesheet's `display: inline-block` overrode it. Added a more specific hidden-state
+rule and a regression guard. The exercise's `finally` restored the exact Serve mapping and public
+readiness. A separate intercepted network failure exposed the generic unavailable message;
+fetch rejection now uses the accepted offline message while HTTP 503 remains unavailable. Nine
+focused tests passed with Node enabled; independent review approved both narrow repairs. Final
+public acceptance remains separate from these deterministic checks.
