@@ -55,6 +55,9 @@ def test_adr_identifiers_are_unique_and_match_filenames() -> None:
         "0036-generation-fidelity-evaluation.md": (
             "- Governing issue: [#26](https://github.com/stauntonjr/scifact-rag/issues/26)"
         ),
+        "0037-agent-generation-fidelity-review.md": (
+            "- Governing issue: [#28](https://github.com/stauntonjr/scifact-rag/issues/28)"
+        ),
     }
     for filename, expected_link in exact_governing_links.items():
         text = (_ROOT / "docs/adr" / filename).read_text(encoding="utf-8")
