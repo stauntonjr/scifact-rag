@@ -1,0 +1,40 @@
+[
+  {
+    "from": "3b64f083056a1262692b4f1306310f39c0b69562",
+    "to": "c72c4f0566718046445b3da74aec091a05e38cad",
+    "scope": [
+      "src",
+      "pyproject.toml",
+      "uv.lock",
+      "Dockerfile",
+      "compose.yaml"
+    ],
+    "changedPaths": []
+  },
+  {
+    "from": "243b739f6773db73ee130e26c5111e9a355e8c25",
+    "to": "c72c4f0566718046445b3da74aec091a05e38cad",
+    "scope": [
+      "src",
+      "pyproject.toml",
+      "uv.lock",
+      "Dockerfile",
+      "compose.yaml"
+    ],
+    "changedPaths": []
+  },
+  {
+    "from": "c72c4f0566718046445b3da74aec091a05e38cad",
+    "to": "bd4591e4051454dfc8f20c688b7b883a32ab250d",
+    "scope": [
+      "src",
+      "pyproject.toml",
+      "uv.lock",
+      "Dockerfile",
+      "compose.yaml"
+    ],
+    "changedPaths": [
+      "src/scifact_rag/web/scifact.js"
+    ]
+  }
+]

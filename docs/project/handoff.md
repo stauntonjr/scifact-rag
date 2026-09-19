@@ -108,14 +108,16 @@ is opt-in, best-effort, API-only, and restricted to one Uvicorn worker; the defa
 is disabled, and the offline page makes no claim that a failed live request produced a result. The
 small VPS hosts only the planned edge and Tailscale connectivity; DGX hosts the application,
 database, and inference. The [Issue #27 acceptance ledger](../reports/issue-27-public-live-demo.md)
-owns the shared twelve-case matrix. Eleven rows are provisionally passed against the frozen
-SciFact and VPS revisions, and both repositories record the redacted evidence. A supplemental public landing-page review on 2026-09-19 verified desktop/narrow layouts and
-Pages playback with captions; the acceptance ledger links screenshots and exact observations.
-Result/error-state browser coverage, M09 outage/fallback, an authorized API-only rollback/restoration
-exercise, and independent cross-repository approval remain. Main `c72c4f0` passed Harness, CodeQL
-and Pages checks; release acceptance must still bind checks to the deployed candidate. A successful
-readiness response is an observation, not completion of Issue #27. The accepted Issue #25 recording
-remains the employer-facing fallback; its report now includes the final publication acceptance.
+owns the shared twelve-case matrix. All twelve rows now have accepted evidence, including
+supported/Search/exact-insufficiency browser results at desktop and narrow widths, fourteen fixed
+failure cases, a genuine upstream outage with independent captioned Pages playback, API-only
+rollback/restoration, and fresh privacy/port-isolation checks. The final ledger qualifies reuse of
+unchanged backend and edge evidence and links masked captures. PR #32 repaired network-offline
+messaging and hidden-link styling; runtime source `bd4591e` passed Harness, CodeQL and Pages and
+was deployed as an API-only update. The final closure comments bind integrated report revisions,
+independent verdicts and checks; VPS #4 closes before SciFact #27. The accepted Issue #25 recording
+remains the durable employer-facing fallback. This remains an anonymous best-effort demonstration,
+with no new product release or supported-service promise.
 
 ## Accepted decisions
 

@@ -1,0 +1,10 @@
+{
+  "excluded": "src/scifact_rag/web/scifact.js",
+  "files": 36,
+  "previousSource": "c72c4f0566718046445b3da74aec091a05e38cad",
+  "currentSource": "bd4591e4051454dfc8f20c688b7b883a32ab250d",
+  "previousDigest": "b1854f15528d01bab1885eea6fd2e0bfbfa78e6d8575a25df0bd74954b375ca9",
+  "currentDigest": "b1854f15528d01bab1885eea6fd2e0bfbfa78e6d8575a25df0bd74954b375ca9",
+  "liveDigest": "b1854f15528d01bab1885eea6fd2e0bfbfa78e6d8575a25df0bd74954b375ca9",
+  "equal": true
+}

@@ -1,0 +1,39 @@
+{
+  "start": 1789835662.398144,
+  "before": {
+    "image": "sha256:5f7d77b3c955ccc29fb865dabec8fd02930167532a0846a9ff03e974040cd989",
+    "hash": "6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2",
+    "ports": {
+      "80/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8090"
+        }
+      ]
+    }
+  },
+  "after": {
+    "image": "sha256:e68907b7f8240fc7395666565a87b44b7c6181f17cffa7a9f8b24df792234a00",
+    "hash": "6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2",
+    "ports": {
+      "80/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8090"
+        }
+      ]
+    }
+  },
+  "scriptSha256": "ece974d55f52325b4b4477cd5b7a9d18bbcdaa1b6152ec751688b23dd9547609",
+  "ready": {
+    "schema_version": "readiness/v1",
+    "status": "ready"
+  },
+  "serveRestored": true,
+  "dependenciesUnchanged": true,
+  "publicReady": {
+    "schema_version": "readiness/v1",
+    "status": "ready"
+  },
+  "end": 1789835668.7212071
+}

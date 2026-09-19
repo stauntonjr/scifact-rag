@@ -760,3 +760,11 @@ readiness. A separate intercepted network failure exposed the generic unavailabl
 fetch rejection now uses the accepted offline message while HTTP 503 remains unavailable. Nine
 focused tests passed with Node enabled; independent review approved both narrow repairs. Final
 public acceptance remains separate from these deterministic checks.
+
+The final closure gate initially failed because its ledger test scanned both the canonical matrix
+and the new evidence table, then required the superseded eleven-provisional/one-pending state.
+No live service changed. Independent technical and scope reviews approved updating that existing
+test: scope it to the Acceptance matrix section and require twelve distinct passed, owned rows,
+while preserving evidence-class and rollback assertions. The failed attempt remains in loop
+history. The integration branch after a squash merge also needs a new branch from the integrated
+revision; a fast-forward of the pre-squash feature branch is not expected to succeed.

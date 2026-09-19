@@ -1,0 +1,18 @@
+{
+  "at": "2026-09-19T16:32:27.265Z",
+  "fixture": "q30",
+  "status": 200,
+  "schema": "search-response/v1",
+  "citations": 0,
+  "evidence": 5,
+  "widths": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ]
+}
