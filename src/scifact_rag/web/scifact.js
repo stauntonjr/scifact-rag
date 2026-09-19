@@ -454,11 +454,16 @@ async function submitRequest(operation) {
 
   try {
     const endpoint = operation === "search" ? "/v1/search" : "/v1/ask";
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (_error) {
+      throw new Error("offline");
+    }
     const payload = await readJsonResponse(response);
     if (operation === "search") {
       renderSearch(payload, strategy);
