@@ -1,12 +1,14 @@
 # Issue #27 public live-demo acceptance ledger
 
-Status: application governance reconciliation in progress; every public acceptance row is pending.
+Status: DGX application acceptance complete; every public acceptance row remains pending until the
+coordinated VPS and public-edge session.
 
 ## Identity and boundary
 
 - Governing issue: [scifact-rag #27](https://github.com/stauntonjr/scifact-rag/issues/27)
 - Coordinated edge issue: [vps-srv #4](https://github.com/stauntonjr/vps-srv/issues/4)
 - Application revision at ledger creation: `932961122b3f9efb5d2a0ff782764dd770deaed1`
+- Integrated and deployed application revision: `3b64f083056a1262692b4f1306310f39c0b69562`
 - Final SciFact and VPS revisions: pending; replace only with exact integrated revisions.
 - Recorded Pages entry point: `https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/`
 - Best-effort live URL: `https://scifact.ediacarian.dedyn.io/`
@@ -29,8 +31,64 @@ coverage and narrows classification as required by the approved design: only an 
 `error/v1` busy envelope is application busy, every other 429 is edge rate limiting, and malformed
 or unsupported responses use the fixed contract-mismatch state. No raw body is displayed.
 
-This deterministic repair does not establish deployment acceptance. Independent re-review,
-exact-SHA CI, DGX/VPS evidence, and all twelve public rows remain required.
+The repaired candidate passed the 71-test focused suite, the full local smoke gate, independent
+re-review, and exact-SHA Harness, CodeQL, and Pages workflows before deployment. These results and
+the DGX evidence below establish only the application boundary. VPS evidence and all twelve public
+rows remain required.
+
+## DGX application acceptance
+
+The owner authorized an API-only deployment on 2026-09-18. The deployed source was clean,
+integrated `main` revision `3b64f083056a1262692b4f1306310f39c0b69562`. Inspection before
+mutation confirmed the existing API was already opt-in enabled, ran one Uvicorn worker, and
+published only `127.0.0.1:8090`. The API image was rebuilt first, then only the API was recreated
+with `docker compose up -d --no-deps api`; PostgreSQL, late-interaction retrieval, Qwen, MCP, and
+unrelated workloads were not restarted.
+
+Immutable deployment identity:
+
+| Field | Recorded value |
+|---|---|
+| Deployment timestamp | `2026-09-19T03:03:56.757304318Z` |
+| API container ID | `0da4751bf229a4368211176e52bbc1cfcfe9c720d55bcac0ddb5df1659b507c2` |
+| API image ID | `sha256:5f7d77b3c955ccc29fb865dabec8fd02930167532a0846a9ff03e974040cd989` |
+| API image creation time | `2026-09-18T23:03:35.679994592-04:00` |
+| Compose service configuration hash | `6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2` |
+| Enabled Compose configuration digest | `sha256:b03d3e00b0e22ae382ab287649912f1ee183599f6799ab021282f0eb76ea5bea` |
+| Non-secret public settings | `SCIFACT_PUBLIC_DEMO_ENABLED=true`; `SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN=https://stauntonjr.github.io` |
+| Listener and worker boundary | `127.0.0.1:8090 -> 80/tcp`; one Uvicorn worker |
+
+Unchanged dependency identities after the API recreation:
+
+| Workload | Container ID | Image ID | Start time |
+|---|---|---|---|
+| PostgreSQL | `27275ceda6b6b94cd244199972c0dc583acc08c867038ea08d4111fb4da29eaf` | `sha256:f9542714f92ce110c49dc3ebc1c6cff74a9138257295f20e71a81a9aa6082686` | `2026-09-18T19:34:46.216013959Z` |
+| Late interaction | `0edbb9a905ae2d21e129ad5c9b71475bf4b4d70ae9460db14e34641715a75a73` | `sha256:59f44d868668552a6d63a5fa3425fa8d63591bf0b9cc1eba1dc0624371068af7` | `2026-09-18T19:34:46.218653446Z` |
+| Qwen | `bc9e75e45b59601fbaf758e57d4fdef35b5f2c54f5221bbb4b3099c4c5d0da79` | `sha256:a71834dea8f397350f037feb84269a07d76e7843d5380cc3d82d792ea0ec119f` | `2026-09-18T21:21:14.158149436Z` |
+
+Bounded loopback acceptance ran immediately after recreation. `/healthz`, `/readyz`, and
+`/v1/capabilities` returned their versioned healthy/ready envelopes. Capabilities advertised 33
+retrieval strategies and three context strategies; the four unavailable optional retrieval
+strategies remained explicit. The retained request evidence contains schemas, status, timings,
+counts, and identifiers only:
+
+| Case | Result |
+|---|---|
+| Unavailable optional strategy | HTTP 503 `error/v1` `unavailable` in 0.029466 seconds, fixed message, no details |
+| Shared busy slot | Overlapping valid operations produced HTTP 429 `error/v1` `busy` in 0.008732 seconds for the rejected request, fixed message, no details |
+| Supported Answer | HTTP 200 `answer/v1` in 12.219210 seconds; three citation IDs (`24341590`, `13069283`, `20454006`) all resolved to displayed evidence |
+| Slot recovery Search | HTTP 200 in 0.680542 seconds with five ordered evidence IDs (`12438901`, `24341590`, `20454006`, `13069283`, `31311495`) |
+| Exact insufficiency | HTTP 200 `answer/v1` in 1.448155 seconds; exact `insufficient evidence`, zero citations, five displayed evidence records |
+
+The post-deployment API log window contained 17 lines and six request-route lines. Searches for
+the unique sentinel `SCIFACT_PRIVACY_20260919T0305Z_7F2A` and both accepted claim texts each
+returned zero matches. No request or response body was retained in this report. This is DGX-side
+privacy evidence only; matrix row M12 still requires the coordinated bounded VPS log search.
+
+Rollback is confined to the API: recreate only that service with
+`SCIFACT_PUBLIC_DEMO_ENABLED=false` and `docker compose up -d --no-deps api`, then verify readiness
+and the loopback listener. Do not stop or recreate PostgreSQL, model services, MCP, or unrelated
+workloads. The rollback command is recorded but was not exercised in this stage.
 
 ## Rollback boundary
 
