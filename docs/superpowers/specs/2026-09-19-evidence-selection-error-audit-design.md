@@ -16,7 +16,7 @@ correctness, a demonstrated causal mechanism, or a generation-quality improvemen
 
 Included:
 
-- one narrow CPU-only audit script, its focused tests, and ignored per-case outputs;
+- one tracked narrow CPU-only audit script, its focused tests, and ignored per-case outputs;
 - exact integrity checks over the retained preparation, runtime, ledger, and evaluation inputs;
 - every-prompt outcome reconciliation, abstention accounting, and article-aware aggregates;
 - exact LF-view coverage and selector-rank geometry; and
@@ -72,6 +72,23 @@ artifacts before publishing an audit result. It rejects duplicate, missing, reor
 unreconcilable prompt/article identities; it never fills gaps from memory, regenerates a response,
 or overwrites a pre-existing audit directory.
 
+### Execution location and input staging
+
+The audit runs on the Mac planning host that retains the fixed-reader artifacts, using the Issue
+#31 checkout for the tracked script and tests. It does not assume that the DGX checkout contains
+the artifacts and does not copy, stage, or regenerate them. Invocation requires an explicit,
+read-only absolute `--reader-artifact-root` pointing to the Mac planning worktree's
+`artifacts/evidence-inference-v2/reader-v1/` directory. The script derives only these fixed
+children from that root: `prepared-002/`, `live-20260919-001/`, and
+`evaluation-20260919-001/report.json`.
+
+The local absolute root is environment-specific and appears only in the ignored audit manifest;
+tracked outputs retain relative artifact names and SHA-256 values. The script refuses a missing,
+non-directory, writable-by-the-process root or a root that is not the exact declared tree. It
+binds the three Issue #31 SHA-256 identities and all constituent membership before any case-level
+analysis. A hash failure is an evidence stop, not a request to transplant artifacts into the DGX
+checkout or reconstruct data.
+
 ### Integrity and outcome ledger
 
 The audit binds the Issue #31 SHA-256 values for the preparation manifest, runtime identity, and
@@ -80,6 +97,12 @@ immutable ledger, then rechecks constituent digests and membership. Its input co
 - 20 articles, 101 prompt identities, 101 complete three-arm result triplets;
 - 303 reader requests, 101 selector requests, and 1,599 scored pairs; and
 - the published text-free comparison target to reconcile to the retained native results.
+
+Preparation order and inference order are separate recorded sequences. The audit validates each
+against the ordering field or event sequence in its own retained artifact, then joins prompt and
+article rows strictly by their IDs; it never compares row positions across the two artifacts.
+Duplicate IDs, missing IDs, and a broken order within either source fail the integrity gate, while
+the intentionally different preparation and inference orders do not.
 
 For every prompt, the output preserves only IDs, labels, correctness, and abstention state. It
 creates one row joined by exact prompt and article identity, with reference label and parsed
@@ -135,8 +158,10 @@ qualification or confirmation-custody scope.
 - Reject any missing, duplicate, or extra prompt/article/source-window identity.
 - Reject altered bound digests, membership, arm totals, request/pair totals, labels, offsets, or
   non-finite selector scores.
-- Reject malformed or overlapping structure that cannot be represented as exact half-open input
-  intervals; do not coerce it.
+- Accept valid half-open reference spans even when they touch or overlap, and union them before
+  coverage counting. Reject only malformed reference intervals (non-integers, out-of-bounds, or
+  `start >= end`) and malformed/overlapping source-window structure, because source windows must
+  remain distinct existing views with a determinate order.
 - Reject output paths that already exist instead of overwriting retained evidence.
 - Stop publication of interpretation when integrity or denominator checks fail.
 - Never retrieve external content, call a model, change a selector, or repair retained inputs.
