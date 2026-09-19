@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import itertools
-import os
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,10 +46,24 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def write_json(path: Path, value: object) -> None:
+    """Write an audit output once; retained evidence is never overwritten."""
+    try:
+        with path.open("x") as handle:
+            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+    except FileExistsError as exc:
+        raise AuditError("audit output exists") from exc
+
+
+def read_jsonl(path: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
 def bind_inputs(root: Path, public_results: Path) -> AuditInputs:
     """Bind the exact, locally retained reader inputs without modifying them."""
-    if not root.is_dir() or os.access(root, os.W_OK):
-        raise AuditError("reader artifact root must be an existing read-only directory")
+    if not root.is_dir():
+        raise AuditError("reader artifact root must be an existing directory")
     prepared = root / "prepared-002"
     run = root / "live-20260919-001"
     ledger = run / "ledger.jsonl"
@@ -164,3 +179,64 @@ def public_summary(summary: dict[str, object]) -> dict[str, object]:
         "claim_boundary": "deterministic overlap and rank audit only",
         **{key: summary[key] for key in required},
     }
+
+
+def run_audit(inputs: AuditInputs, output: Path) -> dict[str, object]:
+    """Derive the complete deterministic audit from retained artifacts only."""
+    if output.exists() or inputs.root in output.resolve().parents:
+        raise AuditError("audit output exists or is inside the retained input tree")
+    manifest = json.loads((inputs.prepared / "manifest.json").read_text())
+    prompts = read_jsonl(inputs.prepared / "prompts.jsonl")
+    refs = read_jsonl(inputs.prepared / "references.jsonl")
+    windows = {str(r["article_id"]): r["windows"] for r in read_jsonl(inputs.prepared / "windows.jsonl")}
+    if [str(row["prompt_id"]) for row in prompts] != manifest["prompt_order"]:
+        raise AuditError("preparation prompt order mismatch")
+    if len(prompts) != 101 or len(refs) != 101 or manifest["prompt_count"] != 101 or manifest["selector_pairs"] != 1599:
+        raise AuditError("retained membership totals mismatch")
+    terminals = [r for r in read_jsonl(inputs.ledger) if r.get("status") in ("completed", "failed", "unknown", "context_overflow")]
+    by_key = {(str(r["prompt_id"]), str(r["arm"])): r for r in terminals}
+    if len(by_key) != len(terminals):
+        raise AuditError("duplicate terminal ledger event")
+    rows = reconcile_outcomes(prompts, refs, [by_key[(str(p["prompt_id"]), arm)] for p in prompts for arm in ARMS])
+    outcomes: dict[str, int] = {}
+    geometry: dict[str, int] = {"actual_equals_maximum": 0, "actual_below_maximum": 0, "maximum_complete": 0}
+    case_rows = []
+    ref_by_id = {str(r["prompt_id"]): r for r in refs}
+    for row in rows:
+        pid = row.prompt_id
+        selected = json.loads((inputs.run / f"selected-{pid}.json").read_text())
+        selected_intervals = selected["intervals"]
+        source = windows[row.article_id]
+        validate_source_windows(source)
+        actual = coverage(ref_by_id[pid]["intervals"], selected_intervals)
+        maximum = two_window_upper_bound(source, ref_by_id[pid]["intervals"])
+        key = "|".join(f"{arm}={int(row.correctness[arm])}" for arm in ARMS)
+        outcomes[key] = outcomes.get(key, 0) + 1
+        geometry["actual_equals_maximum" if actual["recall"] == maximum["recall"] else "actual_below_maximum"] += 1
+        geometry["maximum_complete"] += int(maximum["recall"] == 1)
+        case_rows.append({"prompt_id": pid, "article_id": row.article_id, "target": row.target, "predictions": row.predictions, "correctness": row.correctness, "abstentions": row.abstentions, "selected_intervals": selected_intervals, "actual_recall": actual["recall"], "maximum_recall": maximum["recall"], "maximum_intervals": maximum["intervals"]})
+    correct = {arm: sum(row.correctness[arm] for row in rows) for arm in ARMS}
+    abstentions = {arm: sum(row.abstentions[arm] for row in rows) for arm in ARMS}
+    if correct != {"full": 92, "selected": 79, "oracle": 92} or abstentions != {"full": 0, "selected": 5, "oracle": 1}:
+        raise AuditError("published outcome totals do not reconcile")
+    summary = {"input_digests": {"preparation": PREPARATION_SHA256, "runtime": RUNTIME_SHA256, "ledger": LEDGER_SHA256}, "prompt_count": 101, "article_count": len({r.article_id for r in rows}), "outcomes": {"correct": correct, "abstentions": abstentions, "partition": outcomes}, "geometry": geometry, "decision": "insufficient-evidence"}
+    output.mkdir(parents=True)
+    write_json(output / "selection-audit-manifest.json", {"schema_version": "evidence-selection-audit/v1", **summary["input_digests"]})
+    with (output / "case-rows.jsonl").open("x") as handle:
+        for row in case_rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    write_json(output / "summary.json", summary)
+    return summary
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reader-artifact-root", type=Path, required=True)
+    parser.add_argument("--public-results", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    print(json.dumps(public_summary(run_audit(bind_inputs(args.reader_artifact_root, args.public_results), args.output)), indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

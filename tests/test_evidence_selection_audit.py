@@ -29,15 +29,11 @@ def make_retained_tree(tmp_path: Path) -> tuple[Path, Path]:
     return root, published
 
 
-def test_bind_inputs_requires_exact_read_only_reader_tree(tmp_path: Path):
+def test_bind_inputs_requires_exact_reader_tree_not_read_only_permissions(tmp_path: Path):
     root = tmp_path / "reader-v1"
     root.mkdir()
-    root.chmod(0o555)
-    try:
-        with pytest.raises(audit.AuditError, match="prepared-002"):
-            audit.bind_inputs(root, tmp_path / "published.json")
-    finally:
-        root.chmod(0o755)
+    with pytest.raises(audit.AuditError, match="prepared-002"):
+        audit.bind_inputs(root, tmp_path / "published.json")
 
 
 def test_bind_inputs_rejects_digest_drift_before_case_loading(tmp_path: Path):
@@ -115,3 +111,10 @@ def test_public_summary_excludes_case_content():
     assert published["prompt_count"] == 101
     assert "raw_text" not in published
     assert published["claim_boundary"] == "deterministic overlap and rank audit only"
+
+
+def test_write_json_refuses_existing_output(tmp_path: Path):
+    output = tmp_path / "audit.json"
+    audit.write_json(output, {"schema_version": "test/v1"})
+    with pytest.raises(audit.AuditError, match="output exists"):
+        audit.write_json(output, {"schema_version": "test/v1"})
