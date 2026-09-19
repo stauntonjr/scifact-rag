@@ -100,3 +100,18 @@ def test_two_window_upper_bound_cannot_cover_three_disjoint_required_windows():
         [[0, 2], [4, 6], [8, 10]],
     )
     assert result["recall"] == pytest.approx(2 / 3)
+
+
+def test_public_summary_excludes_case_content():
+    published = audit.public_summary({
+        "input_digests": {"ledger": "a" * 64},
+        "prompt_count": 101,
+        "article_count": 20,
+        "outcomes": {"selected_correct": 79},
+        "geometry": {"max_complete": 3},
+        "decision": "no-intervention",
+        "raw_text": "must not escape",
+    })
+    assert published["prompt_count"] == 101
+    assert "raw_text" not in published
+    assert published["claim_boundary"] == "deterministic overlap and rank audit only"

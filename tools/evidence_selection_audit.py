@@ -145,3 +145,22 @@ def two_window_upper_bound(
     intervals = [[int(row["start"]), int(row["end"])] for row in selected]
     result = coverage(reference, intervals)
     return {"intervals": tuple(map(tuple, intervals)), **result}
+
+
+def public_summary(summary: dict[str, object]) -> dict[str, object]:
+    """Project an audited aggregate without allowing case payloads into tracked output."""
+    required = (
+        "input_digests",
+        "prompt_count",
+        "article_count",
+        "outcomes",
+        "geometry",
+        "decision",
+    )
+    if any(key not in summary for key in required):
+        raise AuditError("audit summary is incomplete")
+    return {
+        "schema_version": "evidence-selection-error-audit-summary/v1",
+        "claim_boundary": "deterministic overlap and rank audit only",
+        **{key: summary[key] for key in required},
+    }
