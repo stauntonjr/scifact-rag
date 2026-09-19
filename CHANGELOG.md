@@ -14,6 +14,11 @@ All notable changes to the harness are recorded here. The harness version and a 
   capability-discovery, fixed busy/unavailable errors, exact Pages origin, and shared inference
   slot. The live path remains anonymous, best-effort, pre-1.0, and carries no uptime or supported
   third-party API commitment.
+  Eleven shared public-matrix rows are provisionally complete against frozen application and edge
+  identities, including cited Answer, exact insufficiency, Search, busy/rate-limit separation,
+  dependency restoration, fallback, kill switch, port isolation, and bounded log-privacy evidence.
+  Final Issue closure still requires a managed-browser visual pass, exact-revision SciFact CI, and
+  independent cross-repository approval.
 
 - Added a linked README showcase and static GitHub Pages video captured from the real
   evidence-inspection UI. The recording uses the grammatically corrected claim `Side effects of

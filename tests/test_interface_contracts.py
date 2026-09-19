@@ -375,12 +375,13 @@ def test_project_contract_bounds_the_public_demo() -> None:
     } <= set(project["engineering"]["versioning"]["public_contract"])
 
 
-def test_public_demo_acceptance_ledger_has_twelve_pending_owned_rows() -> None:
+def test_public_demo_acceptance_ledger_has_eleven_provisional_and_one_pending_owned_rows() -> None:
     report = (_ROOT / "docs/reports/issue-27-public-live-demo.md").read_text(encoding="utf-8")
     rows = [line for line in report.splitlines() if line.startswith("| M")]
 
     assert len(rows) == 12
-    assert all("| pending |" in row for row in rows)
+    assert sum("| provisionally passed |" in row for row in rows) == 11
+    assert sum("| pending |" in row for row in rows) == 1
     assert all(
         any(f"| {owner} |" in row for owner in ("scifact-rag", "vps-srv", "shared")) for row in rows
     )

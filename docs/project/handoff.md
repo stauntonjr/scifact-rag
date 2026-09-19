@@ -110,8 +110,11 @@ is opt-in, best-effort, API-only, and restricted to one Uvicorn worker; the defa
 is disabled, and the offline page makes no claim that a failed live request produced a result. The
 small VPS hosts only the planned edge and Tailscale connectivity; DGX hosts the application,
 database, and inference. The [Issue #27 acceptance ledger](../reports/issue-27-public-live-demo.md)
-owns the shared twelve-case matrix. Its rows remain pending until exact deployment evidence exists,
-so public availability and Issue closure are not yet claimed.
+owns the shared twelve-case matrix. Eleven rows are provisionally passed against the frozen
+SciFact and VPS revisions, and both repositories record the redacted evidence. The final visual
+desktop/narrow-layout browser check could not run because no managed browser was available.
+Exact-revision SciFact integration/CI and independent cross-repository approval also remain;
+public availability and Issue closure are therefore not yet claimed.
 
 ## Accepted decisions
 

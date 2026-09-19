@@ -722,3 +722,20 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   v1/v2 output paths.
 - Prevention: cross-boundary completion semantics must share explicit schema-derived mappings and
   executable parity cases; evidence-producing writers must test retained destinations before use.
+
+## SCIFACT-RAG-012: patch helper could not enter the configured sandbox
+
+- Date: 2026-09-19.
+- Workflow: record the shared public-demo acceptance packet in an isolated worktree.
+- Failed approach: invoke the required patch helper repeatedly after its sandbox setup reported a
+  nonexistent nested `.git/.git` remount target.
+- Error signature: sandbox setup failed before reading the target file, with a remount error for
+  `mac-codex-project/.git/.git`.
+- Mutation check: the failed patch invocations changed no project or external state; a tested empty
+  mount-point workaround did not persist.
+- Corrected path: apply the same bounded unified diffs through `git apply` with repository-scoped
+  host authority, then inspect the resulting diff normally.
+- Verification: `git diff --check` and the task's affected checks validate the resulting tracked
+  changes before commit.
+- Prevention: after this exact sandbox-bootstrap signature, do not repeat the patch helper; use one
+  explicit unified-diff fallback and preserve this correction for future runs.
