@@ -13,6 +13,7 @@ from typing import Any
 
 from scifact_rag.generation_review_pilot import (
     AgentReviewValidationError,
+    build_agent_review_envelope,
     build_pilot_selection,
     build_review_v2_worksheet,
     build_source_inventory,
@@ -158,6 +159,44 @@ def _command_project(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def _command_wrap(args: argparse.Namespace) -> dict[str, object]:
+    source = _load_json(args.source)
+    source_rows = _source_rows(source)
+    source_row = source_rows.get(args.response_id)
+    if source_row is None:
+        raise AgentReviewValidationError("response_id is not in the source worksheet")
+    raw_output = args.raw_output.read_text(encoding="utf-8").rstrip("\n")
+    try:
+        judgment = json.loads(raw_output)
+    except json.JSONDecodeError as exc:
+        raise AgentReviewValidationError("raw model output is not one JSON object") from exc
+    if not isinstance(judgment, dict):
+        raise AgentReviewValidationError("raw model output must be a JSON object")
+    envelope = build_agent_review_envelope(
+        judgment,
+        source_row,
+        role=args.role,
+        provider=args.provider,
+        model=args.model,
+        model_revision=args.model_revision,
+        session_id=args.session_id,
+        request_id=args.request_id,
+        submitted_at=args.submitted_at,
+        prompt_version=args.prompt_version,
+        prompt_sha256=_sha256(args.prompt),
+        rubric_version=args.rubric_version,
+        rubric_sha256=_sha256(args.rubric),
+        raw_output=raw_output,
+    )
+    _write_json(args.output, envelope)
+    return {
+        "agent_review_sha256": canonical_json_sha256(envelope),
+        "output": str(args.output),
+        "response_id": args.response_id,
+        "role": args.role,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -195,6 +234,24 @@ def _parser() -> argparse.ArgumentParser:
     project.add_argument("--review-output", type=Path, required=True)
     project.add_argument("--adequacy-output", type=Path, required=True)
     project.set_defaults(handler=_command_project)
+
+    wrap = subparsers.add_parser("wrap", help="Wrap and validate one raw model judgment")
+    wrap.add_argument("--source", type=Path, required=True)
+    wrap.add_argument("--response-id", required=True)
+    wrap.add_argument("--raw-output", type=Path, required=True)
+    wrap.add_argument("--role", choices=("r1", "r2", "adjudicator"), required=True)
+    wrap.add_argument("--provider", required=True)
+    wrap.add_argument("--model", required=True)
+    wrap.add_argument("--model-revision")
+    wrap.add_argument("--session-id", required=True)
+    wrap.add_argument("--request-id")
+    wrap.add_argument("--submitted-at", required=True)
+    wrap.add_argument("--prompt", type=Path, required=True)
+    wrap.add_argument("--prompt-version", required=True)
+    wrap.add_argument("--rubric", type=Path, required=True)
+    wrap.add_argument("--rubric-version", required=True)
+    wrap.add_argument("--output", type=Path, required=True)
+    wrap.set_defaults(handler=_command_wrap)
     return parser
 
 

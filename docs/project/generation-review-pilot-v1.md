@@ -98,8 +98,9 @@ Apply these rules:
   the claim. `insufficient evidence` is appropriate when the supplied context cannot responsibly
   answer; it is inadequate when a material supported answer is available.
 - `supplied_context_answerability` asks whether the supplied evidence can support a responsible
-  substantive or insufficiency answer. Assess `answer_adequacy` only when answerability is
-  `answerable`; otherwise it must be `not_applicable`.
+  substantive answer to the scientific claim. Evidence that only supports declining the claim is
+  `not_answerable`. Assess `answer_adequacy` only when answerability is `answerable`; otherwise it
+  must be `not_applicable`.
 - A material error requires a bounded answer span and either bounded contrasting evidence spans or
   explicit `evidence_absent=true`. Clean results contain no material-error annotation.
 

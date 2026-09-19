@@ -336,6 +336,58 @@ def validate_agent_review(
     return dict(item)
 
 
+def build_agent_review_envelope(
+    judgment: Mapping[str, Any],
+    source_row: Mapping[str, Any],
+    *,
+    role: str,
+    provider: str,
+    model: str,
+    model_revision: str | None,
+    session_id: str,
+    request_id: str | None,
+    submitted_at: str,
+    prompt_version: str,
+    prompt_sha256: str,
+    rubric_version: str,
+    rubric_sha256: str,
+    raw_output: str,
+    latency_ms: float | None = None,
+) -> dict[str, Any]:
+    """Wrap one raw model judgment with explicit immutable provenance, then validate it."""
+    expected = {"review_v2", "adequacy", "rationale"}
+    errors: list[str] = []
+    _strict_object(judgment, expected, "raw judgment", errors)
+    if errors:
+        raise AgentReviewValidationError("; ".join(errors))
+    envelope = {
+        "schema_version": AGENT_REVIEW_SCHEMA,
+        "response_id": source_row.get("response_id"),
+        "role": role,
+        "review_v2": judgment.get("review_v2"),
+        "adequacy": judgment.get("adequacy"),
+        "rationale": judgment.get("rationale"),
+        "provenance": {
+            "input_sha256": canonical_json_sha256(source_row),
+            "latency_ms": latency_ms,
+            "model": model,
+            "model_revision": model_revision,
+            "prompt_sha256": prompt_sha256,
+            "prompt_version": prompt_version,
+            "provider": provider,
+            "raw_output": raw_output,
+            "raw_output_sha256": hashlib.sha256(raw_output.encode()).hexdigest(),
+            "request_id": request_id,
+            "rubric_sha256": rubric_sha256,
+            "rubric_version": rubric_version,
+            "session_id": session_id,
+            "submitted_at": submitted_at,
+            "usage": {"input_tokens": None, "output_tokens": None, "total_tokens": None},
+        },
+    }
+    return validate_agent_review(envelope, source_row)
+
+
 def canonical_json_sha256(value: object) -> str:
     """Digest canonical newline-terminated JSON used by pilot artifacts."""
     encoded = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()

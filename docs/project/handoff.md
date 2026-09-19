@@ -1,5 +1,26 @@
 # Project handoff
 
+## Development reviewer pilot stopped at preflight
+
+[Issue #28](https://github.com/stauntonjr/scifact-rag/issues/28) implements the strict
+[agent-review contracts](generation-review-pilot-v1.md), accepts
+[ADR-0037](../adr/0037-agent-generation-fidelity-review.md), and inventories all 42 exposed
+historical responses into 20 connected claim/article-family groups. The frozen split contains 11
+clarification responses and 31 assessment responses without splitting a group.
+
+The six-task fictional preflight produced only two source-valid envelopes. Both adjudicator
+attempts were malformed, so staged evidence-first adjudication was not validated before the
+prospective preflight ceiling. The [pilot report](../reports/generation-review-pilot-v1.md) records
+`insufficient-evidence`; no real development response was sent to a reviewer, no agreement metric
+was computed, and the panel is not qualified for Candidate A screening. Do not retry, change the
+model panel, enlarge the budget, or relax the schema without a separately accepted revision.
+
+The [confirmation custody specification](generation-confirmation-custody-v1.md) is documented but
+status remains `incomplete`: no separately permissioned owner-controlled environment or fabricated
+sentinel rehearsal exists. Candidate A and confirmation acquisition/execution remain separate and
+unauthorized. No generation improvement, human-gold calibration, model independence, or untouched
+confirmation result is established.
+
 ## Generation-fidelity evaluation foundation
 
 [Issue #26](https://github.com/stauntonjr/scifact-rag/issues/26) establishes a model-free,

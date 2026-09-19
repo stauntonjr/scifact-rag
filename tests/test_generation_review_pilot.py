@@ -9,6 +9,7 @@ import pytest
 from scifact_rag.generation_review_pilot import (
     AgentReviewValidationError,
     agreement_summary,
+    build_agent_review_envelope,
     build_article_family_groups,
     build_pilot_selection,
     build_review_v2_worksheet,
@@ -118,6 +119,40 @@ def test_validate_agent_review_accepts_exact_source_bound_envelope() -> None:
 
     assert validated["response_id"] == RESPONSE_ID
     assert validated["review_v2"]["causal_strengthening"] == "yes"
+
+
+def test_build_agent_review_envelope_adds_provenance_and_validates() -> None:
+    expected = _review()
+    judgment = {
+        "review_v2": expected["review_v2"],
+        "adequacy": expected["adequacy"],
+        "rationale": expected["rationale"],
+    }
+    raw_output = json.dumps(judgment, separators=(",", ":"))
+
+    envelope = build_agent_review_envelope(
+        judgment,
+        _source_row(),
+        role="r1",
+        provider="fixture-provider",
+        model="fixture-model",
+        model_revision=None,
+        session_id="fixture-session",
+        request_id=None,
+        submitted_at="2026-09-19T15:00:00Z",
+        prompt_version="reviewer-r1/v1",
+        prompt_sha256="b" * 64,
+        rubric_version="generation-review-pilot/v1",
+        rubric_sha256="c" * 64,
+        raw_output=raw_output,
+    )
+
+    assert envelope["provenance"]["raw_output_sha256"] == hashlib.sha256(
+        raw_output.encode()
+    ).hexdigest()
+    assert envelope["provenance"]["input_sha256"] == hashlib.sha256(
+        (json.dumps(_source_row(), sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
 
 
 @pytest.mark.parametrize(
