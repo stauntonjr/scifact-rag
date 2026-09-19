@@ -44,20 +44,16 @@ def test_adr_identifiers_are_unique_and_match_filenames() -> None:
                 f"{path.name}: filename {filename_number} != heading {heading_number}"
             )
 
-    duplicates = {
-        number: paths for number, paths in identifiers.items() if len(paths) != 1
-    }
+    duplicates = {number: paths for number, paths in identifiers.items() if len(paths) != 1}
     assert duplicates == {}
     assert mismatches == []
 
     exact_governing_links = {
         "0035-public-live-demo-edge.md": (
-            "- Governing issue: [#27]"
-            "(https://github.com/stauntonjr/scifact-rag/issues/27)"
+            "- Governing issue: [#27](https://github.com/stauntonjr/scifact-rag/issues/27)"
         ),
         "0036-generation-fidelity-evaluation.md": (
-            "- Governing issue: [#26]"
-            "(https://github.com/stauntonjr/scifact-rag/issues/26)"
+            "- Governing issue: [#26](https://github.com/stauntonjr/scifact-rag/issues/26)"
         ),
     }
     for filename, expected_link in exact_governing_links.items():
@@ -302,8 +298,7 @@ def test_http_capability_is_active_with_exact_delivery_contract() -> None:
     assert contract["runtime_dependencies"] == ["FastAPI", "Uvicorn"]
     assert (
         "uv run pytest tests/test_public_demo.py tests/test_health_adapters.py "
-        "tests/test_http_api.py tests/test_interface_contracts.py"
-        in contract["ci_checks"]
+        "tests/test_http_api.py tests/test_interface_contracts.py" in contract["ci_checks"]
     )
     assert set(contract["implementation_paths"]) == {
         "src/scifact_rag/http_api.py",
@@ -324,9 +319,7 @@ def test_http_capability_is_active_with_exact_delivery_contract() -> None:
 
 def test_web_capability_is_active_with_exact_delivery_contract() -> None:
     catalog = json.loads((_ROOT / "harness/capabilities.json").read_text(encoding="utf-8"))
-    capability = next(
-        item for item in catalog["capabilities"] if item["id"] == "web-interface"
-    )
+    capability = next(item for item in catalog["capabilities"] if item["id"] == "web-interface")
 
     assert capability["status"] == "active"
     contract = capability["active_contract"]
@@ -336,8 +329,7 @@ def test_web_capability_is_active_with_exact_delivery_contract() -> None:
     ]
     assert (
         "uv run pytest tests/test_web_ui.py tests/test_http_api.py "
-        "tests/test_showcase.py tests/test_interface_contracts.py"
-        in contract["ci_checks"]
+        "tests/test_showcase.py tests/test_interface_contracts.py" in contract["ci_checks"]
     )
     assert set(contract["implementation_paths"]) == {
         "src/scifact_rag/web/__init__.py",
@@ -372,9 +364,9 @@ def test_project_contract_bounds_the_public_demo() -> None:
         "A supported third-party public API or uptime objective",
         "Automated DGX or model-service lifecycle management",
     } <= set(project["intent"]["out_of_scope"])
-    assert "application publication retained on host loopback" in project["constraints"][
-        "deployment"
-    ]
+    assert (
+        "application publication retained on host loopback" in project["constraints"]["deployment"]
+    )
     assert "single-worker API" in project["constraints"]["deployment"]
     assert {
         "Opt-in public-demo readiness, capability-discovery, and fixed busy/unavailable error schemas",
@@ -390,8 +382,7 @@ def test_public_demo_acceptance_ledger_has_twelve_pending_owned_rows() -> None:
     assert len(rows) == 12
     assert all("| pending |" in row for row in rows)
     assert all(
-        any(f"| {owner} |" in row for owner in ("scifact-rag", "vps-srv", "shared"))
-        for row in rows
+        any(f"| {owner} |" in row for owner in ("scifact-rag", "vps-srv", "shared")) for row in rows
     )
     assert {"deterministic", "live non-inference", "live inference"} == {
         evidence_class

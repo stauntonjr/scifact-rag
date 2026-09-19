@@ -78,6 +78,22 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
 - Prevention: browser response classification now has executable cases rather than source-marker
   assertions alone; the accepted design remains the protocol authority.
 
+## FORMAT-CI-007: focused lint omitted the repository format gate
+
+- Date: 2026-09-18. Workflow: Issue #27 predeployment integration.
+- Failed approach: treated focused Ruff lint, tests, and whitespace checks as sufficient before
+  push without running the repository's separate Ruff format check.
+- Error signature: exact-SHA Harness run `35415107967` failed in `make smoke` because
+  `tests/test_interface_contracts.py` and `tests/test_web_ui.py` would be reformatted. The harness
+  contract check itself passed; no deployment or issue mutation occurred.
+- Correction: run the repository formatter on exactly the two reported files, then rerun the
+  focused suite and `make smoke` before committing and pushing the repaired SHA.
+- Verification: the repaired local `make smoke` passed all harness, format, lint, type, 501 unit,
+  package, and Compose checks; the focused public-demo suite passed 71 tests. Exact-SHA CI remains
+  required after push; preserve this entry as a failure even after that check passes.
+- Prevention: every pre-push candidate must run the declared `format_check` or `make smoke`; lint
+  and `git diff --check` do not establish formatter conformance.
+
 ## GH-PLANNING-001: Classic Project shortcut used for a Projects v2 item
 
 - Date: 2026-08-24.

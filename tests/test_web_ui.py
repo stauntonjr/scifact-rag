@@ -122,9 +122,9 @@ def test_web_response_classifier_distinguishes_public_failure_contracts() -> Non
     if node is None:
         pytest.skip("Node.js is required for the browser response classifier contract")
 
-    script = (
-        Path(__file__).resolve().parents[1] / "src/scifact_rag/web/scifact.js"
-    ).read_text(encoding="utf-8")
+    script = (Path(__file__).resolve().parents[1] / "src/scifact_rag/web/scifact.js").read_text(
+        encoding="utf-8"
+    )
     start = script.index("async function readJsonResponse")
     end = script.index("\nasync function submitRequest", start)
     classifier = script[start:end]
