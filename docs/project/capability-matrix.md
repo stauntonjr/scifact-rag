@@ -46,9 +46,14 @@ focused integration oracle; the full 300-query benchmark remains authoritative. 
 accepted the CLI proof, the owner activated `http-api-interface` for Issue #11's three-operation,
 loopback-only FastAPI adapter with explicit CLI parity. For Issue #12, the owner activated
 `mcp-interface` for exactly two read-only, closed-corpus tools over the same application layer,
-using the official SDK and a DGX-local loopback client path.
+using the official SDK and a DGX-local loopback client path. For Issue #28, the owner activated
+`role-separated-analysis` for one bounded development-review panel: R1 and R2 own disjoint
+first-pass model artifacts, A owns staged adjudication, the coordinator owns validation and
+aggregation, and the human owner retains approval. Its implementation is limited to the strict
+agent-review envelope, retained 42-response inventory, frozen pilot protocol, and report; it does
+not establish model independence or authorize confirmation access.
 
-Durable memory, architecture analysis, complexity review, and role parallelism remain inactive.
+Durable memory, architecture analysis, and complexity review remain inactive.
 The web capability remains the owner of the packaged UI; the public showcase is a static delivery
 artifact and does not activate a second web or deployment capability. The increase to 3.72 chunk
 vectors per document is below the accepted four-vector budget and does not yet justify activating

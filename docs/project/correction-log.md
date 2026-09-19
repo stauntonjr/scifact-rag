@@ -768,3 +768,74 @@ test: scope it to the Acceptance matrix section and require twelve distinct pass
 while preserving evidence-class and rollback assertions. The failed attempt remains in loop
 history. The integration branch after a squash merge also needs a new branch from the integrated
 revision; a fast-forward of the pre-squash feature branch is not expected to succeed.
+
+## SCIFACT-RAG-013: isolated worktree repeated the protected uv-cache path
+
+- Date: 2026-09-19.
+- Workflow: establish the clean Issue #28 implementation baseline in a new linked worktree.
+- Failed approach: run locked synchronization and the smoke gate with uv's default shared cache,
+  repeating the protected-cache assumption already recorded in SCIFACT-RAG-010.
+- Error signature: uv could not create its cache lock temporary file beneath `/home/jrs/.cache/uv`
+  because that host path was read-only; project tests had not started.
+- Mutation check: the failure changed no tracked project, model, service, scientific artifact, or
+  external state.
+- Corrected path: use the task-specific writable cache `/tmp/scifact-issue28-uv-cache` while
+  retaining the locked dependency graph and the isolated worktree environment.
+- Verification: locked synchronization completed and `make smoke` passed the harness, Ruff,
+  Pyright, 501 non-integration tests, package smoke, and Compose configuration.
+- Prevention: isolated worktree setup must choose a verified writable task-specific uv cache before
+  the first synchronization command when the shared host cache is outside the writable profile.
+
+## SCIFACT-RAG-014: review inventory assumed the product fallback was the reviewed answer
+
+- Date: 2026-09-19.
+- Workflow: reconcile the 42 retained development responses into the Issue #28 pilot inventory.
+- Failed approach: require every historical worksheet answer to equal the mapped result's product
+  `answer_text`, even though the frozen review protocol defines distinct responses using the raw
+  generated text and removes its leading verdict before review.
+- Error signature: three mapped pioglitazone rows contained the citation-gated product fallback
+  `insufficient evidence` while the worksheet retained the exact verdict-stripped generated prose.
+- Mutation check: the failed inventory attempt wrote no output and changed no source artifact,
+  historical label, model, service, or external state.
+- Corrected path: accept only the exact product answer or the exact raw generation after removing a
+  valid frozen verdict line, while still requiring the mapped raw line digest and every supplied
+  evidence title, text, and document identifier to match exactly.
+- Verification: 13 focused tests pass, and the retained artifacts reconcile to 42 responses across
+  20 connected article-family groups without modifying any source byte.
+- Prevention: provenance validators must implement the prospective review artifact's documented
+  answer boundary, not infer that a later product fallback is always the reviewed representation.
+
+## SCIFACT-RAG-015: repository harness check used a guessed filename
+
+- Date: 2026-09-19.
+- Workflow: run affected checks after the Issue #28 review repair batch.
+- Failed approach: invoke `tools/check_harness.py` from recollection instead of resolving the
+  repository's actual harness entry point.
+- Error signature: Python reported that `tools/check_harness.py` did not exist after all preceding
+  focused tests and static checks had passed.
+- Mutation check: the failed invocation changed no tracked file, scientific artifact, model,
+  service, or external state.
+- Corrected path: locate the checked-in entry point and run `python3 tools/harness_check.py`.
+- Verification: the authoritative harness check passed all listed project, ADR, capability, role,
+  adapter, schema, planning, and engineering-tooling checks.
+- Prevention: resolve repository check entry points from the Makefile or tracked tools before
+  composing a multi-command verification batch.
+
+## SCIFACT-RAG-016: release-impact evidence was refreshed after candidate verification
+
+- Date: 2026-09-19.
+- Workflow: close the Issue #28 engineering loop after independent approval and the final full
+  gate.
+- Failed approach: refresh the current-attempt release-impact record after independent review and
+  the full gate had already bound themselves to the previous candidate identity.
+- Error signature: the completion gate rejected every acceptance check, the verifier verdict, the
+  latest review, and the full gate as stale; the accumulated repair attempts then reached the
+  configured retry ceiling.
+- Mutation check: the ordering failure changed only ignored loop metadata. Commit `863ba8d`, its
+  implementation, scientific artifacts, model budget, services, and external state were unchanged.
+- Corrected path: use the owner-authorized recovery handoff, finish all tracked mutations first,
+  then record release impact before independent review and exactly one final full gate.
+- Verification: the resumed revision must pass the loop completion gate with current-candidate
+  release impact, independent approval, and one current-attempt full gate.
+- Prevention: treat release impact as candidate identity: record it after the last tracked mutation
+  and before review or full-gate evidence.
