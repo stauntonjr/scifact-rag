@@ -791,3 +791,22 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   adapter, schema, planning, and engineering-tooling checks.
 - Prevention: resolve repository check entry points from the Makefile or tracked tools before
   composing a multi-command verification batch.
+
+## SCIFACT-RAG-016: release-impact evidence was refreshed after candidate verification
+
+- Date: 2026-09-19.
+- Workflow: close the Issue #28 engineering loop after independent approval and the final full
+  gate.
+- Failed approach: refresh the current-attempt release-impact record after independent review and
+  the full gate had already bound themselves to the previous candidate identity.
+- Error signature: the completion gate rejected every acceptance check, the verifier verdict, the
+  latest review, and the full gate as stale; the accumulated repair attempts then reached the
+  configured retry ceiling.
+- Mutation check: the ordering failure changed only ignored loop metadata. Commit `863ba8d`, its
+  implementation, scientific artifacts, model budget, services, and external state were unchanged.
+- Corrected path: use the owner-authorized recovery handoff, finish all tracked mutations first,
+  then record release impact before independent review and exactly one final full gate.
+- Verification: the resumed revision must pass the loop completion gate with current-candidate
+  release impact, independent approval, and one current-attempt full gate.
+- Prevention: treat release impact as candidate identity: record it after the last tracked mutation
+  and before review or full-gate evidence.
