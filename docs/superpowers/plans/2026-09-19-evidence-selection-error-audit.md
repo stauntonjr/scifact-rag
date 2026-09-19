@@ -10,6 +10,23 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-19-evidence-selection-error-audit-design.md`
 
+## Recovery rulings — 2026-09-19
+
+The recovery completes the existing accepted slice on its Mac artifact host. Prior helper commits
+are retained; they did not meet the full acceptance criteria. The original DGX loop remains
+preserved, and recovery evidence starts at `20260919T172022Z-d75f4696` before recovery edits.
+
+The root-permission check in the illustrative design/plan was an implementation mistake: the
+owner's retained directory is writable, while the audit must treat its contents as immutable.
+Do not chmod or copy it. Check resolved output separation and before/after input digests instead.
+This clarification preserves the accepted prohibition on modifying the evidence.
+
+Issue #31 requires definitions frozen before case analysis. Persist an ignored, text-free input
+manifest after integrity validation and before deriving outcomes. If analysis then fails, retain
+that manifest as failure evidence but emit no successful summary. This supersedes the illustrative
+instruction below to leave no partial directory at all. It never permits overwriting an existing
+output or treating a partial directory as completion.
+
 ## Global Constraints
 
 - Execute only on the Mac planning host with `--reader-artifact-root` set to the retained
@@ -25,7 +42,7 @@
 
 ## Review Focus
 
-- A Mac-root path that is missing, writable, or not the declared reader-v1 layout must fail before any input is opened for analysis.
+- A Mac root that is missing or has mismatched retained identities must fail before case analysis. Read-only is an audit behavior: owner-writable inputs remain valid; do not chmod them. Reject output paths inside the resolved input tree and verify input hashes after analysis.
 - A valid overlap/touch in reference intervals must be unioned, while a source-window overlap must fail instead of being silently merged.
 - Preparation order and ledger/inference order may differ; ID joins must remain correct and a broken order within either artifact must fail.
 - An `insufficient_evidence` output must remain an abstention, never be normalized to native neutral, and remain wrong in correctness totals.
@@ -85,8 +102,8 @@ class AuditInputs:
 
 
 def bind_inputs(root: Path, public_results: Path) -> AuditInputs:
-    if not root.is_dir() or os.access(root, os.W_OK):
-        raise AuditError("reader artifact root must be an existing read-only directory")
+    if not root.is_dir():
+        raise AuditError("reader artifact root must be an existing directory")
     prepared = root / "prepared-002"
     run = root / "live-20260919-001"
     ledger = run / "ledger.jsonl"
@@ -374,7 +391,7 @@ Expected: PASS, with a fresh text-free artifact only after complete validation.
 - [ ] **Step 5: Execute the retained audit on the Mac planning host**
 
 Set `READER_ARTIFACT_ROOT` to the exact absolute `reader-v1` path in the Mac planning worktree,
-not a copied DGX location. Run the command only after read-only root and digest checks pass.
+not a copied DGX location. Run with the verified Python 3.12 environment after identity checks pass. On the planning Mac, `/tmp/scifact-reader-env/bin/python` and `/opt/homebrew/bin/uv` are available; non-login SSH PATH discovery is not a runtime availability check.
 Record the exact absolute root in the ignored manifest only. If the input root is unavailable or
 any identity mismatches, record the evidence stop in the tracked report instead; do not regenerate
 or transplant inputs.
