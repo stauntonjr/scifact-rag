@@ -1,5 +1,27 @@
 # Project handoff
 
+## Development reviewer pilot stopped at preflight
+
+[Issue #28](https://github.com/stauntonjr/scifact-rag/issues/28) implements the strict
+[agent-review contracts](generation-review-pilot-v1.md), accepts
+[ADR-0037](../adr/0037-agent-generation-fidelity-review.md), and inventories all 42 exposed
+historical responses into 20 connected claim/article-family groups. The frozen split contains 11
+clarification responses and 31 assessment responses without splitting a group.
+
+The six-task fictional preflight produced only two source-valid envelopes. No attributable valid
+adjudicator envelope was retained; two coordinator-assigned raw blobs were malformed, so staged
+evidence-first adjudication was not validated before the prospective preflight ceiling. The
+[pilot report](../reports/generation-review-pilot-v1.md) records
+`insufficient-evidence`; no real development response was sent to a reviewer, no agreement metric
+was computed, and the panel is not qualified for Candidate A screening. Do not retry, change the
+model panel, enlarge the budget, or relax the schema without a separately accepted revision.
+
+The [confirmation custody specification](generation-confirmation-custody-v1.md) is documented but
+status remains `incomplete`: no separately permissioned owner-controlled environment or fabricated
+sentinel rehearsal exists. Candidate A and confirmation acquisition/execution remain separate and
+unauthorized. No generation improvement, human-gold calibration, model independence, or untouched
+confirmation result is established.
+
 ## Generation-fidelity evaluation foundation
 
 [Issue #26](https://github.com/stauntonjr/scifact-rag/issues/26) establishes a model-free,
@@ -15,17 +37,15 @@ Public benchmarks are development material only and do not satisfy the required 
 confirmation boundary. The next scientific step requires a separately authorized custodian-owned
 confirmation cohort and frozen baseline/candidate run; Issue #26 does not authorize that work.
 
-## Fixed-reader implementation and pending execution
+## Fixed-reader diagnostic completed
 
-[Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) implements the standalone
-preparation, finite request runner and evaluator. The
-[readiness report](../research/evidence-inference-reader-readiness.md) records 101 prepared prompts,
-1,599 selector pairs, all full/oracle inputs fitting, and local tokenizer-version parity.
-The owner authorizes the bounded diagnostic and transfer to the owner's DGX after Lattice finishes.
-Lattice's fit and other audit processes were still active at the last resource inspection; no
-reader or selector inference has run. Keep Issue #23 open until the authorized execution is
-completed or a specific runtime/budget stop is reported. Do not infer resource release from a
-running container's exit-code field or silently expand the frozen budget.
+[Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) completed its single authorized
+fixed-reader run on September 19 after owner GPU release and reader restoration. The
+[results](../research/evidence-inference-reader-results.md) record all 101 three-arm triplets,
+303 reader calls, 101 selector calls and 238.925 seconds, without transport/identity failures.
+Full and oracle accuracy were 92/101; selected two-window accuracy was 79/101. Selection merits
+bounded diagnosis, but this inspected training cohort provides no fresh validation or automatic
+authority for further experiments. The heartbeat remains paused; no retry or new run is authorized.
 
 ## Fixed-reader protocol
 
@@ -110,12 +130,16 @@ is opt-in, best-effort, API-only, and restricted to one Uvicorn worker; the defa
 is disabled, and the offline page makes no claim that a failed live request produced a result. The
 small VPS hosts only the planned edge and Tailscale connectivity; DGX hosts the application,
 database, and inference. The [Issue #27 acceptance ledger](../reports/issue-27-public-live-demo.md)
-owns the shared twelve-case matrix. Eleven rows are provisionally passed against the frozen
-SciFact and VPS revisions, and both repositories record the redacted evidence. The final visual
-desktop/narrow-layout browser check could not run because no managed browser was available.
-Exact-revision SciFact CI, an authorized API-only rollback/restoration exercise, and independent
-cross-repository approval also remain; public availability and Issue closure are therefore not
-yet claimed.
+owns the shared twelve-case matrix. All twelve rows now have accepted evidence, including
+supported/Search/exact-insufficiency browser results at desktop and narrow widths, fourteen fixed
+failure cases, a genuine upstream outage with independent captioned Pages playback, API-only
+rollback/restoration, and fresh privacy/port-isolation checks. The final ledger qualifies reuse of
+unchanged backend and edge evidence and links masked captures. PR #32 repaired network-offline
+messaging and hidden-link styling; runtime source `bd4591e` passed Harness, CodeQL and Pages and
+was deployed as an API-only update. The final closure comments bind integrated report revisions,
+independent verdicts and checks; VPS #4 closes before SciFact #27. The accepted Issue #25 recording
+remains the durable employer-facing fallback. This remains an anonymous best-effort demonstration,
+with no new product release or supported-service promise.
 
 ## Accepted decisions
 

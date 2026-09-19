@@ -200,3 +200,7 @@ footer {
     scroll-behavior: auto !important;
   }
 }
+
+.live-link[hidden] {
+  display: none;
+}

@@ -649,7 +649,7 @@
         "parallel-domain-roles",
         "structured-role-handoffs"
       ],
-      "status": "inactive",
+      "status": "active",
       "purpose": "Split genuinely independent domain analysis across bounded roles with structured artifacts and independent approval where correlated error matters.",
       "source_projects": [
         {
@@ -684,6 +684,25 @@
         "runtime_dependencies": [],
         "ci_checks": [],
         "implementation_paths": []
+      },
+      "active_contract": {
+        "approved_by": "human owner in the Issue #28 reviewer-pilot plan on 2026-09-19",
+        "runtime_dependencies": [
+          "subscription-backed OpenAI Codex frontier agents"
+        ],
+        "ci_checks": [
+          "uv run pytest tests/test_generation_review_pilot.py tests/test_interface_contracts.py",
+          "make smoke"
+        ],
+        "implementation_paths": [
+          "src/scifact_rag/generation_review_pilot.py",
+          "tools/generation_review_pilot.py",
+          "tests/test_generation_review_pilot.py",
+          "docs/adr/0037-agent-generation-fidelity-review.md",
+          "docs/project/generation-review-pilot-v1.md",
+          "docs/project/generation-confirmation-custody-v1.md",
+          "docs/reports/generation-review-pilot-v1.md"
+        ]
       }
     }
   ]

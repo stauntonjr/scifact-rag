@@ -1,0 +1,30 @@
+{
+  "at": "2026-09-19T16:38:36.618220+00:00",
+  "dgxAddressSha256": "ad634a12d7d31e15764a62b8fd68a9a744b50fc46f6e3afc462a10d0557a6f0e",
+  "vpsToDgx": {
+    "5432": false,
+    "8000": false,
+    "8081": false,
+    "8082": false,
+    "8083": false,
+    "8084": false,
+    "8085": false,
+    "8090": false,
+    "8091": false,
+    "18090": false
+  },
+  "dgxToVps": {
+    "80": true,
+    "443": true,
+    "5432": false,
+    "8000": false,
+    "8081": false,
+    "8082": false,
+    "8083": false,
+    "8084": false,
+    "8085": false,
+    "8090": false,
+    "8091": false,
+    "18090": false
+  }
+}

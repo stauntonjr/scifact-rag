@@ -49,3 +49,12 @@ def test_showcase_script_is_one_shot_and_fails_closed() -> None:
     assert "setInterval" not in script
     assert "localStorage" not in script
     assert "document.cookie" not in script
+
+
+def test_live_link_hidden_state_overrides_button_display() -> None:
+    stylesheet = (SHOWCASE / "showcase.css").read_text(encoding="utf-8")
+    import re
+
+    hidden_rule = re.search(r"\.live-link\[hidden\]\s*\{([^}]+)\}", stylesheet)
+    assert hidden_rule is not None
+    assert re.search(r"display:\s*none\s*;", hidden_rule.group(1))

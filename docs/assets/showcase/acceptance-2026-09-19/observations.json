@@ -1,0 +1,65 @@
+{
+  "at": "2026-09-19T15:36:19.792Z",
+  "browser": "153.0.8010.48",
+  "observations": [
+    {
+      "name": "pages",
+      "mode": "desktop",
+      "url": "https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/",
+      "http": 200,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "playback": {
+        "time": 1.534217,
+        "duration": 100.8,
+        "readyState": 4,
+        "tracks": [
+          {
+            "kind": "captions",
+            "label": "English",
+            "cues": 6
+          }
+        ]
+      },
+      "snapshot": "- main:\n  - paragraph: Live application recording · September 18, 2026\n  - heading \"From scientific claim to inspectable evidence.\" [level=1]\n  - paragraph: \"This recording follows one request through the actual SciFact RAG interface running on a single NVIDIA DGX Spark: enter a claim, generate a qualified answer, and open the cited parent-document evidence.\"\n  - region \"Try the running evidence inspector\":\n    - paragraph: Optional live path\n    - heading \"Try the running evidence inspector\" [level=2]\n    - status: The live demo is ready.\n    - link \"Open live demo\":\n      - /url: https://scifact.ediacarian.dedyn.io/\n    - button \"Retry status check\"\n  - text: Your browser does not support embedded video. Download the instead.\n  - region \"Showcase details\":\n    - article:\n      - heading \"What happens\" [level=2]\n      - list:\n        - listitem: The recorded claim is entered into the live evidence inspector.\n        - listitem: The selected retrieval pipeline ranks evidence from the public SciFact corpus.\n        - listitem: Local Qwen generation returns a qualified answer with parent-document citations.\n        - listitem: A citation moves directly to the complete evidence supplied to generation.\n    - complementary:\n      - heading \"Recording boundary\" [level=2]\n      - paragraph: \"Claim: Side effects of antidepressants increase the risk of stroke.\"\n      - paragraph: The source recording is continuous except for eight seconds of unchanged waiting frames removed at source time 00:39–00:47, and source content after 01:50 is omitted. Results and citations are unmodified. The README GIF is a 24-second excerpt from this same recording.\n      - paragraph:\n        - link \"View the repository on GitHub\":\n          - /url: https://github.com/stauntonjr/scifact-rag\n  - paragraph: Research demonstration only. This closed-corpus prototype is not a clinical decision system, and its generated answer is not medical advice.\n  - text: Recorded from application source\n  - link \"e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\":\n    - /url: https://github.com/stauntonjr/scifact-rag/commit/e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\n    - code: e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\n  - text: and API image\n  - code: sha256:03f52076e78d2359fe05f466843d7241a387cf5e0690c13e0271e9cbb305823c\n  - text: . The recorded media is static. The optional live link is best-effort and may be unavailable."
+    },
+    {
+      "name": "pages",
+      "mode": "narrow",
+      "url": "https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/",
+      "http": 200,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "playback": null,
+      "snapshot": "- main:\n  - paragraph: Live application recording · September 18, 2026\n  - heading \"From scientific claim to inspectable evidence.\" [level=1]\n  - paragraph: \"This recording follows one request through the actual SciFact RAG interface running on a single NVIDIA DGX Spark: enter a claim, generate a qualified answer, and open the cited parent-document evidence.\"\n  - region \"Try the running evidence inspector\":\n    - paragraph: Optional live path\n    - heading \"Try the running evidence inspector\" [level=2]\n    - status: The live demo is ready.\n    - link \"Open live demo\":\n      - /url: https://scifact.ediacarian.dedyn.io/\n    - button \"Retry status check\"\n  - text: Your browser does not support embedded video. Download the instead.\n  - region \"Showcase details\":\n    - article:\n      - heading \"What happens\" [level=2]\n      - list:\n        - listitem: The recorded claim is entered into the live evidence inspector.\n        - listitem: The selected retrieval pipeline ranks evidence from the public SciFact corpus.\n        - listitem: Local Qwen generation returns a qualified answer with parent-document citations.\n        - listitem: A citation moves directly to the complete evidence supplied to generation.\n    - complementary:\n      - heading \"Recording boundary\" [level=2]\n      - paragraph: \"Claim: Side effects of antidepressants increase the risk of stroke.\"\n      - paragraph: The source recording is continuous except for eight seconds of unchanged waiting frames removed at source time 00:39–00:47, and source content after 01:50 is omitted. Results and citations are unmodified. The README GIF is a 24-second excerpt from this same recording.\n      - paragraph:\n        - link \"View the repository on GitHub\":\n          - /url: https://github.com/stauntonjr/scifact-rag\n  - paragraph: Research demonstration only. This closed-corpus prototype is not a clinical decision system, and its generated answer is not medical advice.\n  - text: Recorded from application source\n  - link \"e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\":\n    - /url: https://github.com/stauntonjr/scifact-rag/commit/e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\n    - code: e3bf3b3a802d813ab7c4bf6f5d3b4fe6fdbdc17c\n  - text: and API image\n  - code: sha256:03f52076e78d2359fe05f466843d7241a387cf5e0690c13e0271e9cbb305823c\n  - text: . The recorded media is static. The optional live link is best-effort and may be unavailable."
+    },
+    {
+      "name": "live",
+      "mode": "desktop",
+      "url": "https://scifact.ediacarian.dedyn.io/",
+      "http": 200,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "playback": null,
+      "snapshot": "- banner:\n  - paragraph: Grounded scientific retrieval\n  - heading \"SciFact Evidence Inspector\" [level=1]\n  - paragraph: Public benchmark prototype · Local DGX service\n- main:\n  - region \"Trace an answer back to its supplied evidence.\":\n    - heading \"Trace an answer back to its supplied evidence.\" [level=2]\n    - paragraph: Search the SciFact corpus or ask for a grounded response. Generated answers cite only the parent documents shown below, or report exact insufficient evidence.\n    - paragraph: Research demonstration only. This interface is not a clinical decision system.\n  - region \"Scientific claim\":\n    - heading \"Scientific claim\" [level=2]\n    - text: Claim or research question\n    - textbox \"Claim or research question\":\n      - /placeholder: \"Example: Rapamycin delays aging in organisms.\"\n    - paragraph: Submit a complete claim. Evidence comes only from the local SciFact corpus.\n    - group: Retrieval controls\n    - button \"Answer with evidence\"\n    - button \"Search documents\"\n  - status: Ready for a claim.\n  - status: Live capabilities are ready.\n  - link \"View the recorded showcase\":\n    - /url: https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/\n  - region \"Supplied evidence\":\n    - paragraph: Inspect the source boundary\n    - heading \"Supplied evidence\" [level=2]\n    - paragraph: No evidence loaded\n- contentinfo:\n  - paragraph: SciFact RAG · Evidence-first, inspectable, and bounded to the public corpus."
+    },
+    {
+      "name": "live",
+      "mode": "narrow",
+      "url": "https://scifact.ediacarian.dedyn.io/",
+      "http": 200,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "playback": null,
+      "snapshot": "- banner:\n  - paragraph: Grounded scientific retrieval\n  - heading \"SciFact Evidence Inspector\" [level=1]\n  - paragraph: Public benchmark prototype · Local DGX service\n- main:\n  - region \"Trace an answer back to its supplied evidence.\":\n    - heading \"Trace an answer back to its supplied evidence.\" [level=2]\n    - paragraph: Search the SciFact corpus or ask for a grounded response. Generated answers cite only the parent documents shown below, or report exact insufficient evidence.\n    - paragraph: Research demonstration only. This interface is not a clinical decision system.\n  - region \"Scientific claim\":\n    - heading \"Scientific claim\" [level=2]\n    - text: Claim or research question\n    - textbox \"Claim or research question\":\n      - /placeholder: \"Example: Rapamycin delays aging in organisms.\"\n    - paragraph: Submit a complete claim. Evidence comes only from the local SciFact corpus.\n    - group: Retrieval controls\n    - button \"Answer with evidence\"\n    - button \"Search documents\"\n  - status: Ready for a claim.\n  - status: Live capabilities are ready.\n  - link \"View the recorded showcase\":\n    - /url: https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/\n  - region \"Supplied evidence\":\n    - paragraph: Inspect the source boundary\n    - heading \"Supplied evidence\" [level=2]\n    - paragraph: No evidence loaded\n- contentinfo:\n  - paragraph: SciFact RAG · Evidence-first, inspectable, and bounded to the public corpus."
+    }
+  ]
+}

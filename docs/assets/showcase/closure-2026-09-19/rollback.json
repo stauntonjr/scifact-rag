@@ -1,0 +1,52 @@
+{
+  "start": 1789835318.957061,
+  "before": {
+    "image": "sha256:5f7d77b3c955ccc29fb865dabec8fd02930167532a0846a9ff03e974040cd989",
+    "hash": "6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2",
+    "ports": {
+      "80/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8090"
+        }
+      ]
+    }
+  },
+  "disabled": {
+    "image": "sha256:5f7d77b3c955ccc29fb865dabec8fd02930167532a0846a9ff03e974040cd989",
+    "hash": "eafb173010d6ea2111910145e69103551eaa33ff2ab4b91641542398bd33e391",
+    "ports": {
+      "80/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8090"
+        }
+      ]
+    }
+  },
+  "disabledConfig": true,
+  "disabledReadinessStatus": "404",
+  "after": {
+    "image": "sha256:5f7d77b3c955ccc29fb865dabec8fd02930167532a0846a9ff03e974040cd989",
+    "hash": "6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2",
+    "ports": {
+      "80/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8090"
+        }
+      ]
+    }
+  },
+  "privateReady": {
+    "schema_version": "readiness/v1",
+    "status": "ready"
+  },
+  "serveRestored": true,
+  "dependenciesUnchanged": true,
+  "publicReady": {
+    "schema_version": "readiness/v1",
+    "status": "ready"
+  },
+  "end": 1789835330.030405
+}

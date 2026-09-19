@@ -1,0 +1,19 @@
+{
+  "at": "2026-09-19T16:41:55.394Z",
+  "fixture": "q92",
+  "exactInsufficiency": true,
+  "status": 200,
+  "schema": "answer/v1",
+  "citations": 0,
+  "evidence": 5,
+  "widths": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ]
+}

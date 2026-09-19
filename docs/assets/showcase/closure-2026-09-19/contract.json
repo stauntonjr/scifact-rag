@@ -1,0 +1,217 @@
+{
+  "at": "2026-09-19T16:21:38.184Z",
+  "browser": "153.0.8010.48",
+  "boundary": "Deterministic intercepted errors and candidate JS; no inference requests",
+  "records": [
+    {
+      "width": 1440,
+      "kind": "network",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe live demo is offline. View the recorded showcase instead.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "upstream",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe live demo is offline. View the recorded showcase instead.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "unavailable",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nA required service is temporarily unavailable.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "busy",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nAnother live request is running. Try again shortly.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "limited",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe anonymous request allowance is exhausted. Try again later.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "contract",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe response did not match the expected contract.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 1440,
+      "kind": "validation",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nRequest validation failed. Check the claim and controls, then try again.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 1440,
+        "scroll": 1440
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "network",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe live demo is offline. View the recorded showcase instead.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "upstream",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe live demo is offline. View the recorded showcase instead.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "unavailable",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nA required service is temporarily unavailable.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "busy",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nAnother live request is running. Try again shortly.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "limited",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe anonymous request allowance is exhausted. Try again later.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "contract",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nThe response did not match the expected contract.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    },
+    {
+      "width": 390,
+      "kind": "validation",
+      "message": "REQUEST NOT COMPLETED\n\nUnable to show a result\n\nRequest validation failed. Check the claim and controls, then try again.",
+      "expectedMatched": true,
+      "claimPreserved": true,
+      "searchEnabled": true,
+      "answerEnabled": true,
+      "rawLeak": false,
+      "dimensions": {
+        "viewport": 390,
+        "scroll": 390
+      },
+      "disabledStrategies": 4
+    }
+  ]
+}

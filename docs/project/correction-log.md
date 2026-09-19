@@ -739,3 +739,103 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   changes before commit.
 - Prevention: after this exact sandbox-bootstrap signature, do not repeat the patch helper; use one
   explicit unified-diff fallback and preserve this correction for future runs.
+
+## 2026-09-19 — Use the configured Python for repository tools
+
+- Failed approach: invoked the host default `python3 tools/loop.py start --help`.
+- Signature: `ImportError: cannot import name UTC from datetime` under Python 3.9.
+- Mutation status: the command failed before starting a run or changing repository state.
+- Corrected path: used the configured bundled Python, then the locked project environment.
+- Verification: the same help command succeeded and the showcase evidence loop started.
+- Prevention: follow the configured-runtime requirement when running repository tools; do not
+  interpret an incompatible host Python as a project defect.
+
+## 2026-09-19 — Public-demo offline browser acceptance
+
+A real upstream interruption returned the expected HTTP 502 and Pages fallback body, but browser
+acceptance failed because the showcase link remained visible. JavaScript correctly set `hidden`;
+the author stylesheet's `display: inline-block` overrode it. Added a more specific hidden-state
+rule and a regression guard. The exercise's `finally` restored the exact Serve mapping and public
+readiness. A separate intercepted network failure exposed the generic unavailable message;
+fetch rejection now uses the accepted offline message while HTTP 503 remains unavailable. Nine
+focused tests passed with Node enabled; independent review approved both narrow repairs. Final
+public acceptance remains separate from these deterministic checks.
+
+The final closure gate initially failed because its ledger test scanned both the canonical matrix
+and the new evidence table, then required the superseded eleven-provisional/one-pending state.
+No live service changed. Independent technical and scope reviews approved updating that existing
+test: scope it to the Acceptance matrix section and require twelve distinct passed, owned rows,
+while preserving evidence-class and rollback assertions. The failed attempt remains in loop
+history. The integration branch after a squash merge also needs a new branch from the integrated
+revision; a fast-forward of the pre-squash feature branch is not expected to succeed.
+
+## SCIFACT-RAG-013: isolated worktree repeated the protected uv-cache path
+
+- Date: 2026-09-19.
+- Workflow: establish the clean Issue #28 implementation baseline in a new linked worktree.
+- Failed approach: run locked synchronization and the smoke gate with uv's default shared cache,
+  repeating the protected-cache assumption already recorded in SCIFACT-RAG-010.
+- Error signature: uv could not create its cache lock temporary file beneath `/home/jrs/.cache/uv`
+  because that host path was read-only; project tests had not started.
+- Mutation check: the failure changed no tracked project, model, service, scientific artifact, or
+  external state.
+- Corrected path: use the task-specific writable cache `/tmp/scifact-issue28-uv-cache` while
+  retaining the locked dependency graph and the isolated worktree environment.
+- Verification: locked synchronization completed and `make smoke` passed the harness, Ruff,
+  Pyright, 501 non-integration tests, package smoke, and Compose configuration.
+- Prevention: isolated worktree setup must choose a verified writable task-specific uv cache before
+  the first synchronization command when the shared host cache is outside the writable profile.
+
+## SCIFACT-RAG-014: review inventory assumed the product fallback was the reviewed answer
+
+- Date: 2026-09-19.
+- Workflow: reconcile the 42 retained development responses into the Issue #28 pilot inventory.
+- Failed approach: require every historical worksheet answer to equal the mapped result's product
+  `answer_text`, even though the frozen review protocol defines distinct responses using the raw
+  generated text and removes its leading verdict before review.
+- Error signature: three mapped pioglitazone rows contained the citation-gated product fallback
+  `insufficient evidence` while the worksheet retained the exact verdict-stripped generated prose.
+- Mutation check: the failed inventory attempt wrote no output and changed no source artifact,
+  historical label, model, service, or external state.
+- Corrected path: accept only the exact product answer or the exact raw generation after removing a
+  valid frozen verdict line, while still requiring the mapped raw line digest and every supplied
+  evidence title, text, and document identifier to match exactly.
+- Verification: 13 focused tests pass, and the retained artifacts reconcile to 42 responses across
+  20 connected article-family groups without modifying any source byte.
+- Prevention: provenance validators must implement the prospective review artifact's documented
+  answer boundary, not infer that a later product fallback is always the reviewed representation.
+
+## SCIFACT-RAG-015: repository harness check used a guessed filename
+
+- Date: 2026-09-19.
+- Workflow: run affected checks after the Issue #28 review repair batch.
+- Failed approach: invoke `tools/check_harness.py` from recollection instead of resolving the
+  repository's actual harness entry point.
+- Error signature: Python reported that `tools/check_harness.py` did not exist after all preceding
+  focused tests and static checks had passed.
+- Mutation check: the failed invocation changed no tracked file, scientific artifact, model,
+  service, or external state.
+- Corrected path: locate the checked-in entry point and run `python3 tools/harness_check.py`.
+- Verification: the authoritative harness check passed all listed project, ADR, capability, role,
+  adapter, schema, planning, and engineering-tooling checks.
+- Prevention: resolve repository check entry points from the Makefile or tracked tools before
+  composing a multi-command verification batch.
+
+## SCIFACT-RAG-016: release-impact evidence was refreshed after candidate verification
+
+- Date: 2026-09-19.
+- Workflow: close the Issue #28 engineering loop after independent approval and the final full
+  gate.
+- Failed approach: refresh the current-attempt release-impact record after independent review and
+  the full gate had already bound themselves to the previous candidate identity.
+- Error signature: the completion gate rejected every acceptance check, the verifier verdict, the
+  latest review, and the full gate as stale; the accumulated repair attempts then reached the
+  configured retry ceiling.
+- Mutation check: the ordering failure changed only ignored loop metadata. Commit `863ba8d`, its
+  implementation, scientific artifacts, model budget, services, and external state were unchanged.
+- Corrected path: use the owner-authorized recovery handoff, finish all tracked mutations first,
+  then record release impact before independent review and exactly one final full gate.
+- Verification: the resumed revision must pass the loop completion gate with current-candidate
+  release impact, independent approval, and one current-attempt full gate.
+- Prevention: treat release impact as candidate identity: record it after the last tracked mutation
+  and before review or full-gate evidence.
