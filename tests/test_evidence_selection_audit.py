@@ -54,3 +54,35 @@ def test_bind_inputs_rejects_digest_drift_before_case_loading(tmp_path: Path):
         root.chmod(0o755)
         for path in (root / "prepared-002", root / "live-20260919-001", root / "evaluation-20260919-001"):
             path.chmod(0o755)
+
+
+def terminal(prompt_id: str, article_id: str, arm: str, label: str) -> dict[str, object]:
+    return {
+        "prompt_id": prompt_id,
+        "article_id": article_id,
+        "arm": arm,
+        "status": "completed",
+        "response": {"choices": [{"message": {"content": f'{{"label":"{label}"}}'}}]},
+    }
+
+
+def test_reconcile_outcomes_joins_differently_ordered_sources_by_id():
+    prepared = [{"prompt_id": "p2", "article_id": "a2"}, {"prompt_id": "p1", "article_id": "a1"}]
+    references = [{"prompt_id": "p1", "article_id": "a1", "target": "increased"}, {"prompt_id": "p2", "article_id": "a2", "target": "decreased"}]
+    events = [
+        terminal("p1", "a1", arm, "increased") for arm in ("full", "selected", "oracle")
+    ] + [terminal("p2", "a2", arm, "decreased") for arm in ("full", "selected", "oracle")]
+    rows = audit.reconcile_outcomes(prepared, references, events)
+    assert [row.prompt_id for row in rows] == ["p2", "p1"]
+    assert rows[0].article_id == "a2"
+
+
+def test_reconcile_outcomes_preserves_abstention_as_wrong():
+    prepared = [{"prompt_id": "p1", "article_id": "a1"}]
+    references = [{"prompt_id": "p1", "article_id": "a1", "target": "increased"}]
+    events = [terminal("p1", "a1", arm, "increased") for arm in ("full", "oracle")]
+    events.append(terminal("p1", "a1", "selected", "insufficient_evidence"))
+    row = audit.reconcile_outcomes(prepared, references, events)[0]
+    assert row.predictions["selected"] == "insufficient_evidence"
+    assert row.abstentions["selected"] is True
+    assert row.correctness["selected"] is False
