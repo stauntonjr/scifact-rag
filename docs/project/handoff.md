@@ -1,5 +1,23 @@
 # Project handoff
 
+## Reviewer workflow repair remains in progress
+
+[Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35) contains the accepted repair plan
+for the stopped Issue #28 pilot. The [v2 protocol](generation-review-workflow-v2.md) adds the finite
+coordinator and initial/final adjudication contracts. Software tests and runtime probes have
+separate evidentiary roles; the [v2 report](../reports/generation-review-workflow-v2.md) records the
+current boundary. The candidate subscription controls were independently admitted for fictional
+execution. Two discovery calls, one bounded diagnostic and two rehearsal rounds are retained. The
+final rehearsal completed all eight calls but measured insufficient category coverage by design;
+real-case qualification remains unexecuted and the issue must stay open. No Candidate A or
+confirmation work is authorized by this repair.
+
+The original Issue #28 worktree cleanup removed its ignored pilot artifacts. The retained source
+worksheet and deterministic builders recovered the inventory and selection with exact original
+SHA-256 matches; the scientific cohort did not change. The old preflight result remains historical.
+Recovered files live outside that removed worktree under the DGX repository's ignored
+`artifacts/generation-review-workflow-v2/recovered-source/` directory.
+
 ## Development reviewer pilot stopped at preflight
 
 [Issue #28](https://github.com/stauntonjr/scifact-rag/issues/28) implements the strict
