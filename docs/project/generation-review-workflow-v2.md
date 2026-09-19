@@ -75,3 +75,7 @@ both existing discovery-probe directories. Do not create a new campaign to reset
 The host-specific registered profile lazily loads only its pinned descriptor file and rejects
 missing files or digest drift. It cannot admit an arbitrary configuration file. Public checkouts
 without ignored evidence can run offline tests; they cannot dispatch this host's live review.
+
+The single authorized development run is now spent. It stopped after two completed calls when the
+third call reached the 180-second ceiling. Campaign continuation and replacement development runs
+remain fail-closed; a new attempt requires an explicit owner-approved protocol revision.

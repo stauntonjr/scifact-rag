@@ -2,10 +2,12 @@
 
 Date: 2026-09-19. Governing work: [Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35).
 
-**Execution status: execution_complete. Assessment status: insufficient_category_coverage. Issue
-remains open for the 42-case development assessment.** This is a successful fictional workflow
-rehearsal and a measured negative coverage result, not a qualified review panel or a claim-answer
-label. No generation-quality improvement is established.
+**Development execution status: execution_failed. Assessment status: not_assessed. Issue remains
+open.** The real 42-case run was attempted once under the frozen protocol. Two development calls
+completed, the third reached the 180-second subprocess ceiling, and the coordinator stopped with
+zero unknown outcomes. No retry or replacement is authorized. This is not a qualified review panel,
+a scientific assessment result, or a claim-answer label. No generation-quality improvement is
+established.
 
 ## Retained accounting
 
@@ -16,11 +18,11 @@ label. No generation-quality improvement is established.
 | Transport troubleshooting round | 2 | 1 | 1 | 0 |
 | One bounded transport diagnostic | 1 | 1 | 0 | 0 |
 | Final fictional rehearsal round | 8 | 8 | 0 | 0 |
-| Scientific development turns | 0 | 0 | 0 | 0 |
+| Scientific development run | 3 | 2 | 1 | 0 |
 
-All attempts are attributable and retained. The campaign consumed 19 engineering turns and
-301.2154211669622 seconds against the 20-engineering / 168-development / 188-combined-turn and
-10,800-second ceilings. There are zero unknown outcomes and zero scientific development turns.
+All attempts are attributable and retained. The campaign consumed 19 engineering turns, 3
+development turns, 22 total turns and 514.9947052089483 seconds against the 20-engineering /
+168-development / 188-combined-turn and 10,800-second ceilings. There are zero unknown outcomes.
 The final rehearsal used two fabricated cases and all eight scheduled stages; it is intentionally
 too small to qualify the 42-case panel. Its execution report is complete and its assessment result
 is `insufficient_category_coverage`.
@@ -34,6 +36,17 @@ did not reproduce as a deterministic launch defect. The final eight-call rehears
 without transport or validation failures. The
 [research record](../research/generation-review-runtime-v2.md) explains the pinned capability
 boundary and nullable provider metadata.
+
+The real run used the frozen 42-response population, original inventory and selection hashes,
+11/31 split, unchanged rubric, R1 `gpt-5.6-sol`, R2 `gpt-5.5`, and adjudicator
+`gpt-5.6-terra`. Attempts 1 and 2 completed. Attempt 3 was attributable to a fresh
+`gpt-5.6-sol` session but produced no final judgment or usage before the subprocess was killed at
+180.180 seconds; its sanitized failure is `call_timeout`, exit `-9`, `process_exit`. The public
+report records 3 attempted, 2 completed, 1 failed, 0 unknown and 165 not attempted turns. The
+manifest, report and terminal file SHA-256 values are respectively
+`64387310a91aaa1c34c33596187e941a034aa0c932f7be88a84fc552d26f4c63`,
+`cde7cbab7f1099b9b58c8aa43ef7b90242fee48471b1d2606a16b6e49f8c756a`, and
+`426cd164c31cad719a96481a371bfd33676235ebb3981959b064b7f10d123961`.
 
 ## Source recovery and preparation
 
@@ -62,13 +75,16 @@ fresh-output protection, subprocess timeout and a conditional subscription adapt
 fake transports exercise success and failure paths without model calls. Existing v1 validators and
 artifacts remain supported. Public report projection excludes source and judgment text.
 
-The pinned capability profile was independently reviewed and admitted for fictional execution.
-The same issue still requires the 11-case clarification stage, the frozen 31-case assessment and
-independent result accounting before any development qualification claim.
+The pinned capability profile was independently requalified after user-config digest drift. The
+retained passing rehearsal was reused only after independent approval of exact run/result digests
+and closed scientific, validator, campaign and CLI contract digests. The one permitted development
+run then stopped on its third call. Completing the 42-case assessment now requires an explicit
+owner-approved contract revision; automatic continuation or a replacement run is forbidden.
 No budget increase, alternative models, paid API, new scientific answers, Candidate A, confirmation
 acquisition or custody provisioning is authorized here. Confirmation custody remains incomplete.
 
-The focused suite passes 71 tests after the transport-observability repair. The locked final
-repository gate passed: harness checks, formatting, lint, type checking, 603 non-integration tests
-with 3 skips, package smoke, and Docker Compose configuration. A later completed assessment may
-validly fail coverage or reliability without being an execution failure.
+The focused workflow suite passes 51 tests after final formatting. The current reporting candidate
+also passes the full repository gate: 607 tests passed, 3 skipped and 3 deselected, with harness,
+formatting, lint, type checking, package smoke and Compose validation all successful. Two earlier
+gate invocations exposed missing non-login-shell paths for the project Python and Docker CLI; those
+were environment setup failures, not passing gates or product evidence.

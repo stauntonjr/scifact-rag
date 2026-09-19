@@ -941,3 +941,22 @@ revision; a fast-forward of the pre-squash feature branch is not expected to suc
   ledger and is reported as non-reproducible under the available evidence.
 - Prevention surface: future transport failures retain enough sanitized classification to support
   root-cause analysis without widening the publication boundary.
+
+## SCIFACT-RAG-022: development timeout is not a retryable transport probe
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 real 42-case development assessment.
+- Failed approach: the third scheduled development request did not return a final judgment within
+  the frozen 180-second subprocess ceiling.
+- Error signature: `call_timeout`, exit `-9`, `process_exit`, with an attributable fresh session
+  and no usage or provider-returned model identity.
+- Mutation check: two prior development judgments completed; the third failed; 165 turns were not
+  dispatched. The campaign has zero unknown outcomes. No scientific result or aggregate assessment
+  was computed.
+- Corrected path: none exists inside the accepted contract. Preserve the failed attempt and stop;
+  do not retry, replace the case, resume the run, enlarge the timeout, or start another campaign.
+- Verification: the public report and campaign chain record 3 attempted, 2 completed, 1 failed,
+  0 unknown and 165 not attempted turns; execution is `execution_failed`, assessment is
+  `not_assessed`.
+- Prevention surface: the finite coordinator persists every attempt and prohibits any second
+  development run. Further work requires an explicit owner-approved contract revision.

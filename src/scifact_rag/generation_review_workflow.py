@@ -7,6 +7,7 @@ implementation, not operator assertions or model promises.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -783,12 +784,123 @@ APPROVED_RUNTIME_PROFILES: dict[str, dict[str, Any]] = {
     "mac-subscription-review-v2": {
         "descriptor_path": "artifacts/generation-review-workflow-v2/runtime-controls-003/candidate-profile.json",
         "descriptor_sha256": "efcac1165c37115354b7e34cd12783cbd2975b820f5b5f79c5bed6deaf8dd389",
+    },
+    "mac-subscription-review-v2-config2": {
+        "descriptor_path": "artifacts/generation-review-workflow-v2/runtime-controls-004/candidate-profile.json",
+        "descriptor_sha256": "678b8d65575860178545554ac1a8caa3eb9398bd907d2a34035d2c25fd5938ca",
+    },
+}
+
+# Reuse records are separately reviewed, immutable applicability decisions. They may
+# admit a passing rehearsal across a non-scientific implementation-identity change,
+# but only while the selected scientific and dispatch contract remains byte-identical.
+APPROVED_REHEARSAL_REUSES: dict[str, dict[str, str]] = {
+    "fictional-run-003-runtime-profile-only": {
+        "descriptor_path": "artifacts/generation-review-workflow-v2/rehearsal-reuse-001.json",
+        "descriptor_sha256": "e2bd70ca6480238d6402adc1251bc8cadca8392ea975d34a7bfb4afb8e106f80",
     }
 }
 
 
 def _file_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+_REUSE_GATE_NAMES = {
+    "_REUSE_GATE_NAMES",
+    "APPROVED_RUNTIME_PROFILES",
+    "APPROVED_REHEARSAL_REUSES",
+    "_normalized_ast_sha256",
+    "_contract_digests_from_sources",
+    "rehearsal_contract_digests",
+    "rehearsal_reuse",
+    "Campaign",
+}
+
+
+def _normalized_ast_sha256(source: str, excluded_names: set[str]) -> str:
+    tree = ast.parse(source)
+    retained = []
+    for node in tree.body:
+        if isinstance(node, ast.Import) and [alias.name for alias in node.names] == ["ast"]:
+            continue
+        name = getattr(node, "name", None)
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            name = node.target.id
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name):
+                name = target.id
+        if name not in excluded_names:
+            retained.append(node)
+    tree.body = retained
+    return hashlib.sha256(ast.dump(tree, include_attributes=False).encode()).hexdigest()
+
+
+def _contract_digests_from_sources(
+    workflow_source: str, pilot_source: str, cli_source: str
+) -> dict[str, str]:
+    workflow_tree = ast.parse(workflow_source)
+    gate_tree = ast.Module(
+        body=[
+            node for node in workflow_tree.body if getattr(node, "name", None) in _REUSE_GATE_NAMES
+        ],
+        type_ignores=[],
+    )
+    return {
+        "workflow_contract_sha256": _normalized_ast_sha256(workflow_source, _REUSE_GATE_NAMES),
+        "pilot_module_sha256": hashlib.sha256(pilot_source.encode()).hexdigest(),
+        "execution_gate_sha256": hashlib.sha256(
+            (
+                ast.dump(gate_tree, include_attributes=False)
+                + ast.dump(ast.parse(cli_source), include_attributes=False)
+            ).encode()
+        ).hexdigest(),
+    }
+
+
+def rehearsal_contract_digests() -> dict[str, str]:
+    root = Path(__file__).resolve().parents[2]
+    return _contract_digests_from_sources(
+        Path(__file__).read_text(),
+        (Path(__file__).with_name("generation_review_pilot.py")).read_text(),
+        (root / "tools/generation_review_workflow.py").read_text(),
+    )
+
+
+def rehearsal_reuse(reuse_id: str) -> dict[str, Any]:
+    registered = APPROVED_REHEARSAL_REUSES.get(reuse_id)
+    if registered is None:
+        raise WorkflowStop("unreviewed_rehearsal_reuse")
+    path = Path(registered["descriptor_path"])
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    if not path.is_file() or _file_digest(path) != registered["descriptor_sha256"]:
+        raise WorkflowStop("rehearsal_reuse_descriptor_digest_mismatch")
+    record = json.loads(path.read_text())
+    required = {
+        "schema_version",
+        "source_run_start_sha256",
+        "source_run_result_sha256",
+        "rehearsal_implementation_sha256",
+        "rubric_sha256",
+        "workflow_contract_sha256",
+        "pilot_module_sha256",
+        "execution_gate_sha256",
+        "evidence_origin",
+        "applicability",
+        "independent_reviewer",
+    }
+    if (
+        set(record) != required
+        or record["schema_version"] != "generation-review-rehearsal-reuse/v1"
+        or record["evidence_origin"] != "reused"
+        or not record["applicability"]
+        or not record["independent_reviewer"]
+        or any(record[key] != value for key, value in rehearsal_contract_digests().items())
+    ):
+        raise WorkflowStop("rehearsal_reuse_inapplicable")
+    return record
 
 
 def runtime_profile(profile_id: str) -> dict[str, Any]:
@@ -827,9 +939,10 @@ def runtime_profile(profile_id: str) -> dict[str, Any]:
 class Campaign:
     """One append-only campaign spanning prior probes, at most two rehearsals, and development."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, rehearsal_reuse_id: str | None = None):
         self.root = root
         self.manifest = json.loads((root / "campaign.json").read_text())
+        self.rehearsal_reuse_id = rehearsal_reuse_id
 
     @classmethod
     def create(cls, root: Path, prior_probes: list[Path]) -> Campaign:
@@ -969,6 +1082,21 @@ class Campaign:
                         and record["implementation_sha256"] == manifest["implementation_sha256"]
                         and record["rubric_sha256"] == manifest["rubric_sha256"]
                     )
+                if not passing and self.rehearsal_reuse_id is not None:
+                    reuse = rehearsal_reuse(self.rehearsal_reuse_id)
+                    for path, record in zip(previous, records, strict=True):
+                        result_path = path.with_name(path.name.replace(".start.", ".result."))
+                        result = json.loads(result_path.read_text())
+                        passing |= (
+                            record["kind"] == "engineering"
+                            and result["execution_status"] == "execution_complete"
+                            and _file_digest(path) == reuse["source_run_start_sha256"]
+                            and _file_digest(result_path) == reuse["source_run_result_sha256"]
+                            and record["implementation_sha256"]
+                            == reuse["rehearsal_implementation_sha256"]
+                            and record["rubric_sha256"] == reuse["rubric_sha256"]
+                            and record["rubric_sha256"] == manifest["rubric_sha256"]
+                        )
                 if not passing:
                     raise WorkflowStop("passing_frozen_rehearsal_required")
             needed = len(manifest["cases"]) * 4

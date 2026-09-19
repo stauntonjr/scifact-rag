@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -335,6 +336,26 @@ def test_cli_runtime_stop_is_persisted(tmp_path):
     assert (tmp_path / "admission" / "runtime-admission.json").exists()
 
 
+def test_development_cli_exposes_registered_rehearsal_reuse_option():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).parents[1] / "tools" / "generation_review_workflow.py"),
+            "run-development",
+            "--help",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "--rehearsal-reuse" in result.stdout
+
+
 def test_campaign_binds_prior_attempts_and_stops_unknown(tmp_path):
     prior = tmp_path / "prior"
     prior.mkdir()
@@ -450,6 +471,96 @@ def test_campaign_development_requires_frozen_rehearsal(tmp_path):
     with pytest.raises(workflow.WorkflowStop, match="rehearsal"):
         campaign.begin_run(value)
     assert not (tmp_path / "campaign" / "active-run").exists()
+
+
+def test_campaign_accepts_only_registered_digest_bound_rehearsal_reuse(tmp_path, monkeypatch):
+    campaign = workflow.Campaign.create(tmp_path / "campaign", [])
+    rehearsal = manifest()
+    rehearsal_start = campaign.begin_run(rehearsal)
+    campaign.end_run(rehearsal_start, {"execution_status": "execution_complete"})
+    rehearsal_result = rehearsal_start.with_name("001.result.json")
+
+    reuse = {
+        "schema_version": "generation-review-rehearsal-reuse/v1",
+        "source_run_start_sha256": workflow._file_digest(rehearsal_start),
+        "source_run_result_sha256": workflow._file_digest(rehearsal_result),
+        "rehearsal_implementation_sha256": rehearsal["implementation_sha256"],
+        "rubric_sha256": rehearsal["rubric_sha256"],
+        **workflow.rehearsal_contract_digests(),
+        "evidence_origin": "reused",
+        "applicability": "Only runtime-profile registration changed.",
+        "independent_reviewer": "test/verifier",
+    }
+    descriptor = tmp_path / "reuse.json"
+    descriptor.write_text(json.dumps(reuse))
+    monkeypatch.setitem(
+        workflow.APPROVED_REHEARSAL_REUSES,
+        "test-reuse",
+        {
+            "descriptor_path": str(descriptor),
+            "descriptor_sha256": workflow._file_digest(descriptor),
+        },
+    )
+    development = {**rehearsal, "mode": "development", "implementation_sha256": "c" * 64}
+    original = descriptor.read_text()
+    descriptor.write_text(original + "\n")
+    with pytest.raises(workflow.WorkflowStop, match="reuse_descriptor_digest"):
+        workflow.Campaign(campaign.root, rehearsal_reuse_id="test-reuse").begin_run(development)
+
+    descriptor.write_text(original)
+    reused = workflow.Campaign(campaign.root, rehearsal_reuse_id="test-reuse")
+    start = reused.begin_run(development)
+    assert start.name == "002.start.json"
+
+
+def test_rehearsal_contract_digest_closes_transitive_and_gate_surfaces():
+    workflow_source = Path(workflow.__file__).read_text()
+    pilot_source = Path(workflow.__file__.replace("workflow.py", "pilot.py")).read_text()
+    cli_source = (
+        Path(workflow.__file__).parents[2] / "tools/generation_review_workflow.py"
+    ).read_text()
+    baseline = workflow._contract_digests_from_sources(workflow_source, pilot_source, cli_source)
+
+    validator_changed = pilot_source.replace(
+        "def _validate_review(", "def _validate_review_changed("
+    )
+    assert (
+        workflow._contract_digests_from_sources(workflow_source, validator_changed, cli_source)[
+            "pilot_module_sha256"
+        ]
+        != baseline["pilot_module_sha256"]
+    )
+
+    dimensions_changed = workflow_source.replace(
+        '"grounded": ("review_v2", "yes", "no")',
+        '"grounded": ("review_v2", "no", "yes")',
+    )
+    assert (
+        workflow._contract_digests_from_sources(dimensions_changed, pilot_source, cli_source)[
+            "workflow_contract_sha256"
+        ]
+        != baseline["workflow_contract_sha256"]
+    )
+
+    campaign_changed = workflow_source.replace(
+        'state["total_turns"] >= 188', 'state["total_turns"] >= 189'
+    )
+    assert (
+        workflow._contract_digests_from_sources(campaign_changed, pilot_source, cli_source)[
+            "execution_gate_sha256"
+        ]
+        != baseline["execution_gate_sha256"]
+    )
+
+    cli_changed = cli_source.replace(
+        'command.add_argument("--rehearsal-reuse")', 'command.add_argument("--reuse")'
+    )
+    assert (
+        workflow._contract_digests_from_sources(workflow_source, pilot_source, cli_changed)[
+            "execution_gate_sha256"
+        ]
+        != baseline["execution_gate_sha256"]
+    )
 
 
 def development_fixture():
@@ -603,6 +714,17 @@ def test_registered_descriptor_missing_or_changed_fails_closed(tmp_path, monkeyp
     )
     with pytest.raises(workflow.WorkflowStop, match="descriptor_digest"):
         workflow.runtime_profile("descriptor-test")
+
+
+def test_config_drift_requalification_preserves_original_profile():
+    assert set(workflow.APPROVED_RUNTIME_PROFILES) >= {
+        "mac-subscription-review-v2",
+        "mac-subscription-review-v2-config2",
+    }
+    original = workflow.APPROVED_RUNTIME_PROFILES["mac-subscription-review-v2"]
+    requalified = workflow.APPROVED_RUNTIME_PROFILES["mac-subscription-review-v2-config2"]
+    assert original["descriptor_path"] != requalified["descriptor_path"]
+    assert original["descriptor_sha256"] != requalified["descriptor_sha256"]
 
 
 @pytest.mark.parametrize("field,category", sorted(workflow.MATERIAL_ERROR_CATEGORY_FIELDS.items()))

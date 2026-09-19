@@ -111,3 +111,13 @@ This is configuration-based admission for the enumerated capabilities and pinned
 It is not provider attestation or proof of an empty tool surface. Development requires a complete
 passing frozen fictional rehearsal; the [execution report](../reports/generation-review-workflow-v2.md)
 records whether that additional gate was met.
+
+Before development, drift in the ignored user-config source was requalified as profile
+`mac-subscription-review-v2-config2`. The executable, all 24 retained evidence files, system and
+managed source absences, and the three-name MCP source map remained unchanged; only the user-config
+file digest changed. Independent review approved descriptor
+`678b8d65575860178545554ac1a8caa3eb9398bd907d2a34035d2c25fd5938ca`,
+and model-free admission returned `runtime_admitted` with zero turns. A separate independently
+reviewed reuse record bound the exact passing fictional run and unchanged workflow/pilot contract
+while pinning the current campaign and CLI gate. The subsequent development timeout is an execution
+result, not evidence that these admission controls failed.

@@ -1,16 +1,17 @@
 # Project handoff
 
-## Reviewer workflow repair remains in progress
+## Real development review attempted and stopped
 
 [Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35) contains the accepted repair plan
 for the stopped Issue #28 pilot. The [v2 protocol](generation-review-workflow-v2.md) adds the finite
 coordinator and initial/final adjudication contracts. Software tests and runtime probes have
 separate evidentiary roles; the [v2 report](../reports/generation-review-workflow-v2.md) records the
-current boundary. The candidate subscription controls were independently admitted for fictional
-execution. Two discovery calls, one bounded diagnostic and two rehearsal rounds are retained. The
-final rehearsal completed all eight calls but measured insufficient category coverage by design;
-real-case qualification remains unexecuted and the issue must stay open. No Candidate A or
-confirmation work is authorized by this repair.
+current boundary. After independent runtime requalification and retained-rehearsal applicability
+review, the real 42-case run started once. Two calls completed; call three timed out at the fixed
+180-second ceiling. The coordinator retained 3 attempted, 2 completed, 1 failed, 0 unknown and
+165 not attempted turns, then stopped without retry. Execution is `execution_failed` and assessment
+is `not_assessed`; Issue #35 stays open. Completing it requires an explicit owner-approved contract
+revision. No Candidate A or confirmation work is authorized by this attempt.
 
 The original Issue #28 worktree cleanup removed its ignored pilot artifacts. The retained source
 worksheet and deterministic builders recovered the inventory and selection with exact original

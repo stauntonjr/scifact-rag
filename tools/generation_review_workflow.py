@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--campaign", type=Path, required=True)
         command.add_argument("--runtime-profile", required=True)
+        if name == "run-development":
+            command.add_argument("--rehearsal-reuse")
     command = sub.add_parser("report")
     command.add_argument("--run", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -63,7 +65,15 @@ def main(argv: list[str] | None = None) -> int:
             expected_mode = "fictional" if args.command == "rehearse" else "development"
             if manifest["mode"] != expected_mode:
                 raise WorkflowStop("command_manifest_mode_mismatch")
-            transport = CodexTransport(args.runtime_profile, Campaign(args.campaign))
+            transport = CodexTransport(
+                args.runtime_profile,
+                Campaign(
+                    args.campaign,
+                    rehearsal_reuse_id=(
+                        args.rehearsal_reuse if args.command == "run-development" else None
+                    ),
+                ),
+            )
             result = run(args.output, manifest, transport)
         print(json.dumps(result, sort_keys=True))
         return 2 if result.get("status") == "runtime_stopped" else 0
