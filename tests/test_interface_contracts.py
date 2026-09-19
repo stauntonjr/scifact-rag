@@ -380,7 +380,8 @@ def test_public_demo_acceptance_ledger_has_eleven_provisional_and_one_pending_ow
     rows = [line for line in report.splitlines() if line.startswith("| M")]
 
     assert len(rows) == 12
-    assert sum("| provisionally passed |" in row for row in rows) == 11
+    assert all("| provisionally passed |" in row for row in rows if not row.startswith("| M09 "))
+    assert sum(row.startswith("| M09 ") and "| pending |" in row for row in rows) == 1
     assert sum("| pending |" in row for row in rows) == 1
     assert all(
         any(f"| {owner} |" in row for owner in ("scifact-rag", "vps-srv", "shared")) for row in rows

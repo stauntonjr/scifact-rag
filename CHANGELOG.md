@@ -17,8 +17,8 @@ All notable changes to the harness are recorded here. The harness version and a 
   Eleven shared public-matrix rows are provisionally complete against frozen application and edge
   identities, including cited Answer, exact insufficiency, Search, busy/rate-limit separation,
   dependency restoration, fallback, kill switch, port isolation, and bounded log-privacy evidence.
-  Final Issue closure still requires a managed-browser visual pass, exact-revision SciFact CI, and
-  independent cross-repository approval.
+  Final Issue closure still requires a managed-browser visual pass, an authorized API-only
+  rollback/restoration exercise, exact-revision SciFact CI, and independent approval.
 
 - Added a linked README showcase and static GitHub Pages video captured from the real
   evidence-inspection UI. The recording uses the grammatically corrected claim `Side effects of

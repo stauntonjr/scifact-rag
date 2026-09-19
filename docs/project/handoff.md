@@ -113,8 +113,9 @@ database, and inference. The [Issue #27 acceptance ledger](../reports/issue-27-p
 owns the shared twelve-case matrix. Eleven rows are provisionally passed against the frozen
 SciFact and VPS revisions, and both repositories record the redacted evidence. The final visual
 desktop/narrow-layout browser check could not run because no managed browser was available.
-Exact-revision SciFact integration/CI and independent cross-repository approval also remain;
-public availability and Issue closure are therefore not yet claimed.
+Exact-revision SciFact CI, an authorized API-only rollback/restoration exercise, and independent
+cross-repository approval also remain; public availability and Issue closure are therefore not
+yet claimed.
 
 ## Accepted decisions
 

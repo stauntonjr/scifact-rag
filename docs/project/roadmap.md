@@ -482,10 +482,10 @@ link and the opt-in public-demo application boundary. The recording and offline 
 durable public artifacts; the anonymous live path is disabled by default and, when enabled, uses
 only the single-worker API while inference and storage remain on the DGX. It has no uptime,
 clinical-use, or supported-third-party-API commitment. VPS edge deployment is maintained in the
-separate `vps-srv` repository under its own plan and acceptance boundary. Eleven matrix rows and
-rollback evidence are provisionally complete; M09 remains pending. Issue #27 remains open until the visual
-public-browser review, final exact-revision SciFact integration/CI, and independent
-cross-repository approval are complete.
+separate `vps-srv` repository under its own plan and acceptance boundary. Eleven matrix rows are
+provisionally complete; M09 and the API-only rollback exercise remain pending. Issue #27 remains
+open until those checks, final exact-revision SciFact CI, and independent cross-repository
+approval are complete.
 
 ## Handoff to the template program
 

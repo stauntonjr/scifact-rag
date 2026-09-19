@@ -1,8 +1,9 @@
 # Issue #27 public live-demo acceptance ledger
 
 Status: shared public acceptance executed; eleven rows are provisionally accepted and M09 is pending.
-Final closure remains gated on committing and integrating both reports, exact-SHA checks,
-independent cross-repository approval, and the public-browser layout review described below.
+Final closure remains gated on exact-SHA checks, independent cross-repository approval, the
+public-browser layout review described below, and an authorized API-only disabled-mode
+rollback/restoration exercise. That API rollback has not been exercised.
 
 ## Identity and boundary
 
