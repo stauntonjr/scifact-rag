@@ -139,6 +139,18 @@ SEMVER = re.compile(
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
+ADR_FILENAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
+ADR_HEADING = re.compile(r"^# ADR-(?P<number>\d{4}):", re.MULTILINE)
+EXACT_ADR_GOVERNING_LINKS = {
+    "0035-public-live-demo-edge.md": (
+        "- Governing issue: [#27]"
+        "(https://github.com/stauntonjr/scifact-rag/issues/27)"
+    ),
+    "0036-generation-fidelity-evaluation.md": (
+        "- Governing issue: [#26]"
+        "(https://github.com/stauntonjr/scifact-rag/issues/26)"
+    ),
+}
 COMMAND_KEYS = {
     "primary_check",
     "bootstrap",
@@ -186,6 +198,45 @@ def parse_skill_frontmatter(path: Path) -> dict[str, str]:
             raise ValueError(f"invalid frontmatter line: {line}")
         metadata[key.strip()] = value.strip().strip('"')
     return metadata
+
+
+def validate_adrs(root: Path, result: Result) -> None:
+    seen: dict[str, str] = {}
+    adr_directory = root / "docs/adr"
+    for path in sorted(adr_directory.glob("[0-9][0-9][0-9][0-9]-*.md")):
+        filename = ADR_FILENAME.fullmatch(path.name)
+        result.require(filename is not None, f"invalid ADR filename: {path.name}")
+        if filename is None:
+            continue
+
+        heading = ADR_HEADING.search(path.read_text(encoding="utf-8"))
+        result.require(heading is not None, f"{path.name}: missing ADR heading")
+        if heading is None:
+            continue
+
+        filename_number = filename.group("number")
+        heading_number = heading.group("number")
+        result.require(
+            filename_number == heading_number,
+            f"{path.name}: filename {filename_number} != heading {heading_number}",
+        )
+        previous = seen.get(heading_number)
+        result.require(
+            previous is None,
+            f"duplicate ADR-{heading_number}: {previous} and {path.name}",
+        )
+        if previous is None:
+            seen[heading_number] = path.name
+
+    for filename, expected_link in EXACT_ADR_GOVERNING_LINKS.items():
+        path = adr_directory / filename
+        result.require(path.is_file(), f"missing required ADR: {filename}")
+        if path.is_file():
+            result.require(
+                expected_link in path.read_text(encoding="utf-8"),
+                f"{filename}: governing issue link mismatch",
+            )
+    result.checked.append(f"{len(seen)} ADR identifiers")
 
 
 def validate_project(root: Path, result: Result) -> dict[str, Any]:
@@ -845,6 +896,7 @@ def check(root: Path) -> Result:
         result.require((root / relative).is_file(), f"missing required file: {relative}")
     try:
         validate_project(root, result)
+        validate_adrs(root, result)
         validate_capabilities(root, result)
         validate_loop(root, result)
         validate_roles(root, result)

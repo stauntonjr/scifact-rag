@@ -206,9 +206,40 @@ Successful search responses use `search-response/v1` and contain ordered `Search
 Successful ask responses use `answer/v1` and map the complete application answer, citations, and
 actual supplied evidence. The API does not reinterpret exact `insufficient evidence` results.
 
-This is a local non-production interface. There is no authentication, TLS, CORS middleware,
-rate limiting, public ingress, streaming, or job queue. Revisit the architecture before binding
-beyond loopback or accepting untrusted traffic.
+By default this is a local non-production interface. There is no authentication, TLS, broad CORS,
+streaming, or job queue. Compose continues to publish only `127.0.0.1:8090`.
+
+### Opt-in public-demo mode
+
+The same single-worker API can participate in the anonymous, best-effort Issue #27 live demo when
+started with both explicit settings:
+
+```bash
+SCIFACT_PUBLIC_DEMO_ENABLED=true \
+SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN=https://stauntonjr.github.io \
+docker compose up -d --build api
+```
+
+`SCIFACT_PUBLIC_DEMO_ENABLED` accepts exactly `true` or `false` and defaults to `false`.
+`SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN` must be an exact HTTPS origin and defaults to the Pages origin
+above when public mode is enabled. Public mode adds `GET /readyz` (`readiness/v1`) and
+`GET /v1/capabilities` (`capabilities/v1`). Only `/readyz` returns an
+`Access-Control-Allow-Origin` header, and only for the configured exact Pages origin. These probes
+perform no retrieval, reranking, embedding, or generation.
+
+Search and Answer share one non-blocking inference slot. A second valid overlapping request returns
+HTTP 429 with the fixed `error/v1` code `busy`; an unavailable selected dependency returns HTTP 503
+with code `unavailable`. Responses do not expose upstream bodies or exception details. The public
+mode requires exactly one Uvicorn worker; adding workers would multiply the process-local slot and
+requires design review.
+
+The SciFact repository owns application configuration, readiness/capability contracts, UI
+behavior, and the recorded Pages fallback. The separate `vps-srv` repository owns TLS, DNS-facing
+Traefik routes, tailnet transport, anonymous rate limits, request-size bounds, log rotation, and
+the edge kill switch. Operators disable or redirect the SciFact-specific edge before stopping DGX
+services; they can also set `SCIFACT_PUBLIC_DEMO_ENABLED=false` and rebuild only `api`. Neither
+repository authorizes automatic DGX/model startup. The live UI is a research demonstration, not a
+clinical system, production service, supported third-party API, or uptime commitment.
 
 ## Web evidence inspector
 
@@ -234,8 +265,10 @@ the browser groups them under one unique parent card and citation target while p
 passage in supplied order. Validation, unavailable-service, and contract-mismatch states use fixed
 bounded messages rather than raw server responses.
 
-The UI is a single-user loopback inspection surface. It adds no authentication, TLS, CORS,
-non-loopback exposure, persistence, administration, retrieval logic, or generation logic. Its
+The UI remains the presentation adapter for the single-worker API. It adds no authentication,
+persistence, administration, retrieval logic, or generation logic. In public-demo mode it reads
+the capability contract, disables unavailable strategies, retains the entered claim on retryable
+failure, and maps busy, unavailable, network, and malformed-response states to fixed text. Its
 assets ship with the Python wheel and deployment follows the existing API image.
 
 ## MCP service

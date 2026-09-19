@@ -33,6 +33,36 @@ Do not rewrite a failure as success. If the correction is not verified, label it
 failure exposes an escaped defect with a deterministic oracle, create a candidate under
 `harness/challenges/`; do not store a live network call as a replay fixture.
 
+## EXEC-PLAN-004: inline task helper was called with its output path
+
+- Date: 2026-09-18. Workflow: Issue #27 public live-demo closure plan.
+- Failed approach: called `task-start` with the intended task-brief output path rather than the
+  implementation plan and task number.
+- Error signature: `no such plan file: .../task-3-brief.md`.
+- Mutation check: the helper rejected its arguments before creating the brief or changing tracked
+  repository state.
+- Corrected path: run `task-start PLAN_FILE TASK_NUMBER`, then read the reported brief path.
+- Verification: the corrected Task 3 call created the brief from the approved closure plan and
+  reported the unchanged base commit.
+- Prevention: consult the installed helper's usage line when resuming an inline plan; task briefs
+  are outputs, never inputs, to `task-start`.
+
+## UV-CACHE-005: focused check used a read-only shared uv cache
+
+- Date: 2026-09-18. Workflow: Issue #27 public live-demo governance verification.
+- Failed approach: ran a focused `uv` check with the default shared cache inside a restricted
+  worktree environment.
+- Error signature: `Could not acquire lock` followed by `Read-only file system` under the user uv
+  cache. No test ran and no tracked file changed.
+- Corrected path: set `UV_CACHE_DIR=/tmp/scifact-rag-uv-cache` and `UV_LINK_MODE=copy` for bounded
+  checks in this restricted environment. For the focused tools lint, also select `E402` so the
+  repository's existing import suppressions are meaningful rather than flagged as unused.
+- Verification: the isolated-cache interface/showcase suite passed 17 tests, the focused Ruff
+  check passed, the harness check passed, and `git diff --check` passed.
+- Prevention: restricted-run verification commands must use a writable task-specific cache; tool
+  lint commands that include `tools/harness_check.py` must explicitly select its suppressed E402
+  rule. The final repository gate remains authoritative.
+
 ## GH-PLANNING-001: Classic Project shortcut used for a Projects v2 item
 
 - Date: 2026-08-24.

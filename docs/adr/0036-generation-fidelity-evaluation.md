@@ -1,4 +1,4 @@
-# ADR-0035: Sealed generation-fidelity evaluation boundary
+# ADR-0036: Sealed generation-fidelity evaluation boundary
 
 - Status: accepted
 - Date: 2026-09-18

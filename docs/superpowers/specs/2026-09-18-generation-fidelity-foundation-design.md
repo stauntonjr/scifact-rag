@@ -260,7 +260,7 @@ collected as one batch before any repair.
 | `tests/fixtures/generation_fidelity_challenges.json` | Development-only semantic contrasts |
 | `docs/project/generation-fidelity-v1.md` | Normative measurement, custody, and interpretation protocol |
 | `docs/research/generation-fidelity-existing-solutions.md` | Prior-art and dataset disposition |
-| `docs/adr/0035-generation-fidelity-evaluation.md` | Proposed durable architecture decision |
+| `docs/adr/0036-generation-fidelity-evaluation.md` | Proposed durable architecture decision |
 | `docs/project/handoff.md` | Current state and next authority boundary |
 | `docs/reports/issue-26-generation-fidelity-foundation.md` | Final accepted evidence summary |
 

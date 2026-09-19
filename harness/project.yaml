@@ -4,7 +4,7 @@
   "template_mode": false,
   "project": {
     "name": "SciFact RAG",
-    "summary": "A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, loopback MCP, and a small evidence-inspection web interface over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
+    "summary": "A grounded retrieval-augmented generation prototype with CLI, loopback HTTP, loopback MCP, a small evidence-inspection web interface, and an opt-in anonymous best-effort public live demo over the public SciFact corpus using PostgreSQL with pgvector and VectorChord-BM25, MiniLM embeddings, and a DGX-hosted NVFP4 generator.",
     "lifecycle": "new",
     "profile": "python-data",
     "status": "completed-prototype",
@@ -29,6 +29,7 @@
       "A thin loopback HTTP API for liveness, search, and ask over the same application layer",
       "A thin loopback MCP service exposing search_scifact and answer_scifact over the same application layer",
       "A small loopback evidence-inspection web UI over the existing HTTP application contracts",
+      "An opt-in anonymous best-effort public live demo with readiness, capability discovery, fixed public-demo errors, and a recorded GitHub Pages fallback",
       "Python dataclass domain and application contracts",
       "One explicit composition root with PostgreSQL/pgvector/VectorChord-BM25, MiniLM, SciFact, and OpenAI-compatible generation adapters",
       "Docker Compose operation on one DGX Spark"
@@ -37,7 +38,9 @@
       "Pi or weaker-model effectiveness comparisons",
       "A bespoke adoption-effectiveness evaluation framework",
       "Tool-calling by the generation model",
-      "Production deployment or multi-node operation"
+      "Production deployment or multi-node operation",
+      "A supported third-party public API or uptime objective",
+      "Automated DGX or model-service lifecycle management"
     ]
   },
   "constraints": {
@@ -45,7 +48,7 @@
       "No secrets in the repository"
     ],
     "data_classification": "public benchmark data and locally generated evaluation artifacts",
-    "deployment": "Docker Compose on one NVIDIA DGX Spark; generator reached through a published OpenAI-compatible host endpoint",
+    "deployment": "Docker Compose on one NVIDIA DGX Spark with application publication retained on host loopback; an optional separately owned VPS edge may expose the single-worker API as an anonymous best-effort live demo, while DGX and model lifecycle remain manual",
     "budget": "One DGX Spark and locally hosted open components; no paid service is required for the prototype",
     "licenses": [
       "Application code: MIT",
@@ -104,6 +107,9 @@
         "Versioned loopback HTTP request, response, and error schemas",
         "Versioned loopback MCP tool argument, result, and error contracts",
         "Loopback evidence-inspection web routes and packaged asset contract",
+        "Opt-in public-demo readiness, capability-discovery, and fixed busy/unavailable error schemas",
+        "SCIFACT_PUBLIC_DEMO_ENABLED and SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN environment-variable contract",
+        "GitHub Pages one-shot live-status and recorded-fallback behavior",
         "Docker Compose environment-variable contract"
       ],
       "source": "harness/project.yaml:engineering.versioning.current",

@@ -510,7 +510,7 @@ valid path.
 
 - Modify: `compose.yaml`
 - Modify: `tests/test_interface_contracts.py`
-- Create: `docs/adr/0035-bounded-public-live-demo.md`
+- Create: `docs/adr/0035-public-live-demo-edge.md`
 - Create: `docs/reports/issue-27-public-live-demo.md`
 - Modify: `harness/capabilities.json`
 - Modify: `harness/project.yaml`
@@ -567,7 +567,7 @@ valid path.
   python3 tools/github_planning.py audit --offline
   python3 tools/product_version.py
   git diff --check
-  git add compose.yaml tests/test_interface_contracts.py docs/adr/0035-bounded-public-live-demo.md docs/reports/issue-27-public-live-demo.md harness/capabilities.json harness/project.yaml README.md CHANGELOG.md docs/project
+  git add compose.yaml tests/test_interface_contracts.py docs/adr/0035-public-live-demo-edge.md docs/reports/issue-27-public-live-demo.md harness/capabilities.json harness/project.yaml README.md CHANGELOG.md docs/project
   git commit -m "docs: define the bounded public demo contract"
   git push
   ```

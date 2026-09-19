@@ -27,12 +27,12 @@
 
 **Files:**
 - Create: `docs/project/generation-fidelity-v1.md`
-- Modify: `docs/adr/0035-generation-fidelity-evaluation.md`
+- Modify: `docs/adr/0036-generation-fidelity-evaluation.md`
 - Reference: `docs/project/generation-human-review-v1.md`
 - Reference: `docs/reports/issue-5-generation-context-validation.md`
 
 **Interfaces:**
-- Consumes: accepted ADR-0035 and Issue #26 acceptance criteria.
+- Consumes: accepted ADR-0036 and Issue #26 acceptance criteria.
 - Produces: the normative phase, custody, accounting, and interpretation contract used by every later task.
 
 - [ ] **Step 1: Write the protocol with exact authority boundaries**
@@ -91,7 +91,7 @@ accepts them nor produces evidence against them.
 
 - [ ] **Step 2: Confirm ADR acceptance provenance**
 
-Keep ADR-0035 at `Status: accepted` and add this sentence below its header if absent:
+Keep ADR-0036 at `Status: accepted` and add this sentence below its header if absent:
 
 ```markdown
 Owner acceptance: confirmed in the Issue #26 implementation task on 2026-09-18.
@@ -106,7 +106,7 @@ python3 tools/harness_check.py
 git diff --check
 rg -n 'T[B]D|T[O]DO|implement[ ]later|fill[ ]in[ ]details' \
   docs/project/generation-fidelity-v1.md \
-  docs/adr/0035-generation-fidelity-evaluation.md
+  docs/adr/0036-generation-fidelity-evaluation.md
 ```
 
 Expected: harness check exits 0; `git diff --check` exits 0; `rg` returns no matches.
@@ -122,7 +122,7 @@ Step 3, their measured elapsed seconds, `tier static`, criteria AC1 and AC5, and
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/project/generation-fidelity-v1.md docs/adr/0035-generation-fidelity-evaluation.md
+git add docs/project/generation-fidelity-v1.md docs/adr/0036-generation-fidelity-evaluation.md
 git commit -m "docs: freeze generation fidelity protocol"
 ```
 
@@ -837,7 +837,7 @@ In `docs/project/handoff.md`, state:
 - Issue #26 adds model-free fidelity measurement contracts only;
 - current product prompt and defaults are unchanged;
 - no model request or confirmation case was accessed;
-- ADR-0035 and protocol v1 govern later candidate work; and
+- ADR-0036 and protocol v1 govern later candidate work; and
 - cohort acquisition, candidate A/B, latency preflight, and confirmation remain separate owner decisions.
 
 Create `docs/reports/issue-26-generation-fidelity-foundation.md` with the current targeted and

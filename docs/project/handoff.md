@@ -4,7 +4,7 @@
 
 [Issue #26](https://github.com/stauntonjr/scifact-rag/issues/26) establishes a model-free,
 development-only foundation for measuring material scientific generation errors. The accepted
-[ADR-0035](../adr/0035-generation-fidelity-evaluation.md) and
+[ADR-0036](../adr/0036-generation-fidelity-evaluation.md) and
 [protocol](generation-fidelity-v1.md) freeze candidate identity, prompt hashes, cohort/access
 declarations, blinded review-v2 fields, bounded answer/evidence annotations, and a nine-case
 fictional challenge corpus. The existing review-v1 contract remains supported.
@@ -104,11 +104,14 @@ ask endpoints from the same loopback origin. Issue #25 adds a documentation-only
 static showcase page derived from that accepted interface; the DGX application remains
 loopback-only.
 
-The public showcase is now a static GitHub Pages artifact with an optional readiness link to the
-owner-controlled live edge. The live setting is opt-in and API-only; the default Compose state is
-disabled, and the offline page makes no claim that a failed live request produced a result. The
+The public showcase is a static GitHub Pages artifact with an optional readiness link to the
+owner-controlled live edge. The recording is the durable entry point. The anonymous live setting
+is opt-in, best-effort, API-only, and restricted to one Uvicorn worker; the default Compose state
+is disabled, and the offline page makes no claim that a failed live request produced a result. The
 small VPS hosts only the planned edge and Tailscale connectivity; DGX hosts the application,
-database, and inference.
+database, and inference. The [Issue #27 acceptance ledger](../reports/issue-27-public-live-demo.md)
+owns the shared twelve-case matrix. Its rows remain pending until exact deployment evidence exists,
+so public availability and Issue closure are not yet claimed.
 
 ## Accepted decisions
 
@@ -186,6 +189,10 @@ database, and inference.
 - ADR-0034 serves packaged HTML, CSS, and JavaScript from the existing FastAPI process at `/` and
   fixed `/assets/` routes. Browser calls remain same-origin at `127.0.0.1:8090`; there is no new
   service, port, runtime dependency, CORS policy, or application behavior.
+- ADR-0035 defines the opt-in public live-demo boundary: explicit environment settings, readiness
+  and capability discovery, an exact Pages-origin readiness header, fixed busy/unavailable errors,
+  one shared non-blocking inference slot, manual DGX lifecycle, and separately owned VPS edge and
+  rollback controls. It creates no uptime, clinical-use, or supported-third-party-API promise.
 - The Issue #25 showcase publishes only optimized static media from `docs/`. Its longer video
   removes source time 00:39–00:47 to shorten an unchanged loading interval, the README GIF further
   condenses idle and scrolling, and both retain the live answer and evidence identities. GitHub

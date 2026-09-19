@@ -10,10 +10,11 @@ are measured, failure cases remain visible, evaluation component revisions are r
 images and checkpoints are pinned, and experimental strategies stay modular rather than
 accumulating in the production score.
 
-**Status: completed DGX-local prototype.** CLI, HTTP, MCP, and web interfaces are accepted.
+**Status: completed DGX-local prototype with an accepted, opt-in public-demo application
+boundary.** CLI, HTTP, MCP, and web interfaces are accepted.
 The [roadmap](docs/project/roadmap.md) records completed and stopped experiments. Template/Pi
 evaluation now belongs to [agentic-project-template #59](https://github.com/stauntonjr/agentic-project-template/issues/59);
-further scientific research or deployed-service work requires a new scope decision.
+further scientific research or production-service work requires a new scope decision.
 
 ## Measured result
 
@@ -87,8 +88,11 @@ second retrieval or generation path.
 [![SciFact RAG live UI: enter a scientific claim, inspect the generated answer, and open cited evidence](docs/assets/showcase/scifact-ui-answer-evidence.gif)](https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/)
 
 [Watch the full recording with captions](https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/).
-It captures the actual loopback application and local model services; the public page contains
-static media only. The short GIF condenses waiting and scrolling from the disclosed longer edit.
+It captures the actual loopback application and local model services. The recording is the durable
+showcase and remains usable when the optional live demo is offline. The page checks the best-effort
+live path once, enables **Open live demo** only after a successful readiness response, and otherwise
+keeps the recording and an honest offline message. The short GIF condenses waiting and scrolling
+from the disclosed longer edit.
 
 ## Try it
 
@@ -117,8 +121,10 @@ curl -X POST http://127.0.0.1:8090/v1/search \
   -d '{"schema_version":"search-request/v1","query":"immune signaling","limit":5}'
 ```
 
-The API is a loopback-only prototype, not a public deployment. Complete request, response, error,
-and OpenAPI details are in the [technical reference](docs/project/technical-reference.md#http-api).
+The default API remains a loopback-only prototype. Issue #27 adds an opt-in, anonymous,
+best-effort live-demo mode for the same single-worker service; it is not a supported third-party
+API and has no uptime promise. Complete request, response, error, readiness, capability, and
+operator details are in the [technical reference](docs/project/technical-reference.md#http-api).
 
 The same API service hosts the evidence inspector:
 

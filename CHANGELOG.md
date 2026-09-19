@@ -10,7 +10,10 @@ All notable changes to the harness are recorded here. The harness version and a 
   readiness link talks to the single-worker API only when explicitly enabled. The API-only Compose
   environment keeps the default disabled; the static page has a bounded readiness check and an
   honest offline fallback. Inference and storage remain on the DGX, and VPS edge deployment is
-  documented separately.
+  documented separately. Project and capability contracts now enumerate the readiness,
+  capability-discovery, fixed busy/unavailable errors, exact Pages origin, and shared inference
+  slot. The live path remains anonymous, best-effort, pre-1.0, and carries no uptime or supported
+  third-party API commitment.
 
 - Added a linked README showcase and static GitHub Pages video captured from the real
   evidence-inspection UI. The recording uses the grammatically corrected claim `Side effects of

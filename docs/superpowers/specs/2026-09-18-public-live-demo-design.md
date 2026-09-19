@@ -1,9 +1,9 @@
 # SciFact public live-demo design
 
-Date: 2026-09-18  
-Status: approved by the human owner; implementation and deployment unverified  
-Application issue: [scifact-rag #27](https://github.com/stauntonjr/scifact-rag/issues/27)  
-Edge issue: [vps-srv #4](https://github.com/stauntonjr/vps-srv/issues/4)  
+Date: 2026-09-18
+Status: approved by the human owner; implementation and deployment unverified
+Application issue: [scifact-rag #27](https://github.com/stauntonjr/scifact-rag/issues/27)
+Edge issue: [vps-srv #4](https://github.com/stauntonjr/vps-srv/issues/4)
 Human decider: repository owner
 
 ## Objective

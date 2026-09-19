@@ -451,18 +451,24 @@
           "Uvicorn"
         ],
         "ci_checks": [
-          "uv run pytest tests/test_http_api.py tests/test_interface_contracts.py",
+        "uv run pytest tests/test_public_demo.py tests/test_health_adapters.py tests/test_http_api.py tests/test_interface_contracts.py",
           "docker compose config --quiet",
           "make smoke"
         ],
         "implementation_paths": [
-          "src/scifact_rag/http_api.py",
-          "tests/test_http_api.py",
+        "src/scifact_rag/http_api.py",
+        "src/scifact_rag/public_demo.py",
+        "src/scifact_rag/adapters/health.py",
+        "tests/test_public_demo.py",
+        "tests/test_health_adapters.py",
+        "tests/test_http_api.py",
           "tests/test_interface_contracts.py",
           "compose.yaml",
           "docs/research/scifact-rag-http-api.md",
-          "docs/adr/0032-http-api-adapter.md",
-          "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md"
+        "docs/adr/0032-http-api-adapter.md",
+        "docs/adr/0035-public-live-demo-edge.md",
+        "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md",
+        "docs/superpowers/specs/2026-09-18-public-live-demo-design.md"
         ]
       }
     },
@@ -567,7 +573,7 @@
           "native browser HTML/CSS/JavaScript"
         ],
         "ci_checks": [
-          "uv run pytest tests/test_web_ui.py tests/test_http_api.py tests/test_interface_contracts.py",
+        "uv run pytest tests/test_web_ui.py tests/test_http_api.py tests/test_showcase.py tests/test_interface_contracts.py",
           "python3 tools/python_package_smoke.py",
           "docker compose config --quiet",
           "make smoke"
@@ -577,10 +583,17 @@
           "src/scifact_rag/web/index.html",
           "src/scifact_rag/web/scifact.css",
           "src/scifact_rag/web/scifact.js",
-          "src/scifact_rag/http_api.py",
-          "tests/test_web_ui.py",
-          "docs/adr/0034-web-ui.md",
-          "docs/superpowers/specs/2026-09-17-web-ui-design.md"
+        "src/scifact_rag/http_api.py",
+        "src/scifact_rag/public_demo.py",
+        "tests/test_web_ui.py",
+        "tests/test_http_api.py",
+        "tests/test_showcase.py",
+        "tests/test_interface_contracts.py",
+        "docs/showcase/scifact-ui/",
+        "docs/adr/0034-web-ui.md",
+        "docs/adr/0035-public-live-demo-edge.md",
+        "docs/superpowers/specs/2026-09-17-web-ui-design.md",
+        "docs/superpowers/specs/2026-09-18-public-live-demo-design.md"
         ]
       }
     },

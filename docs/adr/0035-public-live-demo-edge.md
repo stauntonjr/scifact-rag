@@ -3,7 +3,7 @@
 - Status: accepted
 - Date: 2026-09-18
 - Decider: Jack Rory Staunton, human owner
-- Governing issue: [#25](https://github.com/stauntonjr/scifact-rag/issues/25)
+- Governing issue: [#27](https://github.com/stauntonjr/scifact-rag/issues/27)
 
 ## Context
 

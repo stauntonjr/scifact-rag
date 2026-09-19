@@ -21,11 +21,48 @@ from scifact_rag.mcp_server import create_mcp_server
 from scifact_rag.strategies import RetrievalStrategyName
 
 _ROOT = Path(__file__).resolve().parents[1]
+_ADR_HEADING = re.compile(r"^# ADR-(?P<number>\d{4}):", re.MULTILINE)
 
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+def test_adr_identifiers_are_unique_and_match_filenames() -> None:
+    identifiers: dict[str, list[str]] = {}
+    mismatches: list[str] = []
+
+    for path in sorted((_ROOT / "docs/adr").glob("[0-9][0-9][0-9][0-9]-*.md")):
+        filename_number = path.name[:4]
+        heading = _ADR_HEADING.search(path.read_text(encoding="utf-8"))
+        assert heading is not None, f"{path.name}: missing ADR heading"
+        heading_number = heading.group("number")
+        identifiers.setdefault(heading_number, []).append(path.name)
+        if filename_number != heading_number:
+            mismatches.append(
+                f"{path.name}: filename {filename_number} != heading {heading_number}"
+            )
+
+    duplicates = {
+        number: paths for number, paths in identifiers.items() if len(paths) != 1
+    }
+    assert duplicates == {}
+    assert mismatches == []
+
+    exact_governing_links = {
+        "0035-public-live-demo-edge.md": (
+            "- Governing issue: [#27]"
+            "(https://github.com/stauntonjr/scifact-rag/issues/27)"
+        ),
+        "0036-generation-fidelity-evaluation.md": (
+            "- Governing issue: [#26]"
+            "(https://github.com/stauntonjr/scifact-rag/issues/26)"
+        ),
+    }
+    for filename, expected_link in exact_governing_links.items():
+        text = (_ROOT / "docs/adr" / filename).read_text(encoding="utf-8")
+        assert expected_link in text
 
 
 class ParityApplication:
@@ -264,18 +301,106 @@ def test_http_capability_is_active_with_exact_delivery_contract() -> None:
     contract = capability["active_contract"]
     assert contract["runtime_dependencies"] == ["FastAPI", "Uvicorn"]
     assert (
-        "uv run pytest tests/test_http_api.py tests/test_interface_contracts.py"
+        "uv run pytest tests/test_public_demo.py tests/test_health_adapters.py "
+        "tests/test_http_api.py tests/test_interface_contracts.py"
         in contract["ci_checks"]
     )
     assert set(contract["implementation_paths"]) == {
         "src/scifact_rag/http_api.py",
+        "src/scifact_rag/public_demo.py",
+        "src/scifact_rag/adapters/health.py",
+        "tests/test_public_demo.py",
+        "tests/test_health_adapters.py",
         "tests/test_http_api.py",
         "tests/test_interface_contracts.py",
         "compose.yaml",
         "docs/research/scifact-rag-http-api.md",
         "docs/adr/0032-http-api-adapter.md",
+        "docs/adr/0035-public-live-demo-edge.md",
         "docs/superpowers/specs/2026-09-17-http-api-adapter-design.md",
+        "docs/superpowers/specs/2026-09-18-public-live-demo-design.md",
     }
+
+
+def test_web_capability_is_active_with_exact_delivery_contract() -> None:
+    catalog = json.loads((_ROOT / "harness/capabilities.json").read_text(encoding="utf-8"))
+    capability = next(
+        item for item in catalog["capabilities"] if item["id"] == "web-interface"
+    )
+
+    assert capability["status"] == "active"
+    contract = capability["active_contract"]
+    assert contract["runtime_dependencies"] == [
+        "FastAPI",
+        "native browser HTML/CSS/JavaScript",
+    ]
+    assert (
+        "uv run pytest tests/test_web_ui.py tests/test_http_api.py "
+        "tests/test_showcase.py tests/test_interface_contracts.py"
+        in contract["ci_checks"]
+    )
+    assert set(contract["implementation_paths"]) == {
+        "src/scifact_rag/web/__init__.py",
+        "src/scifact_rag/web/index.html",
+        "src/scifact_rag/web/scifact.css",
+        "src/scifact_rag/web/scifact.js",
+        "src/scifact_rag/http_api.py",
+        "src/scifact_rag/public_demo.py",
+        "tests/test_web_ui.py",
+        "tests/test_http_api.py",
+        "tests/test_showcase.py",
+        "tests/test_interface_contracts.py",
+        "docs/showcase/scifact-ui/",
+        "docs/adr/0034-web-ui.md",
+        "docs/adr/0035-public-live-demo-edge.md",
+        "docs/superpowers/specs/2026-09-17-web-ui-design.md",
+        "docs/superpowers/specs/2026-09-18-public-live-demo-design.md",
+    }
+
+
+def test_project_contract_bounds_the_public_demo() -> None:
+    project = json.loads((_ROOT / "harness/project.yaml").read_text(encoding="utf-8"))
+
+    assert "opt-in anonymous best-effort public live demo" in project["project"]["summary"]
+    assert (
+        "An opt-in anonymous best-effort public live demo with readiness, capability discovery, "
+        "fixed public-demo errors, and a recorded GitHub Pages fallback"
+        in project["intent"]["in_scope"]
+    )
+    assert {
+        "Production deployment or multi-node operation",
+        "A supported third-party public API or uptime objective",
+        "Automated DGX or model-service lifecycle management",
+    } <= set(project["intent"]["out_of_scope"])
+    assert "application publication retained on host loopback" in project["constraints"][
+        "deployment"
+    ]
+    assert "single-worker API" in project["constraints"]["deployment"]
+    assert {
+        "Opt-in public-demo readiness, capability-discovery, and fixed busy/unavailable error schemas",
+        "SCIFACT_PUBLIC_DEMO_ENABLED and SCIFACT_PUBLIC_DEMO_PAGES_ORIGIN environment-variable contract",
+        "GitHub Pages one-shot live-status and recorded-fallback behavior",
+    } <= set(project["engineering"]["versioning"]["public_contract"])
+
+
+def test_public_demo_acceptance_ledger_has_twelve_pending_owned_rows() -> None:
+    report = (_ROOT / "docs/reports/issue-27-public-live-demo.md").read_text(encoding="utf-8")
+    rows = [line for line in report.splitlines() if line.startswith("| M")]
+
+    assert len(rows) == 12
+    assert all("| pending |" in row for row in rows)
+    assert all(
+        any(f"| {owner} |" in row for owner in ("scifact-rag", "vps-srv", "shared"))
+        for row in rows
+    )
+    assert {"deterministic", "live non-inference", "live inference"} == {
+        evidence_class
+        for row in rows
+        for evidence_class in ("deterministic", "live non-inference", "live inference")
+        if f"| {evidence_class} |" in row
+    }
+    assert "Release-impact recommendation: `minor`" in report
+    assert "## Rollback boundary" in report
 
 
 def test_compose_exposes_only_the_loopback_mcp_module() -> None:

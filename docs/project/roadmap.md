@@ -477,11 +477,14 @@ That acceptance is complete. The retained report records cited-answer rendering,
 insufficiency with evaluated evidence preserved, bounded validation and unavailable states,
 API-only restoration, packaged resources, accessibility markers, and explicit local-only limits.
 
-Issue #25 adds a static GitHub Pages showcase and an optional live-readiness link. The recording
-and offline fallback are public delivery artifacts; the live path is disabled by default and, when
-enabled, uses only the single-worker API while inference and storage remain on the DGX. VPS edge
-deployment is maintained in the separate `vps-srv` repository under its own plan and acceptance
-boundary.
+Issue #25 delivered the static GitHub Pages showcase. Issue #27 adds its optional live-readiness
+link and the opt-in public-demo application boundary. The recording and offline fallback remain the
+durable public artifacts; the anonymous live path is disabled by default and, when enabled, uses
+only the single-worker API while inference and storage remain on the DGX. It has no uptime,
+clinical-use, or supported-third-party-API commitment. VPS edge deployment is maintained in the
+separate `vps-srv` repository under its own plan and acceptance boundary. Issue #27 remains open
+until the shared twelve-case matrix, exact-revision CI, rollback evidence, and independent reviews
+are complete.
 
 ## Handoff to the template program
 
