@@ -1,10 +1,8 @@
 import importlib.util
-import os
 import sys
 from pathlib import Path
 
 import pytest
-
 
 TOOL = Path(__file__).parents[1] / "tools" / "evidence_selection_audit.py"
 spec = importlib.util.spec_from_file_location("evidence_selection_audit", TOOL)
@@ -86,3 +84,19 @@ def test_reconcile_outcomes_preserves_abstention_as_wrong():
     assert row.predictions["selected"] == "insufficient_evidence"
     assert row.abstentions["selected"] is True
     assert row.correctness["selected"] is False
+
+
+def test_reference_spans_union_but_source_window_overlap_fails():
+    assert audit.coverage([[0, 4], [3, 8]], [[2, 6]])["reference_characters"] == 8
+    with pytest.raises(audit.AuditError, match="overlapping source windows"):
+        audit.validate_source_windows([
+            {"start": 0, "end": 4}, {"start": 3, "end": 7},
+        ])
+
+
+def test_two_window_upper_bound_cannot_cover_three_disjoint_required_windows():
+    result = audit.two_window_upper_bound(
+        [{"start": 0, "end": 2}, {"start": 4, "end": 6}, {"start": 8, "end": 10}],
+        [[0, 2], [4, 6], [8, 10]],
+    )
+    assert result["recall"] == pytest.approx(2 / 3)

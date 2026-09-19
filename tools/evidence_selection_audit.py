@@ -1,16 +1,16 @@
-#!/usr/bin/env python3
 """Fail-closed input binding for the retained evidence-selection audit."""
 
 from __future__ import annotations
 
 import hashlib
+import itertools
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from evidence_inference_reader import ARMS, NATIVE, parse_label
+from evidence_inference_reader import ARMS, NATIVE, parse_label, span_coverage
 
 PREPARATION_SHA256 = "888834d7ff034b391f6d90edb9cc819f88e8265823fdf25579f35fce6c88fc20"
 RUNTIME_SHA256 = "891d04c4be3175c803fd1308f1eb24cc6c56c386885d25851752dbac4ce2db9d"
@@ -116,3 +116,32 @@ def reconcile_outcomes(
             abstentions={arm: predictions[arm] == "insufficient_evidence" for arm in ARMS},
         ))
     return rows
+
+
+def validate_source_windows(windows: list[dict[str, object]]) -> None:
+    ordered = sorted(windows, key=lambda row: (int(row["start"]), int(row["end"])))
+    for previous, current in itertools.pairwise(ordered):
+        if int(current["start"]) < int(previous["end"]):
+            raise AuditError("overlapping source windows")
+
+
+def coverage(reference: list[list[int]], selected: list[list[int]]) -> dict[str, float | int]:
+    """Count valid touching/overlapping reference spans exactly once."""
+    return span_coverage(selected, reference)
+
+
+def two_window_upper_bound(
+    windows: list[dict[str, object]], reference: list[list[int]]
+) -> dict[str, object]:
+    validate_source_windows(windows)
+    if not windows:
+        raise AuditError("source windows must not be empty")
+    pairs = list(itertools.combinations(windows, 2)) or [(windows[0],)]
+    def rank(pair: tuple[dict[str, object], ...]) -> tuple[float, tuple[tuple[int, int], ...]]:
+        intervals = [[int(row["start"]), int(row["end"])] for row in pair]
+        result = coverage(reference, intervals)
+        return (-float(result["intersection_characters"]), tuple(map(tuple, intervals)))
+    selected = min(pairs, key=rank)
+    intervals = [[int(row["start"]), int(row["end"])] for row in selected]
+    result = coverage(reference, intervals)
+    return {"intervals": tuple(map(tuple, intervals)), **result}
