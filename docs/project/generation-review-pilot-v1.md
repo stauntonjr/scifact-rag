@@ -114,10 +114,14 @@ R1/R2 artifacts. Reconcile them against your retained initial judgment and the s
 majority vote is not authority. Return the final label or `unresolved`, preserving the initial and
 explaining any change.”
 
-Prompt versions are `reviewer-r1/v1`, `reviewer-r2/v1`, `adjudicator-initial/v1`, and
-`adjudicator-final/v1`. Their exact serialized prompts and SHA-256 digests are retained beside run
-artifacts before fictional preflight. Decoding controls are unavailable on this subscription
-surface and are recorded as such.
+The implemented artifact validator binds `reviewer-r1/v1`, `reviewer-r2/v1`, and
+`adjudicator-initial/v1` to frozen execution identities. The preflight stopped before a valid
+adjudicator-initial envelope, so no final-turn serializer or `adjudicator-final/v1` artifact
+adapter was implemented or exercised. Staged final adjudication remains required for any future
+qualified panel; a successor revision must prospectively define and validate that versioned
+artifact boundary before reviewing real development evidence. Exact serialized prompts and
+SHA-256 digests used by this run are retained beside run artifacts. Decoding controls are
+unavailable on this subscription surface and are recorded as such.
 
 ## Artifact contract
 

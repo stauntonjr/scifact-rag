@@ -10,8 +10,9 @@ Decision: **`insufficient-evidence`**
 
 The agent-panel review process is **not qualified** for Candidate A development comparison in this
 revision. The six-task fictional preflight reached its prospective ceiling with only two strict
-passes. Neither adjudicator output satisfied the immutable artifact contract, so staged
-evidence-first adjudication was not validated. The protocol prohibits more preflight tasks,
+passes. No attributable valid adjudicator envelope was retained; two coordinator-assigned raw
+blobs were malformed, so staged evidence-first adjudication was not validated. The protocol
+prohibits more preflight tasks,
 semantic retries, replacement outputs, or relaxing the schema after seeing those results.
 
 No retained development response was sent to a reviewer model. Therefore this report contains no
@@ -77,7 +78,7 @@ independently verified:
 |---|---|---|---|
 | R1 | `gpt-5.6-sol` | rejected | accepted |
 | R2 | `gpt-5.5` | rejected | accepted |
-| A | `gpt-5.6-terra` | rejected | rejected |
+| Coordinator-assigned A | `gpt-5.6-terra` | rejected | rejected |
 
 Observed strict failures:
 
@@ -85,16 +86,16 @@ Observed strict failures:
   value.
 - Fixture 1 R2 simultaneously declared evidence absent and supplied evidence spans, and used an
   invalid insufficiency value.
-- Fixture 1 A used invalid adequacy enums.
-- Fixture 2 A omitted the required top-level rationale and nested an object where adequacy requires
-  plain text.
+- The coordinator-assigned fixture 1 A blob used invalid adequacy enums.
+- The coordinator-assigned fixture 2 A blob omitted the required top-level rationale and nested an
+  object where adequacy requires plain text.
 
 Fixture 2 R1 and R2 were source-valid and retained as attributable envelopes. They disagreed on
 whether unrelated context is `not_answerable` or `answerable` merely because it supports an
 insufficiency response. Before any real review, the rubric was clarified to define answerability as
 support for a responsible substantive answer; an insufficiency-only case is `not_answerable` and
 has `answer_adequacy=not_applicable`. No remaining fictional task was available to validate that
-wording or the repaired adjudicator serialization.
+wording or a final adjudication artifact boundary, which was neither implemented nor exercised.
 
 Raw-output SHA-256 digests are retained under ignored
 `artifacts/generation-review-pilot-v1/preflight/`:
@@ -103,10 +104,10 @@ Raw-output SHA-256 digests are retained under ignored
 |---|---|
 | Fixture 1 R1 | `c96a052e185e96979f145696839b608447b5bee673f051104c2561de243851a5` |
 | Fixture 1 R2 | `23491ad49fb8b8fe893339b3c158a8eca8352c6f0a89e4fd8a3c6d883425f2b8` |
-| Fixture 1 A | `57a6ca17a50d7ffd1abdeba096182528eb3391ac90787c978bbd57c2fcfe2827` |
+| Coordinator-assigned fixture 1 A | `57a6ca17a50d7ffd1abdeba096182528eb3391ac90787c978bbd57c2fcfe2827` |
 | Fixture 2 R1 | `2f2e8c7389e4dee83222531d3ffa26f9de9145cdb59202a6bb6a5cbd97dde683` |
 | Fixture 2 R2 | `c029f214a4b95a719a632fff703e36b8844b2a2c00467b63b660fdc65244ab18` |
-| Fixture 2 A | `7dd71233a46efa2719da4408b8c7751fcd3503d0adbcbc65212fb1e54fdd11e0` |
+| Coordinator-assigned fixture 2 A | `7dd71233a46efa2719da4408b8c7751fcd3503d0adbcbc65212fb1e54fdd11e0` |
 
 The accepted R1 and R2 canonical envelope digests are
 `6d2aa8c11b9435c40d9509226e649d27ff3a7c3609f5933e059d0487cbb096d8` and
@@ -135,10 +136,10 @@ uncertainty rates, adequacy coverage, and unresolved material counts are **not c
 
 ## Decision and successor boundary
 
-The exact decision is `insufficient-evidence`: usable exposed artifacts and callable reviewer roles
-exist, but the frozen preflight did not validate the adjudicator artifact boundary or resolve the
-answerability instruction within its run budget. This outcome completes the bounded pilot without
-qualifying the panel.
+The exact decision is `insufficient-evidence`: usable exposed artifacts and callable first-pass
+reviewer roles exist, but the frozen preflight did not validate the adjudicator artifact boundary
+or resolve the answerability instruction within its run budget. This outcome completes the bounded
+pilot without qualifying the panel.
 
 Candidate A remains blocked on a separately accepted reviewer-panel revision. Such a revision must
 prospectively choose one of these materially different remedies rather than silently retrying:
@@ -162,3 +163,8 @@ frozen budget.
 
 Not established: reliable scientific judgment, human agreement, independent model errors,
 development-review readiness, better generation, operational custody, or confirmation performance.
+
+## Release impact
+
+Recommended impact: **none**. This development-only pilot changes no public CLI, HTTP, MCP, web,
+package, or product-generation compatibility contract.

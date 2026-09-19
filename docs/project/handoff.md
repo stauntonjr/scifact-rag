@@ -8,9 +8,10 @@
 historical responses into 20 connected claim/article-family groups. The frozen split contains 11
 clarification responses and 31 assessment responses without splitting a group.
 
-The six-task fictional preflight produced only two source-valid envelopes. Both adjudicator
-attempts were malformed, so staged evidence-first adjudication was not validated before the
-prospective preflight ceiling. The [pilot report](../reports/generation-review-pilot-v1.md) records
+The six-task fictional preflight produced only two source-valid envelopes. No attributable valid
+adjudicator envelope was retained; two coordinator-assigned raw blobs were malformed, so staged
+evidence-first adjudication was not validated before the prospective preflight ceiling. The
+[pilot report](../reports/generation-review-pilot-v1.md) records
 `insufficient-evidence`; no real development response was sent to a reviewer, no agreement metric
 was computed, and the panel is not qualified for Candidate A screening. Do not retry, change the
 model panel, enlarge the budget, or relax the schema without a separately accepted revision.

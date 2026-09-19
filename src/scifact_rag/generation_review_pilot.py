@@ -428,16 +428,14 @@ def _validate_execution_identity(
     envelope: Mapping[str, Any],
     provenance: object,
     errors: list[str],
-    expected_identity: Mapping[str, str] | None,
 ) -> None:
     if not isinstance(provenance, Mapping):
         return
-    identity = expected_identity
-    if identity is None:
-        role = envelope.get("role")
-        prompt_version = provenance.get("prompt_version")
-        if isinstance(role, str) and isinstance(prompt_version, str):
-            identity = FROZEN_EXECUTION_IDENTITIES.get((role, prompt_version))
+    identity = None
+    role = envelope.get("role")
+    prompt_version = provenance.get("prompt_version")
+    if isinstance(role, str) and isinstance(prompt_version, str):
+        identity = FROZEN_EXECUTION_IDENTITIES.get((role, prompt_version))
     if identity is None or set(identity) != IDENTITY_FIELDS:
         errors.append("agent review identity is not in the frozen execution contract")
         return
@@ -451,8 +449,6 @@ def _validate_execution_identity(
 def validate_agent_review(
     value: object,
     source_row: Mapping[str, Any],
-    *,
-    expected_identity: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Validate one attributable agent judgment against its exact source row."""
     errors: list[str] = []
@@ -490,7 +486,7 @@ def validate_agent_review(
                 }
                 if raw_judgment != expected_judgment:
                     errors.append("provenance.raw_output does not match the projected judgment")
-    _validate_execution_identity(item, provenance, errors, expected_identity)
+    _validate_execution_identity(item, provenance, errors)
     if errors:
         raise AgentReviewValidationError("; ".join(errors))
     return dict(item)
@@ -513,7 +509,6 @@ def build_agent_review_envelope(
     rubric_sha256: str,
     raw_output: str,
     latency_ms: float | None = None,
-    expected_identity: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Wrap one raw model judgment with explicit immutable provenance, then validate it."""
     expected = {"review_v2", "adequacy", "rationale"}
@@ -546,7 +541,7 @@ def build_agent_review_envelope(
             "usage": {"input_tokens": None, "output_tokens": None, "total_tokens": None},
         },
     }
-    return validate_agent_review(envelope, source_row, expected_identity=expected_identity)
+    return validate_agent_review(envelope, source_row)
 
 
 def canonical_json_sha256(value: object) -> str:
@@ -820,7 +815,6 @@ def project_agent_reviews(
     reviews: Sequence[object],
     *,
     role: str,
-    expected_identity: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Project ordered agent envelopes into review-v2 plus a separate adequacy artifact."""
     if role not in ROLES:
@@ -851,11 +845,7 @@ def project_agent_reviews(
     for source_row, review in zip(source_rows, reviews, strict=True):
         if not isinstance(source_row, Mapping):
             raise AgentReviewValidationError("source worksheet rows must be objects")
-        validated = validate_agent_review(
-            review,
-            source_row,
-            expected_identity=expected_identity,
-        )
+        validated = validate_agent_review(review, source_row)
         if validated["role"] != role:
             raise AgentReviewValidationError(
                 "every agent review role must match the projection role"

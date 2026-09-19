@@ -775,3 +775,19 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   20 connected article-family groups without modifying any source byte.
 - Prevention: provenance validators must implement the prospective review artifact's documented
   answer boundary, not infer that a later product fallback is always the reviewed representation.
+
+## SCIFACT-RAG-015: repository harness check used a guessed filename
+
+- Date: 2026-09-19.
+- Workflow: run affected checks after the Issue #28 review repair batch.
+- Failed approach: invoke `tools/check_harness.py` from recollection instead of resolving the
+  repository's actual harness entry point.
+- Error signature: Python reported that `tools/check_harness.py` did not exist after all preceding
+  focused tests and static checks had passed.
+- Mutation check: the failed invocation changed no tracked file, scientific artifact, model,
+  service, or external state.
+- Corrected path: locate the checked-in entry point and run `python3 tools/harness_check.py`.
+- Verification: the authoritative harness check passed all listed project, ADR, capability, role,
+  adapter, schema, planning, and engineering-tooling checks.
+- Prevention: resolve repository check entry points from the Makefile or tracked tools before
+  composing a multi-command verification batch.

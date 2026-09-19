@@ -34,18 +34,6 @@ def _strict_review_module() -> ModuleType:
     return module
 
 
-def _identity(*, role: str = "r1") -> dict[str, str]:
-    return {
-        "model": "fixture-model",
-        "prompt_sha256": "b" * 64,
-        "prompt_version": f"reviewer-{role}/v1",
-        "provider": "fixture-provider",
-        "role": role,
-        "rubric_sha256": "c" * 64,
-        "rubric_version": "generation-review-pilot/v1",
-    }
-
-
 def _source_row() -> dict[str, object]:
     return {
         "answer": "Treatment A causes improvement in all patients.",
@@ -76,6 +64,19 @@ def _source_row() -> dict[str, object]:
 
 
 def _review(*, role: str = "r1") -> dict[str, object]:
+    identities = {
+        "r1": {
+            "model": "gpt-5.6-sol",
+            "prompt_sha256": "8cb970ec763e364cd1b20733a15258875c3f25522aba171311d79ecf7c17a325",
+            "prompt_version": "preflight2-r1/v1",
+        },
+        "r2": {
+            "model": "gpt-5.5",
+            "prompt_sha256": "94f340a8507c2d4fdc7c368c8fae4c35f866facdc1077b32e462e4e9a1458612",
+            "prompt_version": "preflight2-r2/v1",
+        },
+    }
+    identity = identities[role]
     review: dict[str, object] = {
         "schema_version": "generation-agent-review-envelope/v1",
         "response_id": RESPONSE_ID,
@@ -119,15 +120,15 @@ def _review(*, role: str = "r1") -> dict[str, object]:
                 (json.dumps(_source_row(), sort_keys=True, separators=(",", ":")) + "\n").encode()
             ).hexdigest(),
             "latency_ms": None,
-            "model": "fixture-model",
+            "model": identity["model"],
             "model_revision": None,
-            "prompt_sha256": "b" * 64,
-            "prompt_version": f"reviewer-{role}/v1",
-            "provider": "fixture-provider",
+            "prompt_sha256": identity["prompt_sha256"],
+            "prompt_version": identity["prompt_version"],
+            "provider": "OpenAI-Codex-subscription",
             "raw_output": "",
             "raw_output_sha256": "",
             "request_id": None,
-            "rubric_sha256": "c" * 64,
+            "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
             "rubric_version": "generation-review-pilot/v1",
             "session_id": "fixture-session",
             "submitted_at": "2026-09-19T15:00:00Z",
@@ -165,11 +166,7 @@ def _refresh_raw(review: dict[str, object]) -> None:
 
 
 def test_validate_agent_review_accepts_exact_source_bound_envelope() -> None:
-    validated = validate_agent_review(
-        _review(),
-        _source_row(),
-        expected_identity=_identity(),
-    )
+    validated = validate_agent_review(_review(), _source_row())
 
     assert validated["response_id"] == RESPONSE_ID
     assert validated["review_v2"]["causal_strengthening"] == "yes"
@@ -188,18 +185,17 @@ def test_build_agent_review_envelope_adds_provenance_and_validates() -> None:
         judgment,
         _source_row(),
         role="r1",
-        provider="fixture-provider",
-        model="fixture-model",
+        provider="OpenAI-Codex-subscription",
+        model="gpt-5.6-sol",
         model_revision=None,
         session_id="fixture-session",
         request_id=None,
         submitted_at="2026-09-19T15:00:00Z",
-        prompt_version="reviewer-r1/v1",
-        prompt_sha256="b" * 64,
+        prompt_version="preflight2-r1/v1",
+        prompt_sha256="8cb970ec763e364cd1b20733a15258875c3f25522aba171311d79ecf7c17a325",
         rubric_version="generation-review-pilot/v1",
-        rubric_sha256="c" * 64,
+        rubric_sha256="773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
         raw_output=raw_output,
-        expected_identity=_identity(),
     )
 
     assert (
@@ -246,7 +242,7 @@ def test_validate_agent_review_fails_closed(
     mutation(review)
 
     with pytest.raises(AgentReviewValidationError, match=match):
-        validate_agent_review(review, _source_row(), expected_identity=_identity())
+        validate_agent_review(review, _source_row())
 
 
 def test_validate_agent_review_binds_source_raw_judgment_and_frozen_identity() -> None:
@@ -255,21 +251,21 @@ def test_validate_agent_review_binds_source_raw_judgment_and_frozen_identity() -
     assert isinstance(provenance, dict)
     provenance["input_sha256"] = "d" * 64
     with pytest.raises(AgentReviewValidationError, match="input_sha256"):
-        validate_agent_review(wrong_source, _source_row(), expected_identity=_identity())
+        validate_agent_review(wrong_source, _source_row())
 
     changed_judgment = _review()
     review_v2 = changed_judgment["review_v2"]
     assert isinstance(review_v2, dict)
     review_v2["notes"] = "Changed after raw output was frozen."
     with pytest.raises(AgentReviewValidationError, match="raw_output does not match"):
-        validate_agent_review(changed_judgment, _source_row(), expected_identity=_identity())
+        validate_agent_review(changed_judgment, _source_row())
 
     changed_model = _review()
     changed_provenance = changed_model["provenance"]
     assert isinstance(changed_provenance, dict)
     changed_provenance["model"] = "replacement-model"
     with pytest.raises(AgentReviewValidationError, match="model does not match"):
-        validate_agent_review(changed_model, _source_row(), expected_identity=_identity())
+        validate_agent_review(changed_model, _source_row())
 
 
 def test_validate_agent_review_enforces_material_error_consistency() -> None:
@@ -281,7 +277,7 @@ def test_validate_agent_review_enforces_material_error_consistency() -> None:
     material_errors.append(copy.deepcopy(material_errors[0]))
     _refresh_raw(duplicate)
     with pytest.raises(AgentReviewValidationError, match="duplicate material error"):
-        validate_agent_review(duplicate, _source_row(), expected_identity=_identity())
+        validate_agent_review(duplicate, _source_row())
 
     missing_category = _review()
     missing_review = missing_category["review_v2"]
@@ -289,7 +285,7 @@ def test_validate_agent_review_enforces_material_error_consistency() -> None:
     missing_review["material_errors"] = []
     _refresh_raw(missing_category)
     with pytest.raises(AgentReviewValidationError, match="matching material error"):
-        validate_agent_review(missing_category, _source_row(), expected_identity=_identity())
+        validate_agent_review(missing_category, _source_row())
 
     clean_with_error = _review()
     clean_review = clean_with_error["review_v2"]
@@ -299,7 +295,7 @@ def test_validate_agent_review_enforces_material_error_consistency() -> None:
     clean_review["material_overstatement"] = "none"
     _refresh_raw(clean_with_error)
     with pytest.raises(AgentReviewValidationError, match="clean pass"):
-        validate_agent_review(clean_with_error, _source_row(), expected_identity=_identity())
+        validate_agent_review(clean_with_error, _source_row())
 
 
 def test_project_agent_reviews_emits_strict_review_v2_and_separate_adequacy() -> None:
@@ -315,7 +311,6 @@ def test_project_agent_reviews_emits_strict_review_v2_and_separate_adequacy() ->
         source,
         [_review()],
         role="r1",
-        expected_identity=_identity(),
     )
     expected_adequacy = _review()["adequacy"]
     assert isinstance(expected_adequacy, dict)
@@ -353,13 +348,12 @@ def test_project_agent_reviews_rejects_missing_reordered_and_repeated_ids() -> N
     }
 
     with pytest.raises(AgentReviewValidationError, match="ordered response IDs"):
-        project_agent_reviews(source, [_review()], role="r1", expected_identity=_identity())
+        project_agent_reviews(source, [_review()], role="r1")
     with pytest.raises(AgentReviewValidationError, match="ordered response IDs"):
         project_agent_reviews(
             source,
             [_review(), _review()],
             role="r1",
-            expected_identity=_identity(),
         )
 
 
