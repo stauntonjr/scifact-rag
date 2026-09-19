@@ -1,5 +1,20 @@
 # Project handoff
 
+## Generation-fidelity evaluation foundation
+
+[Issue #26](https://github.com/stauntonjr/scifact-rag/issues/26) establishes a model-free,
+development-only foundation for measuring material scientific generation errors. The accepted
+[ADR-0035](../adr/0035-generation-fidelity-evaluation.md) and
+[protocol](generation-fidelity-v1.md) freeze candidate identity, prompt hashes, cohort/access
+declarations, blinded review-v2 fields, bounded answer/evidence annotations, and a nine-case
+fictional challenge corpus. The existing review-v1 contract remains supported.
+
+No model request, prompt/default change, retrieval/context change, confirmation acquisition,
+human annotation, training, service, graph, deployment, or generation-quality claim is included.
+Public benchmarks are development material only and do not satisfy the required future untouched
+confirmation boundary. The next scientific step requires a separately authorized custodian-owned
+confirmation cohort and frozen baseline/candidate run; Issue #26 does not authorize that work.
+
 ## Fixed-reader implementation and pending execution
 
 [Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) implements the standalone

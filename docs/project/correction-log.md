@@ -608,3 +608,56 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   the five displayed parent IDs in order, and every visible answer citation belongs to that set.
 - Prevention: freeze the literal user-approved or actually captured text, not an assistant-authored
   semantic paraphrase, whenever media provenance depends on exact query identity.
+
+## SCIFACT-RAG-009: linked-worktree Git metadata was outside the writable mount
+
+- Date: 2026-09-18.
+- Workflow: create and commit the isolated generation-fidelity implementation worktree.
+- Failed approach: run ordinary linked-worktree Git mutations while the worktree content was
+  writable but its repository-owned metadata remained on a protected `.git` mount.
+- Error signature: Git could not create the worktree or index lock and reported a read-only file
+  system under the repository's worktree metadata.
+- Mutation check: the failed operations created no commit and did not alter tracked project files.
+- Corrected path: resolve the exact repository and worktree targets read-only, then rerun only the
+  repository-scoped Git mutation with approved host authority.
+- Verification: the isolated `codex/generation-fidelity-foundation` worktree and task-owned commits
+  were created while the source checkout and unrelated paths remained unchanged.
+- Prevention: when a linked worktree's content is writable but Git metadata is protected, escalate
+  the exact repository-scoped Git operation instead of broadening filesystem permissions.
+
+## SCIFACT-RAG-010: uv cache writes were denied inside the workspace sandbox
+
+- Date: 2026-09-18.
+- Workflow: synchronize and execute the locked project environment for generation-fidelity tests.
+- Failed approach: run `uv sync --locked` and `uv run` with workspace-only write authority even
+  though uv's existing cache and temporary directory live outside the writable workspace.
+- Error signature: uv reported a read-only filesystem while creating a temporary path beneath its
+  host cache; no project test had started.
+- Mutation check: the failure did not change source, test, protocol, model, service, or external
+  state.
+- Corrected path: rerun the exact repository-scoped uv command with approved access to the existing
+  package cache, retaining the locked dependency graph.
+- Verification: locked synchronization completed and the targeted/static generation-fidelity
+  checks passed in the project environment.
+- Prevention: treat host-cache denial as an execution-environment boundary; retain the lockfile and
+  escalate only the exact package/test command rather than changing cache ownership or dependencies.
+
+## SCIFACT-RAG-011: review-v2 completion checks diverged across boundaries
+
+- Date: 2026-09-18.
+- Workflow: independently verify the generation-fidelity review-v2 parser and offline reviewer.
+- Failed approach: treat any structurally valid material-error row as sufficient, gate browser
+  completion only on categorical fields, and publish staged HTML with unconditional replacement.
+- Error signature: a causal-strengthening non-pass accepted a `qualifier_loss` annotation; the
+  browser could stamp a missing-annotation export complete; an existing output sentinel was
+  overwritten.
+- Mutation check: the defects were found on an unintegrated local branch. No model, confirmation
+  cohort, retained scientific result, service, deployment, or external planning state changed.
+- Corrected path: require category-specific annotations for every definite triggered error, run an
+  executable equivalent check before browser completion/export, and reject existing output or
+  staging paths before writing.
+- Verification: focused regressions cover mismatched categories, answer/evidence bounds, both and
+  neither evidence modes, duplicates, executable browser validation, v1 isolation, and retained
+  v1/v2 output paths.
+- Prevention: cross-boundary completion semantics must share explicit schema-derived mappings and
+  executable parity cases; evidence-producing writers must test retained destinations before use.

@@ -1,0 +1,106 @@
+{
+  "cases": [
+    {
+      "challenge_id": "conflicting-incomplete-evidence-01",
+      "distinction": "conflicting-incomplete-evidence",
+      "evidence": [
+        "One small trial reported a reduction in marker M, while a second trial found no statistically significant difference and both had wide confidence intervals."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Select one trial as definitive or state that the intervention is proven effective.",
+      "question": "Does intervention D reliably reduce marker M?",
+      "required_behavior": "Describe the conflicting and imprecise evidence without choosing a certain conclusion."
+    },
+    {
+      "challenge_id": "insufficient-evidence-01",
+      "distinction": "insufficient-evidence",
+      "evidence": [
+        "The report measured sleep duration after intervention K but did not measure infection incidence."
+      ],
+      "expected_disposition": "insufficient-evidence",
+      "forbidden_behavior": "Infer an effect on infection incidence from the sleep outcome.",
+      "question": "Does intervention K prevent infection?",
+      "required_behavior": "Return the exact insufficient-evidence disposition because the requested outcome was not measured."
+    },
+    {
+      "challenge_id": "non-significant-difference-01",
+      "distinction": "non-significant-difference",
+      "evidence": [
+        "The observed difference between groups was not statistically significant; the confidence interval included both benefit and harm."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Claim equivalence, no effect, or proof that the groups are the same.",
+      "question": "Were treatments P and Q equivalent?",
+      "required_behavior": "State that no statistically significant difference was detected and retain the imprecision."
+    },
+    {
+      "challenge_id": "observational-association-01",
+      "distinction": "observational-association",
+      "evidence": [
+        "In a retrospective cohort, exposure A was associated with lower outcome B; residual confounding could not be excluded."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Claim that exposure A prevents or causes a reduction in outcome B.",
+      "question": "Does exposure A prevent outcome B?",
+      "required_behavior": "Describe an association and retain the residual-confounding limitation."
+    },
+    {
+      "challenge_id": "population-species-boundary-01",
+      "distinction": "population-species-boundary",
+      "evidence": [
+        "Compound R reduced inflammation in twelve laboratory mice; no human participants were studied."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Generalize the result to patients or people.",
+      "question": "Does compound R reduce inflammation in humans?",
+      "required_behavior": "Identify the mouse population and state that human effects were not established."
+    },
+    {
+      "challenge_id": "qualifier-restriction-01",
+      "distinction": "qualifier-restriction",
+      "evidence": [
+        "A benefit was observed only in participants receiving the high dose during the first seven days; other doses and later visits showed no clear difference."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Describe an unrestricted or persistent benefit.",
+      "question": "Did the treatment improve outcomes?",
+      "required_behavior": "Retain the high-dose and first-seven-day restrictions."
+    },
+    {
+      "challenge_id": "supported-control-01",
+      "distinction": "supported-control",
+      "evidence": [
+        "In a randomized study of adults, treatment S reduced measured symptom duration by two days compared with placebo."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Abstain despite direct evidence or replace symptom duration with another outcome.",
+      "question": "What effect did treatment S have on symptom duration in the studied adults?",
+      "required_behavior": "Answer that symptom duration was reduced by two days versus placebo in the studied adults."
+    },
+    {
+      "challenge_id": "supported-control-02",
+      "distinction": "supported-control",
+      "evidence": [
+        "Cultured cells treated with agent T expressed 30 percent less protein U than untreated cultured cells."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Abstain or generalize the cultured-cell result to organisms.",
+      "question": "How did agent T affect protein U in the cultured cells?",
+      "required_behavior": "Answer that protein U expression was 30 percent lower than in untreated cultured cells."
+    },
+    {
+      "challenge_id": "surrogate-outcome-01",
+      "distinction": "surrogate-outcome",
+      "evidence": [
+        "Therapy V lowered biomarker W, but the study did not measure hospitalization, survival, or clinical recovery."
+      ],
+      "expected_disposition": "answer",
+      "forbidden_behavior": "Claim reduced hospitalization, improved survival, recovery, or clinical benefit.",
+      "question": "Does therapy V improve survival?",
+      "required_behavior": "Report only the biomarker change and state that survival was not measured."
+    }
+  ],
+  "phase": "development",
+  "schema_version": "generation-fidelity-challenges/v1",
+  "synthetic": true
+}

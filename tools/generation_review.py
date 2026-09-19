@@ -13,7 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "generation-human-review/v1"
+SCHEMA_VERSION_V1 = "generation-human-review/v1"
+SCHEMA_VERSION_V2 = "generation-human-review/v2"
+SCHEMA_VERSION = SCHEMA_VERSION_V1
 FROZEN_WORKSHEET_SHA256 = "f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2"
 TOP_LEVEL_FIELDS = {"completed_at", "reviewer", "rows", "schema_version", "selection_protocol"}
 ROW_FIELDS = {"answer", "claim", "evidence", "response_id", "review"}
@@ -29,6 +31,35 @@ REVIEW_OPTIONS = {
     "qualifier_omission": {"yes", "no", "not_applicable", "uncertain"},
 }
 REVIEW_FIELDS = set(REVIEW_OPTIONS) | {"notes"}
+REVIEW_OPTIONS_V2 = {
+    **REVIEW_OPTIONS,
+    "causal_strengthening": {"yes", "no", "not_applicable", "uncertain"},
+    "population_generalization": {"yes", "no", "not_applicable", "uncertain"},
+}
+REVIEW_FIELDS_V2 = set(REVIEW_OPTIONS_V2) | {"material_errors", "notes"}
+MATERIAL_ERROR_CATEGORIES = {
+    "causal_strengthening",
+    "comparison_change",
+    "intervention_change",
+    "negation_loss",
+    "outcome_change",
+    "population_generalization",
+    "qualifier_loss",
+    "unsupported_claim",
+}
+SPAN_FIELDS = {"end", "start"}
+EVIDENCE_SPAN_FIELDS = {"end", "evidence_index", "start"}
+MATERIAL_ERROR_FIELDS = {"answer_span", "category", "evidence_absent", "evidence_spans"}
+MATERIAL_ERROR_CATEGORY_FIELDS = {
+    "causal_strengthening": "causal_strengthening",
+    "comparison_omission": "comparison_change",
+    "intervention_omission": "intervention_change",
+    "negation_omission": "negation_loss",
+    "outcome_omission": "outcome_change",
+    "population_generalization": "population_generalization",
+    "population_omission": "population_generalization",
+    "qualifier_omission": "qualifier_loss",
+}
 RESPONSE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -53,14 +84,153 @@ def _nonempty_text(value: object, location: str, errors: list[str]) -> None:
         errors.append(f"{location} must be non-empty text")
 
 
+def _validate_span(
+    value: object,
+    text: object,
+    location: str,
+    errors: list[str],
+    *,
+    expected_fields: set[str] = SPAN_FIELDS,
+) -> tuple[int, int] | None:
+    _unexpected(value, expected_fields, location, errors)
+    if not isinstance(value, dict):
+        return None
+    start = value.get("start")
+    end = value.get("end")
+    if (
+        isinstance(start, bool)
+        or not isinstance(start, int)
+        or isinstance(end, bool)
+        or not isinstance(end, int)
+    ):
+        errors.append(f"{location} offsets must be integers")
+        return None
+    if not isinstance(text, str) or not 0 <= start < end <= len(text):
+        errors.append(f"{location} must satisfy 0 <= start < end <= text length")
+        return None
+    return start, end
+
+
+def _validate_v2_material_errors(
+    row: dict[str, Any],
+    review: dict[str, Any],
+    location: str,
+    errors: list[str],
+    *,
+    require_complete: bool,
+) -> None:
+    annotations = review.get("material_errors")
+    annotation_location = f"{location}.review.material_errors"
+    if not isinstance(annotations, list):
+        errors.append(f"{annotation_location} must be a list")
+        return
+    if not require_complete and annotations:
+        errors.append(f"{annotation_location} must be empty in build input")
+
+    evidence = row.get("evidence")
+    evidence_items = evidence if isinstance(evidence, list) else []
+    duplicate_keys: set[tuple[str, int, int]] = set()
+    valid_categories: set[str] = set()
+    for annotation_index, annotation in enumerate(annotations):
+        item_location = f"{annotation_location}[{annotation_index}]"
+        error_count = len(errors)
+        _unexpected(annotation, MATERIAL_ERROR_FIELDS, item_location, errors)
+        if not isinstance(annotation, dict):
+            continue
+
+        category = annotation.get("category")
+        if category not in MATERIAL_ERROR_CATEGORIES:
+            errors.append(f"{item_location}.category is invalid")
+        answer_span = _validate_span(
+            annotation.get("answer_span"),
+            row.get("answer"),
+            f"{item_location}.answer_span",
+            errors,
+        )
+
+        evidence_absent = annotation.get("evidence_absent")
+        if not isinstance(evidence_absent, bool):
+            errors.append(f"{item_location}.evidence_absent must be a boolean")
+        evidence_spans = annotation.get("evidence_spans")
+        if not isinstance(evidence_spans, list):
+            errors.append(f"{item_location}.evidence_spans must be a list")
+            evidence_spans = []
+        elif bool(evidence_spans) == (evidence_absent is True):
+            errors.append(
+                f"{item_location} must use exactly one of evidence_spans or evidence_absent=true"
+            )
+
+        for span_index, span in enumerate(evidence_spans):
+            span_location = f"{item_location}.evidence_spans[{span_index}]"
+            _unexpected(span, EVIDENCE_SPAN_FIELDS, span_location, errors)
+            if not isinstance(span, dict):
+                continue
+            evidence_index = span.get("evidence_index")
+            if (
+                isinstance(evidence_index, bool)
+                or not isinstance(evidence_index, int)
+                or not 0 <= evidence_index < len(evidence_items)
+            ):
+                errors.append(f"{span_location}.evidence_index is out of bounds")
+                continue
+            evidence_item = evidence_items[evidence_index]
+            evidence_text = evidence_item.get("text") if isinstance(evidence_item, dict) else None
+            _validate_span(
+                span,
+                evidence_text,
+                span_location,
+                errors,
+                expected_fields=EVIDENCE_SPAN_FIELDS,
+            )
+
+        if isinstance(category, str) and answer_span is not None:
+            duplicate_key = (category, *answer_span)
+            if duplicate_key in duplicate_keys:
+                errors.append(f"{item_location} is a duplicate material error")
+            duplicate_keys.add(duplicate_key)
+        if len(errors) == error_count and isinstance(category, str):
+            valid_categories.add(category)
+
+    if not require_complete:
+        return
+
+    required_categories = {
+        category
+        for field, category in MATERIAL_ERROR_CATEGORY_FIELDS.items()
+        if review.get(field) == "yes"
+    }
+    summary_nonpass = (
+        review.get("grounded") == "no" or review.get("material_overstatement") == "present"
+    )
+    if summary_nonpass and not required_categories:
+        required_categories.add("unsupported_claim")
+    missing_categories = required_categories - valid_categories
+    if missing_categories:
+        errors.append(
+            f"{location}.review requires a material error annotation; "
+            "missing matching material error categories: " + ", ".join(sorted(missing_categories))
+        )
+    elif not required_categories and annotations:
+        errors.append(f"{location}.review clean pass must not contain material errors")
+
+
 def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any]:
     """Validate a frozen blank worksheet or a completed human-review export."""
     errors: list[str] = []
     _unexpected(data, TOP_LEVEL_FIELDS, "worksheet", errors)
     if not isinstance(data, dict):
         raise ReviewValidationError("; ".join(errors))
-    if data.get("schema_version") != SCHEMA_VERSION:
-        errors.append(f"schema_version must be {SCHEMA_VERSION}")
+    schema_version = data.get("schema_version")
+    if schema_version == SCHEMA_VERSION_V1:
+        review_options = REVIEW_OPTIONS
+        review_fields = REVIEW_FIELDS
+    elif schema_version == SCHEMA_VERSION_V2:
+        review_options = REVIEW_OPTIONS_V2
+        review_fields = REVIEW_FIELDS_V2
+    else:
+        errors.append(f"schema_version must be {SCHEMA_VERSION_V1} or {SCHEMA_VERSION_V2}")
+        review_options = REVIEW_OPTIONS
+        review_fields = REVIEW_FIELDS
     _nonempty_text(data.get("selection_protocol"), "selection_protocol", errors)
     rows = data.get("rows")
     if not isinstance(rows, list) or not rows:
@@ -112,11 +282,11 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
                     _nonempty_text(item.get(field), f"{evidence_location}.{field}", errors)
 
         review = row.get("review")
-        _unexpected(review, REVIEW_FIELDS, f"{location}.review", errors)
+        _unexpected(review, review_fields, f"{location}.review", errors)
         if not isinstance(review, dict):
             continue
         row_incomplete = False
-        for field, allowed in REVIEW_OPTIONS.items():
+        for field, allowed in review_options.items():
             value = review.get(field)
             if require_complete:
                 if value not in allowed:
@@ -129,6 +299,14 @@ def validate_worksheet(data: object, *, require_complete: bool) -> dict[str, Any
                 row_incomplete = True
         elif notes is not None:
             errors.append(f"{location}.review.notes must be null in build input")
+        if schema_version == SCHEMA_VERSION_V2:
+            _validate_v2_material_errors(
+                row,
+                review,
+                location,
+                errors,
+                require_complete=require_complete,
+            )
         if row_incomplete:
             incomplete_rows.append(index)
 
@@ -171,6 +349,172 @@ def load_worksheet(
     return validated, raw
 
 
+RUBRIC_V1 = [
+    [
+        "grounded",
+        "Grounded",
+        "Is every material answer claim directly supported by the supplied evidence?",
+        ["yes", "no", "uncertain"],
+    ],
+    [
+        "material_overstatement",
+        "Material overstatement",
+        "Does the answer materially strengthen the evidence?",
+        ["none", "present", "uncertain"],
+    ],
+    [
+        "negation_omission",
+        "Negation omission",
+        "Is a material negation lost?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "qualifier_omission",
+        "Qualifier omission",
+        "Is a material limitation or qualifier lost?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "population_omission",
+        "Population omission",
+        "Is the studied population changed or omitted materially?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "intervention_omission",
+        "Intervention omission",
+        "Is the intervention or exposure changed or omitted materially?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "comparison_omission",
+        "Comparison omission",
+        "Is the comparator changed or omitted materially?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "outcome_omission",
+        "Outcome omission",
+        "Is the measured outcome changed or omitted materially?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+]
+RUBRIC_V2_ADDITIONS = [
+    [
+        "causal_strengthening",
+        "Causal strengthening",
+        "Does the answer strengthen association into causation or a stronger causal claim?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+    [
+        "population_generalization",
+        "Population generalization",
+        "Does the answer extend the finding beyond the studied population or species?",
+        ["yes", "no", "not_applicable", "uncertain"],
+    ],
+]
+
+
+def _reviewer_config(schema_version: object) -> dict[str, object]:
+    config: dict[str, object] = {
+        "rubric": RUBRIC_V1,
+        "material_error": None,
+        "export_filename": "generation-validation-v2-human-review.completed.json",
+    }
+    if schema_version == SCHEMA_VERSION_V2:
+        config["rubric"] = [*RUBRIC_V1, *RUBRIC_V2_ADDITIONS]
+        config["material_error"] = {
+            "categories": sorted(MATERIAL_ERROR_CATEGORIES),
+            "category_fields": MATERIAL_ERROR_CATEGORY_FIELDS,
+            "labels": {
+                "add_error": "Add material error",
+                "add_evidence": "Add evidence span",
+                "answer_end": "Answer span end",
+                "answer_start": "Answer span start",
+                "category": "Error category",
+                "evidence_absent": "Evidence absent",
+                "evidence_end": "Evidence span end",
+                "evidence_index": "Evidence item",
+                "evidence_start": "Evidence span start",
+                "heading": "Material error spans",
+                "remove": "Remove",
+            },
+        }
+        config["export_filename"] = "generation-fidelity-v2-human-review.completed.json"
+    return config
+
+
+BROWSER_VALIDATION_JAVASCRIPT = r"""
+    function validateMaterialErrors(row, review, config) {
+      if (!config) return [];
+      const errors = [];
+      const annotations = review.material_errors;
+      if (!Array.isArray(annotations)) return ['material_errors must be a list'];
+      const validCategories = new Set();
+      const duplicateKeys = new Set();
+      const boundedSpan = (span, text, location) => {
+        const textLength = typeof text === 'string' ? Array.from(text).length : -1;
+        if (!span || typeof span !== 'object'
+            || !Number.isInteger(span.start) || !Number.isInteger(span.end)
+            || span.start < 0 || span.start >= span.end || span.end > textLength) {
+          errors.push(`${location} is invalid`);
+          return false;
+        }
+        return true;
+      };
+      annotations.forEach((annotation, annotationIndex) => {
+        const initialErrorCount = errors.length;
+        const location = `material_errors[${annotationIndex}]`;
+        if (!annotation || typeof annotation !== 'object') {
+          errors.push(`${location} must be an object`);
+          return;
+        }
+        if (!config.categories.includes(annotation.category)) {
+          errors.push(`${location}.category is invalid`);
+        }
+        const answerValid = boundedSpan(annotation.answer_span, row.answer, `${location}.answer_span`);
+        if (typeof annotation.evidence_absent !== 'boolean') {
+          errors.push(`${location}.evidence_absent must be a boolean`);
+        }
+        const evidenceSpans = annotation.evidence_spans;
+        if (!Array.isArray(evidenceSpans)) {
+          errors.push(`${location}.evidence_spans must be a list`);
+        } else {
+          if ((evidenceSpans.length > 0) === (annotation.evidence_absent === true)) {
+            errors.push(`${location} must use exactly one evidence mode`);
+          }
+          evidenceSpans.forEach((span, spanIndex) => {
+            const spanLocation = `${location}.evidence_spans[${spanIndex}]`;
+            if (!span || typeof span !== 'object'
+                || !Number.isInteger(span.evidence_index)
+                || span.evidence_index < 0 || span.evidence_index >= row.evidence.length) {
+              errors.push(`${spanLocation}.evidence_index is invalid`);
+              return;
+            }
+            boundedSpan(span, row.evidence[span.evidence_index].text, spanLocation);
+          });
+        }
+        if (answerValid && typeof annotation.category === 'string') {
+          const key = `${annotation.category}:${annotation.answer_span.start}:${annotation.answer_span.end}`;
+          if (duplicateKeys.has(key)) errors.push(`${location} is a duplicate`);
+          duplicateKeys.add(key);
+        }
+        if (errors.length === initialErrorCount) validCategories.add(annotation.category);
+      });
+      const requiredCategories = new Set();
+      Object.entries(config.category_fields).forEach(([field, category]) => {
+        if (review[field] === 'yes') requiredCategories.add(category);
+      });
+      const summaryNonpass = review.grounded === 'no' || review.material_overstatement === 'present';
+      if (summaryNonpass && requiredCategories.size === 0) requiredCategories.add('unsupported_claim');
+      const missing = [...requiredCategories].filter(category => !validCategories.has(category));
+      if (missing.length) errors.push(`missing matching material error categories: ${missing.join(', ')}`);
+      if (!requiredCategories.size && annotations.length) errors.push('clean pass must not contain material errors');
+      return errors;
+    }
+"""
+
+
 HTML_TEMPLATE = r"""<!doctype html>
 <html lang="en">
 <head>
@@ -194,7 +538,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--paper); color: var(--ink); line-height: 1.5; }
-    button, input, textarea { font: inherit; }
+    button, input, select, textarea { font: inherit; }
     .topbar { position: sticky; top: 0; z-index: 10; background: rgba(251,250,247,.96); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
     .topbar-inner, main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; }
     .topbar-inner { padding: 14px 0 12px; }
@@ -234,6 +578,13 @@ HTML_TEMPLATE = r"""<!doctype html>
     .option input:focus-visible + span { outline: 3px solid var(--accent-soft); }
     .notes { grid-column: 1 / -1; }
     textarea { min-height: 92px; resize: vertical; margin-top: 8px; }
+    .material-errors { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 18px; }
+    .material-error { border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 10px 0; }
+    .material-error-grid, .evidence-span { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+    .material-error label, .evidence-span label { color: var(--muted); font-size: .82rem; }
+    .material-error input[type=number], .material-error select { width: 100%; margin-top: 4px; border: 1px solid #b8c0bd; border-radius: 8px; padding: 8px; background: white; }
+    .evidence-spans { display: grid; gap: 8px; margin: 12px 0; }
+    .checkbox { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
     .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
     .control-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     button { border: 1px solid #9da7a3; border-radius: 9px; padding: 9px 13px; background: white; color: var(--ink); cursor: pointer; font-weight: 700; }
@@ -244,7 +595,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     @media (max-width: 720px) {
       .rubric { grid-template-columns: 1fr; }
       .notes { grid-column: auto; }
-      .reviewer { grid-template-columns: 1fr; }
+      .reviewer, .material-error-grid, .evidence-span { grid-template-columns: 1fr; }
       .topbar-inner, main { width: min(100% - 20px, 1040px); }
     }
     @media print { .topbar, .controls, .intro { display: none; } body { background: white; } .card { box-shadow: none; border: 0; } }
@@ -286,23 +637,14 @@ HTML_TEMPLATE = r"""<!doctype html>
   <script id="worksheet-data" type="application/json">__WORKSHEET_JSON__</script>
   <script>
     'use strict';
+__BROWSER_VALIDATION_JAVASCRIPT__
     const source = JSON.parse(document.getElementById('worksheet-data').textContent);
+    const reviewConfig = __REVIEW_CONFIG__;
     const storageKey = '__STORAGE_KEY__';
     const sourceDigest = '__SOURCE_DIGEST__';
-    const categoricalFields = [
-      'grounded', 'material_overstatement', 'negation_omission', 'qualifier_omission',
-      'population_omission', 'intervention_omission', 'comparison_omission', 'outcome_omission'
-    ];
-    const rubric = [
-      ['grounded', 'Grounded', 'Is every material answer claim directly supported by the supplied evidence?', ['yes','no','uncertain']],
-      ['material_overstatement', 'Material overstatement', 'Does the answer materially strengthen the evidence?', ['none','present','uncertain']],
-      ['negation_omission', 'Negation omission', 'Is a material negation lost?', ['yes','no','not_applicable','uncertain']],
-      ['qualifier_omission', 'Qualifier omission', 'Is a material limitation or qualifier lost?', ['yes','no','not_applicable','uncertain']],
-      ['population_omission', 'Population omission', 'Is the studied population changed or omitted materially?', ['yes','no','not_applicable','uncertain']],
-      ['intervention_omission', 'Intervention omission', 'Is the intervention or exposure changed or omitted materially?', ['yes','no','not_applicable','uncertain']],
-      ['comparison_omission', 'Comparison omission', 'Is the comparator changed or omitted materially?', ['yes','no','not_applicable','uncertain']],
-      ['outcome_omission', 'Outcome omission', 'Is the measured outcome changed or omitted materially?', ['yes','no','not_applicable','uncertain']]
-    ];
+    const rubric = reviewConfig.rubric;
+    const categoricalFields = rubric.map(([field]) => field);
+    const materialErrorConfig = reviewConfig.material_error;
     const allowedByField = Object.fromEntries(rubric.map(([field,,, options]) => [field, new Set(options)]));
     let current = 0;
     let state = { reviewer: '', reviews: {} };
@@ -336,9 +678,35 @@ HTML_TEMPLATE = r"""<!doctype html>
         for (const field of categoricalFields) {
           if (allowedByField[field].has(saved[field])) review[field] = saved[field];
         }
+        if (materialErrorConfig) {
+          review.material_errors = Array.isArray(saved.material_errors)
+            ? saved.material_errors.map(normalizeMaterialError).filter(Boolean)
+            : [];
+        }
         normalized.reviews[row.response_id] = review;
       }
       return normalized;
+    }
+    function integerOrZero(value) {
+      return Number.isInteger(value) && value >= 0 ? value : 0;
+    }
+    function normalizeMaterialError(candidate) {
+      if (!candidate || typeof candidate !== 'object') return null;
+      const categories = materialErrorConfig.categories;
+      const evidenceSpans = Array.isArray(candidate.evidence_spans) ? candidate.evidence_spans : [];
+      return {
+        category: categories.includes(candidate.category) ? candidate.category : categories[0],
+        answer_span: {
+          start: integerOrZero(candidate.answer_span && candidate.answer_span.start),
+          end: integerOrZero(candidate.answer_span && candidate.answer_span.end)
+        },
+        evidence_spans: evidenceSpans.filter(span => span && typeof span === 'object').map(span => ({
+          evidence_index: integerOrZero(span.evidence_index),
+          start: integerOrZero(span.start),
+          end: integerOrZero(span.end)
+        })),
+        evidence_absent: candidate.evidence_absent === true
+      };
     }
     function saveState() {
       try {
@@ -351,12 +719,18 @@ HTML_TEMPLATE = r"""<!doctype html>
       updateProgress();
     }
     function reviewFor(row) {
-      if (!state.reviews[row.response_id]) state.reviews[row.response_id] = { notes: '' };
+      if (!state.reviews[row.response_id]) {
+        state.reviews[row.response_id] = materialErrorConfig
+          ? { notes: '', material_errors: [] }
+          : { notes: '' };
+      }
       return state.reviews[row.response_id];
     }
     function rowComplete(row) {
       const review = state.reviews[row.response_id] || {};
-      return categoricalFields.every(field => allowedByField[field].has(review[field]));
+      return categoricalFields.every(field => allowedByField[field].has(review[field]))
+        && (!materialErrorConfig
+          || validateMaterialErrors(row, review, materialErrorConfig).length === 0);
     }
     function updateProgress() {
       const complete = source.rows.filter(rowComplete).length;
@@ -369,6 +743,96 @@ HTML_TEMPLATE = r"""<!doctype html>
       [...document.getElementById('jump').options].forEach((option, index) => {
         option.textContent = `${index + 1}. ${rowComplete(source.rows[index]) ? '✓' : '○'} ${source.rows[index].response_id}`;
       });
+    }
+    function evidenceSpanHtml(row, span, errorIndex, spanIndex) {
+      const labels = materialErrorConfig.labels;
+      const evidenceOptions = row.evidence.map((item, index) =>
+        `<option value="${index}" ${span.evidence_index === index ? 'selected' : ''}>${index + 1}. ${escapeHtml(item.title)}</option>`
+      ).join('');
+      return `<div class="evidence-span">
+        <label>${escapeHtml(labels.evidence_index)}<select data-error="${errorIndex}" data-span="${spanIndex}" data-span-field="evidence_index">${evidenceOptions}</select></label>
+        <label>${escapeHtml(labels.evidence_start)}<input type="number" min="0" value="${span.start}" data-error="${errorIndex}" data-span="${spanIndex}" data-span-field="start"></label>
+        <label>${escapeHtml(labels.evidence_end)}<input type="number" min="0" value="${span.end}" data-error="${errorIndex}" data-span="${spanIndex}" data-span-field="end"></label>
+      </div>`;
+    }
+    function materialErrorsHtml(row, review) {
+      if (!materialErrorConfig) return '';
+      const labels = materialErrorConfig.labels;
+      const annotations = review.material_errors || [];
+      const items = annotations.map((annotation, errorIndex) => {
+        const categories = materialErrorConfig.categories.map(category =>
+          `<option value="${category}" ${annotation.category === category ? 'selected' : ''}>${escapeHtml(category.replaceAll('_', ' '))}</option>`
+        ).join('');
+        const evidenceSpans = annotation.evidence_spans.map((span, spanIndex) =>
+          evidenceSpanHtml(row, span, errorIndex, spanIndex)
+        ).join('');
+        return `<div class="material-error">
+          <div class="material-error-grid">
+            <label>${escapeHtml(labels.category)}<select data-error="${errorIndex}" data-error-field="category">${categories}</select></label>
+            <label>${escapeHtml(labels.answer_start)}<input type="number" min="0" value="${annotation.answer_span.start}" data-error="${errorIndex}" data-answer-field="start"></label>
+            <label>${escapeHtml(labels.answer_end)}<input type="number" min="0" value="${annotation.answer_span.end}" data-error="${errorIndex}" data-answer-field="end"></label>
+          </div>
+          <label class="checkbox"><input type="checkbox" data-error="${errorIndex}" data-error-field="evidence_absent" ${annotation.evidence_absent ? 'checked' : ''}> ${escapeHtml(labels.evidence_absent)}</label>
+          <div class="evidence-spans">${evidenceSpans}</div>
+          <div class="control-group">
+            <button type="button" data-add-evidence="${errorIndex}">${escapeHtml(labels.add_evidence)}</button>
+            <button type="button" data-remove-error="${errorIndex}">${escapeHtml(labels.remove)}</button>
+          </div>
+        </div>`;
+      }).join('');
+      return `<section class="material-errors">
+        <h3>${escapeHtml(labels.heading)}</h3>
+        <div class="question">Record the smallest answer span and its supporting evidence span, or explicitly mark evidence absent.</div>
+        ${items}
+        <button type="button" data-add-error>${escapeHtml(labels.add_error)}</button>
+      </section>`;
+    }
+    function bindMaterialErrorControls(row, review) {
+      if (!materialErrorConfig) return;
+      card.querySelector('[data-add-error]').addEventListener('click', () => {
+        review.material_errors.push({
+          category: materialErrorConfig.categories[0],
+          answer_span: { start: 0, end: Math.min(1, row.answer.length) },
+          evidence_spans: [],
+          evidence_absent: true
+        });
+        saveState();
+        render();
+      });
+      card.querySelectorAll('[data-remove-error]').forEach(button => button.addEventListener('click', event => {
+        review.material_errors.splice(Number(event.currentTarget.dataset.removeError), 1);
+        saveState();
+        render();
+      }));
+      card.querySelectorAll('[data-add-evidence]').forEach(button => button.addEventListener('click', event => {
+        const annotation = review.material_errors[Number(event.currentTarget.dataset.addEvidence)];
+        annotation.evidence_absent = false;
+        annotation.evidence_spans.push({ evidence_index: 0, start: 0, end: Math.min(1, row.evidence[0].text.length) });
+        saveState();
+        render();
+      }));
+      card.querySelectorAll('[data-answer-field]').forEach(input => input.addEventListener('input', event => {
+        const annotation = review.material_errors[Number(event.target.dataset.error)];
+        annotation.answer_span[event.target.dataset.answerField] = integerOrZero(Number(event.target.value));
+        saveState();
+      }));
+      card.querySelectorAll('[data-span-field]').forEach(input => input.addEventListener('input', event => {
+        const annotation = review.material_errors[Number(event.target.dataset.error)];
+        const span = annotation.evidence_spans[Number(event.target.dataset.span)];
+        span[event.target.dataset.spanField] = integerOrZero(Number(event.target.value));
+        saveState();
+      }));
+      card.querySelectorAll('[data-error-field]').forEach(input => input.addEventListener('change', event => {
+        const annotation = review.material_errors[Number(event.target.dataset.error)];
+        if (event.target.dataset.errorField === 'category') {
+          annotation.category = event.target.value;
+        } else {
+          annotation.evidence_absent = event.target.checked;
+          if (event.target.checked) annotation.evidence_spans = [];
+        }
+        saveState();
+        render();
+      }));
     }
     function render() {
       const row = source.rows[current];
@@ -388,6 +852,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         <section class="section"><h3>Supplied evidence</h3><div class="evidence-list">${evidence}</div></section>
         <section class="section"><h3>Answer</h3><div class="answer">${escapeHtml(row.answer)}</div></section>
         <section class="rubric" aria-label="Groundedness rubric">${fields}
+          ${materialErrorsHtml(row, review)}
           <label class="notes"><span>Notes</span><div class="question">For a non-pass or uncertainty, cite the smallest evidence and answer span that explains it.</div>
           <textarea id="notes" placeholder="Optional for a clean pass">${escapeHtml(review.notes || '')}</textarea></label>
         </section>`;
@@ -399,6 +864,7 @@ HTML_TEMPLATE = r"""<!doctype html>
         review.notes = event.target.value;
         saveState();
       });
+      bindMaterialErrorControls(row, review);
       document.getElementById('jump').value = String(current);
       document.getElementById('previous').disabled = current === 0;
       document.getElementById('next').disabled = current === source.rows.length - 1;
@@ -426,7 +892,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       const blob = new Blob([JSON.stringify(completed, null, 2) + '\n'], {type: 'application/json'});
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'generation-validation-v2-human-review.completed.json';
+      link.download = reviewConfig.export_filename;
       link.click();
       URL.revokeObjectURL(link.href);
       message.textContent = `Exported ${rows.length} completed responses from source ${sourceDigest.slice(0, 12)}…`;
@@ -462,17 +928,40 @@ def build_reviewer(
     digest = hashlib.sha256(raw).hexdigest()
     embedded = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     embedded = embedded.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    reviewer_config = json.dumps(
+        _reviewer_config(data["schema_version"]),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    reviewer_config = (
+        reviewer_config.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    )
+    browser_validation = (
+        BROWSER_VALIDATION_JAVASCRIPT if data["schema_version"] == SCHEMA_VERSION_V2 else ""
+    )
     html = (
         HTML_TEMPLATE.replace("__WORKSHEET_JSON__", embedded)
+        .replace("__BROWSER_VALIDATION_JAVASCRIPT__", browser_validation)
+        .replace("__REVIEW_CONFIG__", reviewer_config)
         .replace("__STORAGE_KEY__", f"scifact-generation-human-review:{digest}")
         .replace("__SOURCE_DIGEST__", digest)
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
     staged = output.with_name(f".{output.name}.tmp")
-    staged.write_text(html, encoding="utf-8")
+    if os.path.lexists(output):
+        raise ReviewValidationError(f"output already exists: {output}")
+    if os.path.lexists(staged):
+        raise ReviewValidationError(f"staging output already exists: {staged}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with staged.open("x", encoding="utf-8") as stream:
+        stream.write(html)
     os.chmod(staged, 0o644)
     staged.replace(output)
-    return {"output": str(output), "rows": len(data["rows"]), "source_sha256": digest}
+    return {
+        "output": str(output),
+        "rows": len(data["rows"]),
+        "schema_version": data["schema_version"],
+        "source_sha256": digest,
+    }
 
 
 def _source_projection(data: dict[str, Any]) -> dict[str, object]:
