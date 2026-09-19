@@ -1,9 +1,9 @@
 # Issue #27 public live-demo acceptance ledger
 
-Status: shared public acceptance executed; eleven rows are provisionally accepted and M09 is pending.
-Final closure remains gated on exact-SHA checks, independent cross-repository approval, the
-remaining result/error-state public-browser review described below, and an authorized API-only disabled-mode
-rollback/restoration exercise. That API rollback has not been exercised.
+Status: all twelve acceptance rows have passed through fresh evidence or explicitly qualified
+reuse. The final supplement below supersedes the historical pending browser/rollback statements.
+Issue closure requires final integrated checks and immutable cross-repository approval, recorded
+in the ordered closure comments; a readiness response alone is never completion evidence.
 
 ## Identity and boundary
 
@@ -151,18 +151,18 @@ from `pending` to `passed` only with timestamped evidence tied to both exact int
 
 | ID | Evidence class | Owner | Status | Evidence location | Exact pass condition | Stop condition |
 |---|---|---|---|---|---|---|
-| M01 DNS and TLS | live non-inference | vps-srv | provisionally passed | VPS edge report: DNS answer, certificate identity and expiry | Public hostname resolves to the intended VPS and serves a valid certificate for the exact hostname | Wrong address, invalid/expired certificate, or unverified DNS authority |
-| M02 Supported answer and citations | live inference | shared | provisionally passed | This report: timestamped request/result packet plus displayed evidence IDs | One bounded public Answer succeeds and every citation resolves to evidence displayed in that response | Any unresolved/fabricated citation, raw internal error, or unbounded retry |
-| M03 Exact insufficiency | live inference | shared | provisionally passed | This report: timestamped fixed-case packet | One bounded public Answer returns exact `insufficient evidence` with zero citations | Fabricated citation, altered exact result, or repeated model selection/tuning |
-| M04 Search | live inference | shared | provisionally passed | This report: timestamped Search packet | Search succeeds with one accepted, currently available strategy and ordered result evidence | Unavailable strategy accepted, contract mismatch, or unbounded retry |
-| M05 Optional strategy unavailable | deterministic | scifact-rag | provisionally passed | Focused capability/UI test output and captured capability payload | An unavailable optional strategy remains visible, disabled, and has a fixed reason without inference | Hidden strategy, enabled unavailable control, or probe invokes application work |
-| M06 Shared busy slot | deterministic | scifact-rag | provisionally passed | Focused overlapping-request test output | Two overlapping valid Search/Answer operations produce one active operation and one fixed HTTP 429 `busy`, with no second resolver/application call | Queue/retry appears, slot leaks, or more than one worker is required |
-| M07 Separate edge rate limits | live non-inference | vps-srv | provisionally passed | VPS edge report: bounded Answer and Search probes | Frozen Answer and Search token buckets act independently at their specified boundaries | Shared bucket, client-header identity, excessive probe, or unexpected upstream work |
-| M08 Dependency loss and restoration | deterministic | scifact-rag | provisionally passed | Focused health/capability/UI tests; optional bounded live confirmation | Loss returns fixed unavailable state without claim loss or raw detail, and restoration succeeds without code/config drift | Raw error/claim disclosure, lifecycle automation, or failure to restore |
-| M09 DGX outage and Pages fallback | live non-inference | shared | pending | Public browser capture plus VPS response metadata | Pages recording remains usable; live hostname serves the intended failure status/fallback without claiming success | Pages depends on DGX, failure becomes success, or fallback leaks upstream detail |
-| M10 Kill switch and restoration | live non-inference | vps-srv | provisionally passed | VPS edge report: config digests and before/after probes | SciFact route disables and restores without changing another VPS service | Unrelated route changes, manual dirty-checkout edit, or restoration uncertainty |
-| M11 External port isolation | live non-inference | shared | provisionally passed | Timestamped external inspection and DGX listener inventory | PostgreSQL, MCP, model services, and DGX loopback port 8090 are not publicly reachable | Any unintended public listener or inability to identify the exact target |
-| M12 Log privacy | live non-inference | vps-srv | provisionally passed | Sentinel request plus bounded application/VPS log search | Unique harmless claim sentinel and request/response bodies are absent; retained metadata matches the seven-day policy | Claim/body retention, credential/internal-detail exposure, or unbounded log inspection |
+| M01 DNS and TLS | live non-inference | vps-srv | passed | VPS edge report: DNS answer, certificate identity and expiry | Public hostname resolves to the intended VPS and serves a valid certificate for the exact hostname | Wrong address, invalid/expired certificate, or unverified DNS authority |
+| M02 Supported answer and citations | live inference | shared | passed | This report: timestamped request/result packet plus displayed evidence IDs | One bounded public Answer succeeds and every citation resolves to evidence displayed in that response | Any unresolved/fabricated citation, raw internal error, or unbounded retry |
+| M03 Exact insufficiency | live inference | shared | passed | This report: timestamped fixed-case packet | One bounded public Answer returns exact `insufficient evidence` with zero citations | Fabricated citation, altered exact result, or repeated model selection/tuning |
+| M04 Search | live inference | shared | passed | This report: timestamped Search packet | Search succeeds with one accepted, currently available strategy and ordered result evidence | Unavailable strategy accepted, contract mismatch, or unbounded retry |
+| M05 Optional strategy unavailable | deterministic | scifact-rag | passed | Focused capability/UI test output and captured capability payload | An unavailable optional strategy remains visible, disabled, and has a fixed reason without inference | Hidden strategy, enabled unavailable control, or probe invokes application work |
+| M06 Shared busy slot | deterministic | scifact-rag | passed | Focused overlapping-request test output | Two overlapping valid Search/Answer operations produce one active operation and one fixed HTTP 429 `busy`, with no second resolver/application call | Queue/retry appears, slot leaks, or more than one worker is required |
+| M07 Separate edge rate limits | live non-inference | vps-srv | passed | VPS edge report: bounded Answer and Search probes | Frozen Answer and Search token buckets act independently at their specified boundaries | Shared bucket, client-header identity, excessive probe, or unexpected upstream work |
+| M08 Dependency loss and restoration | deterministic | scifact-rag | passed | Focused health/capability/UI tests; optional bounded live confirmation | Loss returns fixed unavailable state without claim loss or raw detail, and restoration succeeds without code/config drift | Raw error/claim disclosure, lifecycle automation, or failure to restore |
+| M09 DGX outage and Pages fallback | live non-inference | shared | passed | Final closure packet and public browser capture plus VPS response metadata | Pages recording remains usable; live hostname serves the intended failure status/fallback without claiming success | Pages depends on DGX, failure becomes success, or fallback leaks upstream detail |
+| M10 Kill switch and restoration | live non-inference | vps-srv | passed | VPS edge report: config digests and before/after probes | SciFact route disables and restores without changing another VPS service | Unrelated route changes, manual dirty-checkout edit, or restoration uncertainty |
+| M11 External port isolation | live non-inference | shared | passed | Timestamped external inspection and DGX listener inventory | PostgreSQL, MCP, model services, and DGX loopback port 8090 are not publicly reachable | Any unintended public listener or inability to identify the exact target |
+| M12 Log privacy | live non-inference | vps-srv | passed | Sentinel request plus bounded application/VPS log search | Unique harmless claim sentinel and request/response bodies are absent; retained metadata matches daily rotation retaining seven archives | Claim/body retention, credential/internal-detail exposure, or unbounded log inspection |
 
 ## Closure gate
 
@@ -208,3 +208,64 @@ Those intercepted cases are deterministic UI evidence, not successful live infer
 The real outage returned HTTP 502 with the Pages offline body, then failed the hidden-link browser
 assertion. Its recovery restored the identical Serve mapping and public readiness. This failed
 attempt is not M09 acceptance. Repeat the browser exercise after the stylesheet is deployed.
+
+## Final acceptance supplement — 2026-09-19
+
+The [closure packet](../assets/showcase/closure-2026-09-19/README.md) contains procedures,
+masked captures, timestamped JSON, source bridges and SHA-256 artifact manifest. Magenta masks
+remove submitted claims, answer and evidence text. Intercepted failures remain deterministic UI
+evidence; they are not represented as live inference or dependency events.
+
+The reviewed repair [PR #32](https://github.com/stauntonjr/scifact-rag/pull/32) integrated as
+`bd4591e4051454dfc8f20c688b7b883a32ab250d`. Exact-revision workflows passed:
+[Harness 35455330635](https://github.com/stauntonjr/scifact-rag/actions/runs/35455330635),
+[CodeQL 35455330583](https://github.com/stauntonjr/scifact-rag/actions/runs/35455330583), and
+[Pages 35455330328](https://github.com/stauntonjr/scifact-rag/actions/runs/35455330328).
+The local repair gate passed 503 tests with three integration tests deselected, formatting,
+lint, types, harness checks, package installation smoke, and Compose validation. The final report
+integration receives its own current gate and exact-SHA workflow checks before closure.
+
+API image `sha256:e68907b7f8240fc7395666565a87b44b7c6181f17cffa7a9f8b24df792234a00`
+serves the reviewed JS digest
+`ece974d55f52325b4b4477cd5b7a9d18bbcdaa1b6152ec751688b23dd9547609`.
+Its enabled configuration remains `6e15c4740086e9ffab346d4bbcbc1ea2b7e7c1b199a804364a7638038ce54ed2`,
+one worker and host loopback 8090. Pages CSS matches
+`823f089aa730fda119e442d8f74be9ec2f12b4dbc71c28916b79a45a3f367697`.
+The API-only update left dependency IDs unchanged and restored the exact Serve mapping and readiness.
+VPS source base is `61b3be855cb7ee3e1dcbfa5b706ff86c4cd52339`; route/configuration/Traefik
+identities in the earlier inventory were independently refreshed and unchanged.
+
+| Rows | Final evidence and applicability |
+|---|---|
+| M01 | Independent edge refresh confirmed DNS/TLS and the same trusted edge/configuration identities. |
+| M02 | 16:31:27 UTC q30: public HTTP 200 `answer/v1`, three citations and five evidence cards; keyboard citation activation resolved. Both 1440px/390px layouts fit. Success rendering is unchanged by the later fetch-error-only repair. |
+| M03 | 16:41:55 UTC q92 after bucket refill: public HTTP 200, exact insufficiency, zero citations and five evidence cards, both widths. No model tuning or repeated case selection. |
+| M04 | 16:32:27 UTC public Search: HTTP 200 `search-response/v1`, five evidence cards and both layouts; same unchanged success rendering. |
+| M05 | Four unavailable options remain visible and disabled. Fresh direct unavailable-strategy request at 16:37 returned fixed 503 `error/v1` without inference. |
+| M06 | Retained overlapping-request observation and current deterministic shared-slot tests; fourteen fresh browser error fixtures preserve input, controls and fixed messages. |
+| M07 | Retained independent bucket/body-limit observations remain valid: exact edge source, middleware, Traefik and client-identity boundary unchanged. No inference about current token balance. |
+| M08 | Retained actual late-interaction pause/recovery, unchanged dependency image/configuration, and fresh fixed-503 browser state. |
+| M09 | 16:34:57 UTC genuine Serve outage: HTTP 502 with exact offline-body digest, Pages 200, hidden live link and recording playback with six caption cues; mapping/readiness restored. The earlier failed visibility attempt is retained separately. No separately exercised 504 claim. |
+| M10 | Retained exact watched-file kill switch/restoration and unrelated Turn-route observation; live/fallback digests and Traefik identity unchanged. |
+| M11 | Fresh 16:38 UTC external probes found all declared DGX service ports closed; only VPS 80/443 open from the opposite host. |
+| M12 | Fresh bounded privacy check found zero sentinel/claim matches in 20 API lines and 1,168 edge lines. This window precedes q92. Daily nonempty rotation retains seven archives; no strict calendar-day deletion promise. |
+
+Disabled-mode rollback at 16:28 UTC used the previous API image: isolated Serve, disabled config,
+404 readiness, unchanged image/loopback binding, restored enabled configuration/readiness and
+identical dependency IDs/Serve mapping. Reuse at the updated image is supported by unchanged
+backend/runtime inputs. `source-bridge.json` proves no relevant differences from original image
+source `3b64f083` and recorded matrix revision `243b739f` to `c72c4f05`; from there to `bd4591e`
+only web fetch-error handling changes. The 36 unaffected live source files match digest
+`b1854f15528d01bab1885eea6fd2e0bfbfa78e6d8575a25df0bd74954b375ca9`.
+Dependency model images and composition inputs remain unchanged; no new scientific quality claim
+is inferred from these acceptance checks.
+
+Independent technical review approved the two narrow repairs. Independent evidence review found
+no additional live exercise necessary once q92 completed, provided these reuse qualifications and
+final immutable gates are retained. The final edge and cross-repository verdicts bind the pushed
+report candidates in the closure comments. No tracked edits may follow that final approval.
+
+Planning inspection found #27 absent from Project 17; it was added and membership verified as
+`PVTI_lAHOAiy8Ic4Bju3qzg7vv5I`. The broader audit reports unrelated missing labels/fields or view
+mismatches; those remain outside this closure. Set only this item's Status to Done after both
+issues satisfy the ordered closure gate. No version bump or release is part of this qualification.

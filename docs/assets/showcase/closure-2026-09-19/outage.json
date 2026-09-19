@@ -1,0 +1,22 @@
+{
+  "start": 1789835689.49005,
+  "browser": {
+    "at": "2026-09-19T16:34:57.758Z",
+    "upstreamStatus": 502,
+    "offlineBodySha256": "16f92f883bb76a582847a9adf62918c22e566f22dce95f1733ca86110c40b363",
+    "pagesStatus": 200,
+    "liveLinkHidden": true,
+    "recording": {
+      "time": 1.141898,
+      "duration": 100.8,
+      "cues": 6
+    },
+    "browser": "153.0.8010.48"
+  },
+  "restored": {
+    "schema_version": "readiness/v1",
+    "status": "ready"
+  },
+  "end": 1789835698.654128,
+  "serve_equal": true
+}
