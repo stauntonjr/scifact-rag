@@ -739,3 +739,39 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   changes before commit.
 - Prevention: after this exact sandbox-bootstrap signature, do not repeat the patch helper; use one
   explicit unified-diff fallback and preserve this correction for future runs.
+
+## SCIFACT-RAG-013: isolated worktree repeated the protected uv-cache path
+
+- Date: 2026-09-19.
+- Workflow: establish the clean Issue #28 implementation baseline in a new linked worktree.
+- Failed approach: run locked synchronization and the smoke gate with uv's default shared cache,
+  repeating the protected-cache assumption already recorded in SCIFACT-RAG-010.
+- Error signature: uv could not create its cache lock temporary file beneath `/home/jrs/.cache/uv`
+  because that host path was read-only; project tests had not started.
+- Mutation check: the failure changed no tracked project, model, service, scientific artifact, or
+  external state.
+- Corrected path: use the task-specific writable cache `/tmp/scifact-issue28-uv-cache` while
+  retaining the locked dependency graph and the isolated worktree environment.
+- Verification: locked synchronization completed and `make smoke` passed the harness, Ruff,
+  Pyright, 501 non-integration tests, package smoke, and Compose configuration.
+- Prevention: isolated worktree setup must choose a verified writable task-specific uv cache before
+  the first synchronization command when the shared host cache is outside the writable profile.
+
+## SCIFACT-RAG-014: review inventory assumed the product fallback was the reviewed answer
+
+- Date: 2026-09-19.
+- Workflow: reconcile the 42 retained development responses into the Issue #28 pilot inventory.
+- Failed approach: require every historical worksheet answer to equal the mapped result's product
+  `answer_text`, even though the frozen review protocol defines distinct responses using the raw
+  generated text and removes its leading verdict before review.
+- Error signature: three mapped pioglitazone rows contained the citation-gated product fallback
+  `insufficient evidence` while the worksheet retained the exact verdict-stripped generated prose.
+- Mutation check: the failed inventory attempt wrote no output and changed no source artifact,
+  historical label, model, service, or external state.
+- Corrected path: accept only the exact product answer or the exact raw generation after removing a
+  valid frozen verdict line, while still requiring the mapped raw line digest and every supplied
+  evidence title, text, and document identifier to match exactly.
+- Verification: 13 focused tests pass, and the retained artifacts reconcile to 42 responses across
+  20 connected article-family groups without modifying any source byte.
+- Prevention: provenance validators must implement the prospective review artifact's documented
+  answer boundary, not infer that a later product fallback is always the reviewed representation.
