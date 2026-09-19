@@ -37,6 +37,21 @@ Public benchmarks are development material only and do not satisfy the required 
 confirmation boundary. The next scientific step requires a separately authorized custodian-owned
 confirmation cohort and frozen baseline/candidate run; Issue #26 does not authorize that work.
 
+## Retained selection audit
+
+[Issue #31](https://github.com/stauntonjr/scifact-rag/issues/31) audits all 101 retained prompts
+without new inference. The [report](../research/evidence-selection-error-audit.md) distinguishes
+15 full-correct/selected-wrong cases from two reverse cases, and 16 oracle-correct/selected-wrong
+cases from three reverse cases. The complete any-arm-error population is 26 prompts from nine
+articles. Another existing window pair could cover all annotated spans on 17 selected-wrong
+prompts; three selected-wrong prompts already have complete annotated coverage. These are
+coverage/ranking observations, not demonstrated causes or semantic judgments.
+
+Decision: no intervention now. Future selection work needs a separately frozen hypothesis,
+fixed reader/context budget and fresh article-disjoint validation. No model call, new data,
+Lattice change or Issue #28 pilot/custody change is authorized by this audit. Code executes on
+the Mac retaining the original artifact tree; source inputs remain unchanged.
+
 ## Fixed-reader diagnostic completed
 
 [Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) completed its single authorized

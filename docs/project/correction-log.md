@@ -839,3 +839,27 @@ revision; a fast-forward of the pre-squash feature branch is not expected to suc
   release impact, independent approval, and one current-attempt full gate.
 - Prevention: treat release impact as candidate identity: record it after the last tracked mutation
   and before review or full-gate evidence.
+
+## SCIFACT-RAG-017: SSH PATH failure misreported as missing Mac runtime
+
+- Date: 2026-09-19.
+- Workflow: Issue #31 retained-artifact audit recovery.
+- Failed approach: invoke bare `uv` through non-login SSH, then fall back to bare `python3`
+  without checking its version or locating the previously used audit environment.
+- Error signatures: `zsh:1: command not found: uv`, then
+  `TypeError: dataclass() got an unexpected keyword argument 'slots'`.
+- Mutation check: both failed audit invocations stopped before artifact analysis or output writes.
+  The preceding Git update did change the code checkout.
+- Corrected path: the Mac has `/opt/homebrew/bin/uv` (0.12.3) and
+  `/tmp/scifact-reader-env/bin/python` (3.12.14). Restore this worktree's environment from
+  `uv.lock` using those explicit paths; run the audit with `.venv/bin/python`.
+- Verification: both explicit binaries returned their versions; the locked environment restored
+  successfully with Python 3.12.14, and the audit CLI imported and displayed its help successfully.
+  The original transcript records only failed bare commands,
+  not failed checks of these configured binaries.
+- Prevention: the Issue #31 implementation plan now names the verified runtime and distinguishes
+  input immutability from filesystem write permission. A missing shell command establishes a PATH
+  boundary, not absence of an installed runtime.
+- Related execution failure: helper tests passed while the accepted renderer still lacked scored
+  ranks, complete cross-tabs, and payload checks. Gate completion against the Issue acceptance
+  criteria and a real retained-artifact execution, not helper-test counts or statements of intent.
