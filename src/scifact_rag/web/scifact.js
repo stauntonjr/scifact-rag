@@ -392,7 +392,17 @@ async function readJsonResponse(response) {
   if (response.status === 429) {
     try {
       const payload = await response.json();
-      if (payload && payload.error && payload.error.code === "busy") {
+      if (
+        payload !== null &&
+        typeof payload === "object" &&
+        Object.keys(payload).length === 2 &&
+        payload.schema_version === "error/v1" &&
+        payload.error !== null &&
+        typeof payload.error === "object" &&
+        Object.keys(payload.error).length === 2 &&
+        payload.error.code === "busy" &&
+        typeof payload.error.message === "string"
+      ) {
         throw new Error("busy");
       }
     } catch (error) {
@@ -409,13 +419,17 @@ async function readJsonResponse(response) {
     throw new Error("offline");
   }
   if (!response.ok) {
-    throw new Error("unavailable");
+    throw new Error("contract");
   }
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
-    throw new Error("unavailable");
+    throw new Error("contract");
   }
-  return response.json();
+  try {
+    return await response.json();
+  } catch (_error) {
+    throw new Error("contract");
+  }
 }
 
 async function submitRequest(operation) {

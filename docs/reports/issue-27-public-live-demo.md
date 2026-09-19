@@ -19,6 +19,19 @@ single-worker application boundary; `vps-srv` owns TLS, public routing, tailnet 
 controls, metadata-only retention, and the edge kill switch. Passing deterministic checks does not
 establish public availability.
 
+## Preliminary application review
+
+Candidate `0f0b54abb2af5d707f686a6654e737b5b1ceeb60` passed the 70-test focused
+public-demo suite. Independent review then found one medium browser-contract defect: malformed or
+unexpected responses were collapsed into dependency unavailability, and an unversioned HTTP 429
+body could be mistaken for the application's fixed busy envelope. Attempt 2 adds behavior-level
+coverage and narrows classification as required by the approved design: only an exact
+`error/v1` busy envelope is application busy, every other 429 is edge rate limiting, and malformed
+or unsupported responses use the fixed contract-mismatch state. No raw body is displayed.
+
+This deterministic repair does not establish deployment acceptance. Independent re-review,
+exact-SHA CI, DGX/VPS evidence, and all twelve public rows remain required.
+
 ## Rollback boundary
 
 First activate the SciFact-specific VPS kill switch or fallback route without touching another

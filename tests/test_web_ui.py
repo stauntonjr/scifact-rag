@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
+from pathlib import Path
 
 import httpx
 import pytest
@@ -112,3 +115,65 @@ def test_web_script_contains_public_failure_and_capability_boundaries() -> None:
     ):
         assert marker in script
     assert "innerHTML" not in script
+
+
+def test_web_response_classifier_distinguishes_public_failure_contracts() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is required for the browser response classifier contract")
+
+    script = (
+        Path(__file__).resolve().parents[1] / "src/scifact_rag/web/scifact.js"
+    ).read_text(encoding="utf-8")
+    start = script.index("async function readJsonResponse")
+    end = script.index("\nasync function submitRequest", start)
+    classifier = script[start:end]
+    probe = f"""
+{classifier}
+
+function response(status, contentType, payload, rejectJson = false) {{
+  return {{
+    status,
+    ok: status >= 200 && status < 300,
+    headers: {{ get: (name) => name === "content-type" ? contentType : null }},
+    json: () => rejectJson ? Promise.reject(new SyntaxError("malformed")) : Promise.resolve(payload),
+  }};
+}}
+
+async function classify(candidate) {{
+  try {{
+    await readJsonResponse(candidate);
+    return "ok";
+  }} catch (error) {{
+    return error.message;
+  }}
+}}
+
+const outcomes = await Promise.all([
+  classify(response(429, "application/json", {{
+    schema_version: "error/v1",
+    error: {{ code: "busy", message: "Another live request is in progress" }},
+  }})),
+  classify(response(429, "application/json", {{ error: {{ code: "busy" }} }})),
+  classify(response(200, "application/json", null, true)),
+  classify(response(200, "text/html", null)),
+  classify(response(500, "application/json", {{}})),
+  classify(response(200, "application/json", {{ schema_version: "search-response/v1" }})),
+]);
+process.stdout.write(JSON.stringify(outcomes));
+"""
+    completed = subprocess.run(
+        [node, "--input-type=module", "-e", probe],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == [
+        "busy",
+        "rate_limited",
+        "contract",
+        "contract",
+        "contract",
+        "ok",
+    ]

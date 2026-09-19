@@ -63,6 +63,21 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   lint commands that include `tools/harness_check.py` must explicitly select its suppressed E402
   rule. The final repository gate remains authoritative.
 
+## WEB-PROTOCOL-006: browser collapsed contract failures into unavailability
+
+- Date: 2026-09-18. Workflow: Issue #27 public live-demo preliminary review.
+- Failed approach: classified any `error.code === "busy"` on HTTP 429 as application busy and
+  mapped malformed JSON, non-JSON success, and unexpected HTTP failures to dependency unavailable.
+- Error signature: an unversioned 429 body was accepted as busy while malformed responses bypassed
+  the fixed contract-mismatch message. The candidate was committed but not pushed or deployed.
+- Correction: require the exact `error/v1` busy envelope; classify every other 429 as edge rate
+  limiting; classify malformed/non-JSON success and unsupported status as contract mismatch.
+- Verification: a Node-executed behavior regression covers versioned busy, unversioned 429,
+  malformed JSON, non-JSON success, unexpected status, and valid JSON success without rendering a
+  raw body.
+- Prevention: browser response classification now has executable cases rather than source-marker
+  assertions alone; the accepted design remains the protocol authority.
+
 ## GH-PLANNING-001: Classic Project shortcut used for a Projects v2 item
 
 - Date: 2026-08-24.
