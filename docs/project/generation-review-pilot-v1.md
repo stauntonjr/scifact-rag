@@ -39,13 +39,17 @@ The frozen ignored artifacts are:
 |---|---|
 | Reconciled source inventory | `ea58f7266dc0233cc5d74c79053ed7c560de6f5662937a2b68a4930fe490f9e6` |
 | Group-contained selection | `fead52c0a781497e278aec8296a24c6731f0a59a5f4c39d3cef12828cb53cfbc` |
-| Shuffled clarification worksheet | `448c12fedb2554ff606ef1a523c0d807820fbe3392f82ae5367327513fb428b8` |
-| Shuffled assessment worksheet | `649271d9ac7964797534a9f179504d4c744893086cf1f99a0c98eceb84824cf3` |
+| Canonical clarification worksheet | `1861db259447548896342e764dcde1a312dde818ac21231e4969f30f7a6ad56c` |
+| Clarification presentation order | `4af5dbec52ce8c1ae33475992dd5cb692a2be4965c4d28094c1ccf349c68884e` |
+| Canonical assessment worksheet | `2ab31ae8f6549355c97ca20810c4b1765aae1eeaffc582687013d7cc3e83d8b2` |
+| Assessment presentation order | `1ee53ee60db2dfac760a0f92c571ec93080425a998359e7a1e07c983265fee70` |
 
-Ordering seeds are `issue-28-clarification-v1` and `issue-28-assessment-v1`. Opaque historical
-response IDs are retained. Reviewers see only one row's opaque ID, claim, answer, and exact supplied
-evidence with document IDs; they do not see stage membership, query ID, policy, prompt/generator,
-automatic metrics, historical labels, or peer output.
+Ordering seeds are `issue-28-clarification-v1` and `issue-28-assessment-v1`. Strict review-v2
+worksheets remain canonically sorted by response ID; randomized presentation is a separate artifact
+and never changes the schema. Opaque historical response IDs are retained. Reviewers see only one
+row's opaque ID, claim, answer, and exact supplied evidence with document IDs; they do not see stage
+membership, query ID, policy, prompt/generator, automatic metrics, historical labels, or peer
+output.
 
 ## Roles, models, and isolation
 

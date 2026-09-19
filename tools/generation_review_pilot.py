@@ -15,6 +15,7 @@ from scifact_rag.generation_review_pilot import (
     AgentReviewValidationError,
     build_agent_review_envelope,
     build_pilot_selection,
+    build_presentation_order,
     build_review_v2_worksheet,
     build_source_inventory,
     canonical_json_sha256,
@@ -101,9 +102,17 @@ def _command_worksheet(args: argparse.Namespace) -> dict[str, object]:
         order_seed=args.order_seed,
     )
     _write_json(args.output, worksheet)
+    presentation_order = build_presentation_order(response_ids, order_seed=args.order_seed)
+    if args.presentation_order_output is not None:
+        _write_json(args.presentation_order_output, presentation_order)
     return {
         "output": str(args.output),
         "output_sha256": _sha256(args.output),
+        "presentation_order_output": (
+            str(args.presentation_order_output)
+            if args.presentation_order_output is not None
+            else None
+        ),
         "rows": len(worksheet["rows"]),
     }
 
@@ -214,6 +223,7 @@ def _parser() -> argparse.ArgumentParser:
     worksheet.add_argument("--stage", choices=("clarification", "assessment"))
     worksheet.add_argument("--order-seed", required=True)
     worksheet.add_argument("--output", type=Path, required=True)
+    worksheet.add_argument("--presentation-order-output", type=Path)
     worksheet.set_defaults(handler=_command_worksheet)
 
     select = subparsers.add_parser("select", help="Freeze a group-contained pilot split")

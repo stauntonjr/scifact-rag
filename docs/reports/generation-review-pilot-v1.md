@@ -1,7 +1,9 @@
 # Generation review pilot v1 report
 
-Date: 2026-09-19  
-Governing issue: [#28](https://github.com/stauntonjr/scifact-rag/issues/28)  
+Date: 2026-09-19
+
+Governing issue: [#28](https://github.com/stauntonjr/scifact-rag/issues/28)
+
 Decision: **`insufficient-evidence`**
 
 ## Executive result
@@ -59,16 +61,19 @@ gold.
 - uncertainty removal or denominator rewriting during agreement calculation.
 
 Valid envelopes project into unchanged `generation-human-review/v2`; adequacy remains a separate
-`generation-agent-adequacy/v1` artifact. Fourteen focused contract tests passed before preflight;
-the later wrapper regression brings the focused total to 15. This establishes software behavior
-only, not judge quality.
+`generation-agent-adequacy/v1` artifact. Seventeen focused contract tests cover the repaired strict
+projection, source/raw/panel identity binding, and earlier inventory/agreement behavior. This
+establishes software behavior only, not judge quality.
 
 ## Fictional preflight
 
-The task ceiling was six: R1, R2, and evidence-first A on each of two fictional fixtures. Models
-were called through the existing subscription surface with fresh no-history tasks:
+The coordinator reports six fresh subscription-backed tasks: R1, R2, and evidence-first A on each
+of two fictional fixtures. Only fixture 2 R1/R2 have independently attributable envelopes. The
+other four artifacts are malformed raw blobs without recoverable prompt, model, session, input, or
+validation-error manifests; their task/model assignments below are coordinator-reported, not
+independently verified:
 
-| Role | Model label | Fixture 1 | Fixture 2 |
+| Assigned role | Reported model label | Fixture 1 | Fixture 2 |
 |---|---|---|---|
 | R1 | `gpt-5.6-sol` | rejected | accepted |
 | R2 | `gpt-5.5` | rejected | accepted |
@@ -110,15 +115,16 @@ Subscription usage, immutable provider revisions, request IDs, decoding controls
 latency were unavailable and were not invented. Coordinator receipt time was retained as the
 available submission timestamp.
 
-The prompts prohibited tool use and no tool-derived material appeared in outputs, but the runtime
-did not expose enforceable per-agent tool denial. The preflight therefore cannot establish sandbox
-isolation or statistical independence.
+The raw text does not cite tool-derived material, but four failures lack attributable prompt/task
+records and the runtime did not expose enforceable per-agent tool denial. The preflight therefore
+cannot independently establish fresh-session execution, tool isolation, exact panel identity, or
+statistical independence for those failures.
 
 ## Gate accounting
 
 | Quantity | Frozen allowance | Executed |
 |---|---:|---:|
-| Fictional scoring tasks | 6 | 6 |
+| Fictional scoring tasks | 6 | 6 coordinator-reported; 2 attributable |
 | Development first-pass tasks | 120 maximum | 0 |
 | Development adjudication tasks | 60 maximum | 0 |
 | Real development responses judged | 60 maximum | 0 |
@@ -148,8 +154,8 @@ calculation, sealed eligible cohort, frozen candidate, and owner-approved one-ru
 ## Claim boundary
 
 Verified: strict source/provenance tooling, a 42-response/20-group eligible inventory, a frozen
-11/31 group-contained split, two valid fictional first-pass envelopes, and four explicit preflight
-failures.
+11/31 group-contained split, two attributable valid fictional first-pass envelopes, and four
+malformed unattributed raw outputs.
 
 Inferred: clearer schema wording may reduce malformed output, but this was not tested within the
 frozen budget.

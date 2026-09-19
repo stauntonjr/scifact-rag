@@ -64,6 +64,16 @@ MATERIAL_CATEGORIES = {
     "unsupported_claim",
 }
 MATERIAL_ERROR_FIELDS = {"answer_span", "category", "evidence_absent", "evidence_spans"}
+MATERIAL_ERROR_CATEGORY_FIELDS = {
+    "causal_strengthening": "causal_strengthening",
+    "comparison_omission": "comparison_change",
+    "intervention_omission": "intervention_change",
+    "negation_omission": "negation_loss",
+    "outcome_omission": "outcome_change",
+    "population_generalization": "population_generalization",
+    "population_omission": "population_generalization",
+    "qualifier_omission": "qualifier_loss",
+}
 ADEQUACY_FIELDS = {
     "answer_adequacy",
     "insufficiency_handling",
@@ -90,6 +100,71 @@ PROVENANCE_FIELDS = {
     "usage",
 }
 USAGE_FIELDS = {"input_tokens", "output_tokens", "total_tokens"}
+IDENTITY_FIELDS = {
+    "model",
+    "prompt_sha256",
+    "prompt_version",
+    "provider",
+    "role",
+    "rubric_sha256",
+    "rubric_version",
+}
+FROZEN_EXECUTION_IDENTITIES: dict[tuple[str, str], dict[str, str]] = {
+    ("r1", "reviewer-r1/v1"): {
+        "role": "r1",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.6-sol",
+        "prompt_version": "reviewer-r1/v1",
+        "prompt_sha256": "b6ca4f0fa642416e346acec8a4536704f4957320711decdd7e6dc4f5bd4c7ed6",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+    ("r2", "reviewer-r2/v1"): {
+        "role": "r2",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.5",
+        "prompt_version": "reviewer-r2/v1",
+        "prompt_sha256": "01f6acaf11976a4db8a16edfb7b89fad39fb4ad547850f5f45690d40ec044707",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+    ("adjudicator", "adjudicator-initial/v1"): {
+        "role": "adjudicator",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "adjudicator-initial/v1",
+        "prompt_sha256": "9d0e909e61a55fe123663070a6565a499afbdd14afdef0dcc9c331af48bb2763",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+    ("r1", "preflight2-r1/v1"): {
+        "role": "r1",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.6-sol",
+        "prompt_version": "preflight2-r1/v1",
+        "prompt_sha256": "8cb970ec763e364cd1b20733a15258875c3f25522aba171311d79ecf7c17a325",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+    ("r2", "preflight2-r2/v1"): {
+        "role": "r2",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.5",
+        "prompt_version": "preflight2-r2/v1",
+        "prompt_sha256": "94f340a8507c2d4fdc7c368c8fae4c35f866facdc1077b32e462e4e9a1458612",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+    ("adjudicator", "preflight2-a/v1"): {
+        "role": "adjudicator",
+        "provider": "OpenAI-Codex-subscription",
+        "model": "gpt-5.6-terra",
+        "prompt_version": "preflight2-a/v1",
+        "prompt_sha256": "b37b739077b9c91fb2425b7088a6aa01583392dab7aebbb632132a2779639a78",
+        "rubric_version": "generation-review-pilot/v1",
+        "rubric_sha256": "773a0f254364a68585376a6315f95852814999d187dfd3ff4a4c7d6d6d3d045d",
+    },
+}
 
 
 class AgentReviewValidationError(ValueError):
@@ -171,6 +246,8 @@ def _validate_review(review: object, source: Mapping[str, Any], errors: list[str
         return
     evidence_items = source.get("evidence")
     evidence_rows = evidence_items if isinstance(evidence_items, list) else []
+    duplicate_keys: set[tuple[str, int, int]] = set()
+    valid_categories: set[str] = set()
     for index, annotation in enumerate(annotations):
         location = f"review_v2.material_errors[{index}]"
         error = _strict_object(annotation, MATERIAL_ERROR_FIELDS, location, errors)
@@ -178,7 +255,19 @@ def _validate_review(review: object, source: Mapping[str, Any], errors: list[str
             continue
         if error.get("category") not in MATERIAL_CATEGORIES:
             errors.append(f"{location}.category is invalid")
+        category = error.get("category")
+        answer_span = error.get("answer_span")
         _span(error.get("answer_span"), source.get("answer"), f"{location}.answer_span", errors)
+        if isinstance(category, str) and isinstance(answer_span, Mapping):
+            start = answer_span.get("start")
+            end = answer_span.get("end")
+            if isinstance(start, int) and isinstance(end, int):
+                duplicate_key = (category, start, end)
+                if duplicate_key in duplicate_keys:
+                    errors.append(f"{location} is a duplicate material error")
+                duplicate_keys.add(duplicate_key)
+                if category in MATERIAL_CATEGORIES:
+                    valid_categories.add(category)
         evidence_absent = error.get("evidence_absent")
         spans = error.get("evidence_spans")
         if not isinstance(evidence_absent, bool):
@@ -204,6 +293,23 @@ def _validate_review(review: object, source: Mapping[str, Any], errors: list[str
             evidence_row = evidence_rows[evidence_index]
             text = evidence_row.get("text") if isinstance(evidence_row, Mapping) else None
             _span(span, text, span_location, errors, evidence=True)
+    required_categories = {
+        category
+        for field, category in MATERIAL_ERROR_CATEGORY_FIELDS.items()
+        if item.get(field) == "yes"
+    }
+    if (item.get("grounded") == "no" or item.get("material_overstatement") == "present") and not (
+        required_categories
+    ):
+        required_categories.add("unsupported_claim")
+    missing_categories = required_categories - valid_categories
+    if missing_categories:
+        errors.append(
+            "review_v2 requires matching material error categories: "
+            + ", ".join(sorted(missing_categories))
+        )
+    elif not required_categories and annotations:
+        errors.append("review_v2 clean pass must not contain material errors")
 
 
 def _validate_adequacy(value: object, errors: list[str]) -> None:
@@ -219,7 +325,9 @@ def _validate_adequacy(value: object, errors: list[str]) -> None:
     if answerability == "answerable" and adequacy == "not_applicable":
         errors.append("adequacy.answer_adequacy must be assessed when context is answerable")
     if answerability != "answerable" and adequacy != "not_applicable":
-        errors.append("adequacy.answer_adequacy must be not_applicable unless context is answerable")
+        errors.append(
+            "adequacy.answer_adequacy must be not_applicable unless context is answerable"
+        )
     if item.get("insufficiency_handling") not in {
         "appropriate",
         "inappropriate",
@@ -231,9 +339,7 @@ def _validate_adequacy(value: object, errors: list[str]) -> None:
         errors.append("adequacy.rationale must be text")
 
 
-def _validate_rationale(
-    value: object, source: Mapping[str, Any], errors: list[str]
-) -> None:
+def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[str]) -> None:
     item = _strict_object(value, RATIONALE_FIELDS, "rationale", errors)
     if item is None:
         return
@@ -244,7 +350,12 @@ def _validate_rationale(
     else:
         answer = source.get("answer")
         for index, quote in enumerate(answer_quotes):
-            if not isinstance(quote, str) or not quote or not isinstance(answer, str) or quote not in answer:
+            if (
+                not isinstance(quote, str)
+                or not quote
+                or not isinstance(answer, str)
+                or quote not in answer
+            ):
                 errors.append(f"rationale.answer quote {index} is not exact")
     evidence_quotes = item.get("evidence_quotes")
     if not isinstance(evidence_quotes, list) or not evidence_quotes:
@@ -253,9 +364,7 @@ def _validate_rationale(
     evidence = source.get("evidence")
     evidence_rows = evidence if isinstance(evidence, list) else []
     evidence_by_id = {
-        row.get("document_id"): row.get("text")
-        for row in evidence_rows
-        if isinstance(row, Mapping)
+        row.get("document_id"): row.get("text") for row in evidence_rows if isinstance(row, Mapping)
     }
     for index, evidence_quote in enumerate(evidence_quotes):
         location = f"rationale.evidence_quotes[{index}]"
@@ -265,7 +374,12 @@ def _validate_rationale(
         document_id = quote_item.get("document_id")
         quote = quote_item.get("quote")
         text = evidence_by_id.get(document_id)
-        if not isinstance(quote, str) or not quote or not isinstance(text, str) or quote not in text:
+        if (
+            not isinstance(quote, str)
+            or not quote
+            or not isinstance(text, str)
+            or quote not in text
+        ):
             errors.append(f"{location}.quote is not exact for the named document")
 
 
@@ -310,8 +424,35 @@ def _validate_provenance(value: object, errors: list[str]) -> None:
                 errors.append(f"provenance.usage.{field} must be unavailable or non-negative")
 
 
+def _validate_execution_identity(
+    envelope: Mapping[str, Any],
+    provenance: object,
+    errors: list[str],
+    expected_identity: Mapping[str, str] | None,
+) -> None:
+    if not isinstance(provenance, Mapping):
+        return
+    identity = expected_identity
+    if identity is None:
+        role = envelope.get("role")
+        prompt_version = provenance.get("prompt_version")
+        if isinstance(role, str) and isinstance(prompt_version, str):
+            identity = FROZEN_EXECUTION_IDENTITIES.get((role, prompt_version))
+    if identity is None or set(identity) != IDENTITY_FIELDS:
+        errors.append("agent review identity is not in the frozen execution contract")
+        return
+    actual = {"role": envelope.get("role")}
+    actual.update({field: provenance.get(field) for field in IDENTITY_FIELDS - {"role"}})
+    for field in sorted(IDENTITY_FIELDS):
+        if actual.get(field) != identity.get(field):
+            errors.append(f"agent review identity {field} does not match the frozen contract")
+
+
 def validate_agent_review(
-    value: object, source_row: Mapping[str, Any]
+    value: object,
+    source_row: Mapping[str, Any],
+    *,
+    expected_identity: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Validate one attributable agent judgment against its exact source row."""
     errors: list[str] = []
@@ -331,6 +472,25 @@ def validate_agent_review(
     _validate_adequacy(item.get("adequacy"), errors)
     _validate_rationale(item.get("rationale"), source_row, errors)
     _validate_provenance(item.get("provenance"), errors)
+    provenance = item.get("provenance")
+    if isinstance(provenance, Mapping):
+        if provenance.get("input_sha256") != canonical_json_sha256(source_row):
+            errors.append("provenance.input_sha256 does not match the source row")
+        raw_output = provenance.get("raw_output")
+        if isinstance(raw_output, str):
+            try:
+                raw_judgment = json.loads(raw_output)
+            except json.JSONDecodeError:
+                errors.append("provenance.raw_output must be one JSON judgment")
+            else:
+                expected_judgment = {
+                    "review_v2": item.get("review_v2"),
+                    "adequacy": item.get("adequacy"),
+                    "rationale": item.get("rationale"),
+                }
+                if raw_judgment != expected_judgment:
+                    errors.append("provenance.raw_output does not match the projected judgment")
+    _validate_execution_identity(item, provenance, errors, expected_identity)
     if errors:
         raise AgentReviewValidationError("; ".join(errors))
     return dict(item)
@@ -353,6 +513,7 @@ def build_agent_review_envelope(
     rubric_sha256: str,
     raw_output: str,
     latency_ms: float | None = None,
+    expected_identity: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Wrap one raw model judgment with explicit immutable provenance, then validate it."""
     expected = {"review_v2", "adequacy", "rationale"}
@@ -385,7 +546,7 @@ def build_agent_review_envelope(
             "usage": {"input_tokens": None, "output_tokens": None, "total_tokens": None},
         },
     }
-    return validate_agent_review(envelope, source_row)
+    return validate_agent_review(envelope, source_row, expected_identity=expected_identity)
 
 
 def canonical_json_sha256(value: object) -> str:
@@ -443,9 +604,7 @@ def build_source_inventory(
             raise AgentReviewValidationError(f"result stream line {line_number} is malformed")
         results_by_sha[line_sha256] = record["result"]
 
-    source_by_id = {
-        row.get("response_id"): row for row in rows if isinstance(row, Mapping)
-    }
+    source_by_id = {row.get("response_id"): row for row in rows if isinstance(row, Mapping)}
     if len(source_by_id) != len(rows) or None in source_by_id:
         raise AgentReviewValidationError("worksheet response IDs must be present and unique")
     inventory_rows: list[dict[str, Any]] = []
@@ -459,7 +618,9 @@ def build_source_inventory(
         seen_mapping_ids.add(response_id)
         source_row = source_by_id.get(response_id)
         if source_row is None:
-            raise AgentReviewValidationError("mapping response IDs must exactly match the worksheet")
+            raise AgentReviewValidationError(
+                "mapping response IDs must exactly match the worksheet"
+            )
         result_line_sha256 = map_row.get("result_line_sha256")
         if not isinstance(result_line_sha256, str):
             raise AgentReviewValidationError("mapped result line digest is invalid")
@@ -494,8 +655,10 @@ def build_source_inventory(
         if evidence != normalized_result_evidence:
             raise AgentReviewValidationError("worksheet evidence does not match the mapped result")
         policies = map_row.get("equivalent_policies")
-        if not isinstance(policies, list) or not policies or any(
-            not isinstance(policy, str) or not policy for policy in policies
+        if (
+            not isinstance(policies, list)
+            or not policies
+            or any(not isinstance(policy, str) or not policy for policy in policies)
         ):
             raise AgentReviewValidationError("mapping equivalent policies are invalid")
         inventory_rows.append(
@@ -548,17 +711,19 @@ def build_review_v2_worksheet(
     *,
     order_seed: str,
 ) -> dict[str, Any]:
-    """Create a label-free, shuffled review-v2 worksheet from exposed source rows."""
+    """Create a label-free canonical review-v2 worksheet from exposed source rows."""
+    if not order_seed:
+        raise AgentReviewValidationError("order_seed must be non-empty")
     rows = source_worksheet.get("rows")
     if not isinstance(rows, list):
         raise AgentReviewValidationError("source worksheet rows must be a list")
-    source_by_id = {
-        row.get("response_id"): row for row in rows if isinstance(row, Mapping)
-    }
+    source_by_id = {row.get("response_id"): row for row in rows if isinstance(row, Mapping)}
     if len(response_ids) != len(set(response_ids)) or set(response_ids) - set(source_by_id):
         raise AgentReviewValidationError("requested response IDs must be unique source rows")
-    selected = [source_by_id[response_id] for response_id in response_ids]
-    random.Random(order_seed).shuffle(selected)
+    selected = sorted(
+        (source_by_id[response_id] for response_id in response_ids),
+        key=lambda row: row["response_id"],
+    )
     blank_review = {
         "causal_strengthening": None,
         "comparison_omission": None,
@@ -589,6 +754,18 @@ def build_review_v2_worksheet(
         "rows": projected_rows,
         "schema_version": REVIEW_V2_SCHEMA,
         "selection_protocol": "docs/project/generation-review-pilot-v1.md",
+    }
+
+
+def build_presentation_order(response_ids: Sequence[str], *, order_seed: str) -> dict[str, Any]:
+    """Create randomized presentation order without changing the canonical worksheet."""
+    if not response_ids or len(response_ids) != len(set(response_ids)):
+        raise AgentReviewValidationError("presentation response IDs must be non-empty and unique")
+    randomized = list(response_ids)
+    random.Random(order_seed).shuffle(randomized)
+    return {
+        "schema_version": "generation-review-presentation-order/v1",
+        "response_ids": randomized,
     }
 
 
@@ -643,6 +820,7 @@ def project_agent_reviews(
     reviews: Sequence[object],
     *,
     role: str,
+    expected_identity: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Project ordered agent envelopes into review-v2 plus a separate adequacy artifact."""
     if role not in ROLES:
@@ -650,19 +828,38 @@ def project_agent_reviews(
     source_rows = source_worksheet.get("rows")
     if not isinstance(source_rows, list):
         raise AgentReviewValidationError("source worksheet rows must be a list")
-    source_ids = [row.get("response_id") if isinstance(row, Mapping) else None for row in source_rows]
-    review_ids = [review.get("response_id") if isinstance(review, Mapping) else None for review in reviews]
+    source_ids_raw = [
+        row.get("response_id") if isinstance(row, Mapping) else None for row in source_rows
+    ]
+    review_ids_raw = [
+        review.get("response_id") if isinstance(review, Mapping) else None for review in reviews
+    ]
+    if any(not isinstance(response_id, str) for response_id in source_ids_raw + review_ids_raw):
+        raise AgentReviewValidationError("source and review response IDs must be text")
+    source_ids = [response_id for response_id in source_ids_raw if isinstance(response_id, str)]
+    review_ids = [response_id for response_id in review_ids_raw if isinstance(response_id, str)]
+    if source_ids != sorted(source_ids):
+        raise AgentReviewValidationError("source worksheet must use canonical response ID order")
     if review_ids != source_ids or len(set(review_ids)) != len(review_ids):
-        raise AgentReviewValidationError("agent reviews must match the ordered response IDs exactly")
+        raise AgentReviewValidationError(
+            "agent reviews must match the ordered response IDs exactly"
+        )
 
     projected_rows: list[dict[str, Any]] = []
     adequacy_rows: list[dict[str, Any]] = []
+    completion_times: list[str] = []
     for source_row, review in zip(source_rows, reviews, strict=True):
         if not isinstance(source_row, Mapping):
             raise AgentReviewValidationError("source worksheet rows must be objects")
-        validated = validate_agent_review(review, source_row)
+        validated = validate_agent_review(
+            review,
+            source_row,
+            expected_identity=expected_identity,
+        )
         if validated["role"] != role:
-            raise AgentReviewValidationError("every agent review role must match the projection role")
+            raise AgentReviewValidationError(
+                "every agent review role must match the projection role"
+            )
         projected_row = dict(source_row)
         projected_row["review"] = validated["review_v2"]
         projected_rows.append(projected_row)
@@ -673,9 +870,10 @@ def project_agent_reviews(
                 "agent_review_sha256": canonical_json_sha256(validated),
             }
         )
+        completion_times.append(validated["provenance"]["submitted_at"])
     return (
         {
-            "completed_at": None,
+            "completed_at": max(completion_times, key=datetime.fromisoformat),
             "reviewer": f"agent-role:{role}",
             "rows": projected_rows,
             "schema_version": REVIEW_V2_SCHEMA,
@@ -685,7 +883,9 @@ def project_agent_reviews(
     )
 
 
-def build_article_family_groups(rows: Sequence[Mapping[str, object]]) -> tuple[tuple[str, ...], ...]:
+def build_article_family_groups(
+    rows: Sequence[Mapping[str, object]],
+) -> tuple[tuple[str, ...], ...]:
     """Group response IDs by connected claims or shared source document IDs."""
     identifiers: list[str] = []
     claims: list[str] = []
@@ -693,7 +893,11 @@ def build_article_family_groups(rows: Sequence[Mapping[str, object]]) -> tuple[t
     for index, row in enumerate(rows):
         response_id = row.get("response_id")
         document_ids = row.get("document_ids")
-        if not isinstance(response_id, str) or not isinstance(document_ids, list) or not document_ids:
+        if (
+            not isinstance(response_id, str)
+            or not isinstance(document_ids, list)
+            or not document_ids
+        ):
             raise ValueError(f"inventory row {index} lacks response_id or document_ids")
         if any(not isinstance(document_id, str) or not document_id for document_id in document_ids):
             raise ValueError(f"inventory row {index} has invalid document_ids")
