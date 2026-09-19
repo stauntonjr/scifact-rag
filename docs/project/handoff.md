@@ -15,17 +15,15 @@ Public benchmarks are development material only and do not satisfy the required 
 confirmation boundary. The next scientific step requires a separately authorized custodian-owned
 confirmation cohort and frozen baseline/candidate run; Issue #26 does not authorize that work.
 
-## Fixed-reader implementation and pending execution
+## Fixed-reader diagnostic completed
 
-[Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) implements the standalone
-preparation, finite request runner and evaluator. The
-[readiness report](../research/evidence-inference-reader-readiness.md) records 101 prepared prompts,
-1,599 selector pairs, all full/oracle inputs fitting, and local tokenizer-version parity.
-The owner authorizes the bounded diagnostic and transfer to the owner's DGX after Lattice finishes.
-Lattice's fit and other audit processes were still active at the last resource inspection; no
-reader or selector inference has run. Keep Issue #23 open until the authorized execution is
-completed or a specific runtime/budget stop is reported. Do not infer resource release from a
-running container's exit-code field or silently expand the frozen budget.
+[Issue #23](https://github.com/stauntonjr/scifact-rag/issues/23) completed its single authorized
+fixed-reader run on September 19 after owner GPU release and reader restoration. The
+[results](../research/evidence-inference-reader-results.md) record all 101 three-arm triplets,
+303 reader calls, 101 selector calls and 238.925 seconds, without transport/identity failures.
+Full and oracle accuracy were 92/101; selected two-window accuracy was 79/101. Selection merits
+bounded diagnosis, but this inspected training cohort provides no fresh validation or automatic
+authority for further experiments. The heartbeat remains paused; no retry or new run is authorized.
 
 ## Fixed-reader protocol
 
