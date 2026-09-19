@@ -226,6 +226,18 @@ def _span(
         errors.append(f"{location} must satisfy 0 <= start < end <= text length")
 
 
+def _occurrence_count(text: str, quote: str) -> int:
+    """Count possibly overlapping occurrences for deterministic quote resolution."""
+    count = 0
+    start = 0
+    while True:
+        index = text.find(quote, start)
+        if index < 0:
+            return count
+        count += 1
+        start = index + 1
+
+
 def _validate_review(review: object, source: Mapping[str, Any], errors: list[str]) -> None:
     item = _strict_object(review, REVIEW_FIELDS, "review_v2", errors)
     if item is None:
@@ -310,6 +322,22 @@ def _validate_review(review: object, source: Mapping[str, Any], errors: list[str
         )
     elif not required_categories and annotations:
         errors.append("review_v2 clean pass must not contain material errors")
+    fields_by_category: dict[str, set[str]] = {}
+    for field, category in MATERIAL_ERROR_CATEGORY_FIELDS.items():
+        fields_by_category.setdefault(category, set()).add(field)
+    for category in sorted(valid_categories):
+        mapped_fields = fields_by_category.get(category)
+        if mapped_fields and not any(item.get(field) == "yes" for field in mapped_fields):
+            errors.append(
+                f"review_v2 material error category {category} contradicts top-level fields"
+            )
+    granular_error = any(item.get(field) == "yes" for field in TRISTATE_FIELDS)
+    if (annotations or granular_error) and item.get("grounded") != "no":
+        errors.append("review_v2 material errors require grounded=no")
+    if item.get("grounded") == "yes" and item.get("material_overstatement") != "none":
+        errors.append("review_v2 grounded=yes requires material_overstatement=none")
+    if item.get("material_overstatement") == "present" and item.get("grounded") != "no":
+        errors.append("review_v2 material_overstatement=present requires grounded=no")
 
 
 def _validate_adequacy(value: object, errors: list[str]) -> None:
@@ -335,8 +363,15 @@ def _validate_adequacy(value: object, errors: list[str]) -> None:
         "uncertain",
     }:
         errors.append("adequacy.insufficiency_handling is invalid")
-    if not isinstance(item.get("rationale"), str):
+    rationale = item.get("rationale")
+    if not isinstance(rationale, str):
         errors.append("adequacy.rationale must be text")
+    elif (
+        adequacy in {"inadequate", "uncertain"}
+        or answerability == "uncertain"
+        or item.get("insufficiency_handling") in {"inappropriate", "uncertain"}
+    ) and not rationale.strip():
+        errors.append("adequacy.rationale must be non-empty for non-pass or uncertainty")
 
 
 def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[str]) -> None:
@@ -350,13 +385,14 @@ def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[s
     else:
         answer = source.get("answer")
         for index, quote in enumerate(answer_quotes):
-            if (
-                not isinstance(quote, str)
-                or not quote
-                or not isinstance(answer, str)
-                or quote not in answer
-            ):
+            if not isinstance(quote, str) or not quote or not isinstance(answer, str):
                 errors.append(f"rationale.answer quote {index} is not exact")
+                continue
+            occurrences = _occurrence_count(answer, quote)
+            if occurrences == 0:
+                errors.append(f"rationale.answer quote {index} is not exact")
+            elif occurrences != 1:
+                errors.append(f"rationale.answer quote {index} is ambiguous")
     evidence_quotes = item.get("evidence_quotes")
     if not isinstance(evidence_quotes, list) or not evidence_quotes:
         errors.append("rationale.evidence_quotes must be a non-empty list")
@@ -374,13 +410,14 @@ def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[s
         document_id = quote_item.get("document_id")
         quote = quote_item.get("quote")
         text = evidence_by_id.get(document_id)
-        if (
-            not isinstance(quote, str)
-            or not quote
-            or not isinstance(text, str)
-            or quote not in text
-        ):
+        if not isinstance(quote, str) or not quote or not isinstance(text, str):
             errors.append(f"{location}.quote is not exact for the named document")
+            continue
+        occurrences = _occurrence_count(text, quote)
+        if occurrences == 0:
+            errors.append(f"{location}.quote is not exact for the named document")
+        elif occurrences != 1:
+            errors.append(f"{location}.quote is ambiguous for the named document")
 
 
 def _validate_provenance(value: object, errors: list[str]) -> None:

@@ -298,6 +298,103 @@ def test_validate_agent_review_enforces_material_error_consistency() -> None:
         validate_agent_review(clean_with_error, _source_row())
 
 
+def test_validate_agent_review_rejects_ambiguous_rationale_quotes() -> None:
+    repeated_answer_source = _source_row()
+    repeated_answer_source["answer"] = (
+        "Treatment A causes improvement in all patients, but whether it causes durable "
+        "improvement is unknown."
+    )
+    repeated_answer = _review()
+    repeated_answer_provenance = repeated_answer["provenance"]
+    assert isinstance(repeated_answer_provenance, dict)
+    repeated_answer_provenance["input_sha256"] = hashlib.sha256(
+        (json.dumps(repeated_answer_source, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
+    with pytest.raises(AgentReviewValidationError, match="answer quote 0 is ambiguous"):
+        validate_agent_review(repeated_answer, repeated_answer_source)
+
+    repeated_evidence_source = _source_row()
+    repeated_evidence = repeated_evidence_source["evidence"]
+    assert isinstance(repeated_evidence, list)
+    repeated_evidence[0]["text"] = (
+        "Treatment A was associated with improvement in adults; a second analysis was also "
+        "associated with improvement in adults."
+    )
+    repeated_evidence_review = _review()
+    repeated_evidence_provenance = repeated_evidence_review["provenance"]
+    assert isinstance(repeated_evidence_provenance, dict)
+    repeated_evidence_provenance["input_sha256"] = hashlib.sha256(
+        (
+            json.dumps(repeated_evidence_source, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+    ).hexdigest()
+    with pytest.raises(AgentReviewValidationError, match="quote is ambiguous"):
+        validate_agent_review(repeated_evidence_review, repeated_evidence_source)
+
+    overlapping_source = _source_row()
+    overlapping_source["answer"] = "Treatment A causes improvement in all patients. aaaa"
+    overlapping_review = _review()
+    overlapping_rationale = overlapping_review["rationale"]
+    assert isinstance(overlapping_rationale, dict)
+    overlapping_rationale["answer_quotes"] = ["aaa"]
+    overlapping_provenance = overlapping_review["provenance"]
+    assert isinstance(overlapping_provenance, dict)
+    overlapping_provenance["input_sha256"] = hashlib.sha256(
+        (json.dumps(overlapping_source, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
+    _refresh_raw(overlapping_review)
+    with pytest.raises(AgentReviewValidationError, match="answer quote 0 is ambiguous"):
+        validate_agent_review(overlapping_review, overlapping_source)
+
+
+def test_validate_agent_review_rejects_bidirectional_judgment_contradictions() -> None:
+    extra_category = _review()
+    extra_review = extra_category["review_v2"]
+    assert isinstance(extra_review, dict)
+    extra_errors = extra_review["material_errors"]
+    assert isinstance(extra_errors, list)
+    population_error = copy.deepcopy(extra_errors[0])
+    population_error["category"] = "population_generalization"
+    population_error["answer_span"] = {"start": 34, "end": 46}
+    extra_errors.append(population_error)
+    _refresh_raw(extra_category)
+    with pytest.raises(AgentReviewValidationError, match="contradicts top-level fields"):
+        validate_agent_review(extra_category, _source_row())
+
+    grounded_contradiction = _review()
+    grounded_review = grounded_contradiction["review_v2"]
+    assert isinstance(grounded_review, dict)
+    grounded_review["grounded"] = "yes"
+    grounded_review["material_overstatement"] = "none"
+    _refresh_raw(grounded_contradiction)
+    with pytest.raises(AgentReviewValidationError, match="material errors require grounded=no"):
+        validate_agent_review(grounded_contradiction, _source_row())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("answer_adequacy", "inadequate"),
+        ("answer_adequacy", "uncertain"),
+        ("supplied_context_answerability", "uncertain"),
+        ("insufficiency_handling", "inappropriate"),
+        ("insufficiency_handling", "uncertain"),
+    ],
+)
+def test_validate_agent_review_requires_nonpass_adequacy_rationale(field: str, value: str) -> None:
+    review = _review()
+    adequacy = review["adequacy"]
+    assert isinstance(adequacy, dict)
+    adequacy[field] = value
+    if field == "supplied_context_answerability":
+        adequacy["answer_adequacy"] = "not_applicable"
+    adequacy["rationale"] = ""
+    _refresh_raw(review)
+
+    with pytest.raises(AgentReviewValidationError, match="rationale must be non-empty"):
+        validate_agent_review(review, _source_row())
+
+
 def test_project_agent_reviews_emits_strict_review_v2_and_separate_adequacy() -> None:
     source = {
         "completed_at": None,

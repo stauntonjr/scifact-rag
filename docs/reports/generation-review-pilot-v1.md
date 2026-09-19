@@ -62,7 +62,7 @@ gold.
 - uncertainty removal or denominator rewriting during agreement calculation.
 
 Valid envelopes project into unchanged `generation-human-review/v2`; adequacy remains a separate
-`generation-agent-adequacy/v1` artifact. Seventeen focused contract tests cover the repaired strict
+`generation-agent-adequacy/v1` artifact. Focused contract tests cover the repaired strict
 projection, source/raw/panel identity binding, and earlier inventory/agreement behavior. This
 establishes software behavior only, not judge quality.
 
