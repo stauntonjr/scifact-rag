@@ -739,3 +739,13 @@ failure exposes an escaped defect with a deterministic oracle, create a candidat
   changes before commit.
 - Prevention: after this exact sandbox-bootstrap signature, do not repeat the patch helper; use one
   explicit unified-diff fallback and preserve this correction for future runs.
+
+## 2026-09-19 — Use the configured Python for repository tools
+
+- Failed approach: invoked the host default `python3 tools/loop.py start --help`.
+- Signature: `ImportError: cannot import name UTC from datetime` under Python 3.9.
+- Mutation status: the command failed before starting a run or changing repository state.
+- Corrected path: used the configured bundled Python, then the locked project environment.
+- Verification: the same help command succeeded and the showcase evidence loop started.
+- Prevention: follow the configured-runtime requirement when running repository tools; do not
+  interpret an incompatible host Python as a project defect.

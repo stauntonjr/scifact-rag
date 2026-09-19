@@ -12,7 +12,7 @@ Capture path: Mac Firefox through an SSH local forward to the DGX loopback servi
 
 ## Boundary
 
-This report will authenticate a documentation-only recording of the existing SciFact evidence
+This report authenticates a documentation-only recording of the existing SciFact evidence
 inspector. The recording must show the real UI calling the existing API, PostgreSQL corpus,
 ColBERT ranker, and Qwen generator. It does not authorize a mock response, a reconstructed
 citation, a public RAG endpoint, or a retrieval/generation change. GitHub Pages will publish only
@@ -23,8 +23,7 @@ attach to the visible in-app tab. The untouched source and edited high-resolutio
 outside Git; only the optimized GIF, MP4, poster, captions, and static page are committed. The
 static page also performs one bounded readiness check against the optional live edge and falls
 back to a recorded-only message on timeout, non-ready status, or contract mismatch; it does not
-claim a live result from a failed request. Public route verification remains pending until the
-branch is integrated and Pages is enabled.
+claim a live result from a failed request. Public route verification was completed on integrated main `0c23bbc25eacc90bb4bce4db118e9f4cc4c876e6`; see the final acceptance record below.
 
 ## Recorded-query authentication
 
@@ -103,11 +102,11 @@ recorded separately below when complete.
 | Local HTTP routes | passed; page, CSS, GIF, MP4, poster, and VTT returned HTTP 200 with exact byte counts |
 | Repository harness | passed through `python3 tools/harness_check.py` |
 | Whitespace check | passed through `git diff --check` |
-| Public Pages routes | pending integration and Pages activation |
+| Public Pages routes | accepted on integrated main `0c23bbc`; public asset digests matched committed files |
 | Static live-readiness fallback | passed; 3.5-second abort, exact readiness schema, explicit retry only |
 
-This evidence validates the assets and static publication shape, not cross-browser playback or a
-public deployment. Those claims require the integrated exact revision and live Pages responses.
+The original local checks validated the assets and static publication shape. Final public
+acceptance is recorded below; neither check establishes playback in every browser.
 
 ## Independent review and owner disposition
 
@@ -123,5 +122,26 @@ revision, and the VTT lacked a final research-only cue. Revision 2 repairs each 
 changing the recording, answer, application, runtime, or publication topology. A second review
 found that the GIF jumped directly from the answer to already-visible evidence and that this report
 understated the caption cue count. Attempt 2 repairs both by retaining the real citation activation
-and anchor scroll from the same master and by recording all six cues. It remains pending fresh
-independent review, the final repository gate, and public Pages verification.
+and anchor scroll from the same master and by recording all six cues. That attempt subsequently passed independent review, the final repository gate, and public Pages
+verification, as recorded in the Issue #25 closure comment below.
+
+## Final publication acceptance and current browser observation
+
+[Issue #25 closure evidence](https://github.com/stauntonjr/scifact-rag/issues/25#issuecomment-5732390468)
+records acceptance on `0c23bbc25eacc90bb4bce4db118e9f4cc4c876e6`: exact public media digests,
+Harness run `35363485681`, CodeQL run `35363485636`, Pages run `35363515584`, and independent
+review without remaining findings. This supersedes the pre-integration pending status above;
+it does not change the authenticated recording source or edit boundaries.
+
+On 2026-09-19 at 15:36 UTC, Chrome 153.0.8010.48 loaded the public Pages URL with HTTP 200.
+Actual video playback advanced to 1.534 seconds; the browser reported duration 100.8 seconds,
+readyState 4, and six English caption cues. Pages and live landing pages were inspected at
+1440×1000 and 390×844. Both pages fit the viewport without page-level horizontal overflow.
+The narrow recording naturally has small embedded text; use full-screen playback for evidence
+inspection. The 100.8-second owner-approved recording is reused rather than padded to the
+parallel plan's suggested three-to-five-minute duration.
+
+[Browser observations](../assets/showcase/acceptance-2026-09-19/observations.json) and
+[Pages narrow screenshot](../assets/showcase/acceptance-2026-09-19/pages-narrow.png) retain this
+bounded check. No model request, service restart, new generative acceptance, or cross-browser
+claim is included. The optional public live-demo closure remains governed by Issue #27.

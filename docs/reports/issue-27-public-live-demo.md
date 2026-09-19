@@ -2,7 +2,7 @@
 
 Status: shared public acceptance executed; eleven rows are provisionally accepted and M09 is pending.
 Final closure remains gated on exact-SHA checks, independent cross-repository approval, the
-public-browser layout review described below, and an authorized API-only disabled-mode
+remaining result/error-state public-browser review described below, and an authorized API-only disabled-mode
 rollback/restoration exercise. That API rollback has not been exercised.
 
 ## Identity and boundary
@@ -171,3 +171,26 @@ Done until all twelve rows pass, both repositories record exact-SHA green CI, th
 and configuration digests are retained, rollback has been exercised, and independent application
 and infrastructure reviews approve the same stable candidates. A failure is not waived unless the
 human owner explicitly accepts the risk; otherwise keep the row and issue open.
+
+## Supplemental public layout observation — 2026-09-19
+
+A non-inference Chrome 153.0.8010.48 session at 15:36 UTC loaded the public Pages showcase and
+live inspector at desktop 1440×1000 and narrow 390×844 viewports. Both returned HTTP 200 and
+reported document widths equal to viewport widths. Visual inspection found readable headings,
+claim-field labels, stacked narrow-layout actions, readiness text, and the recorded-showcase link.
+The Pages video played and loaded six English caption cues.
+
+Evidence: [desktop live](../assets/showcase/acceptance-2026-09-19/live-desktop.png),
+[narrow live](../assets/showcase/acceptance-2026-09-19/live-narrow.png),
+[desktop Pages](../assets/showcase/acceptance-2026-09-19/pages-desktop.png),
+[narrow Pages](../assets/showcase/acceptance-2026-09-19/pages-narrow.png), and
+[observations](../assets/showcase/acceptance-2026-09-19/observations.json).
+
+This resolves the absence of any fresh public landing-page layout observation. It does not
+complete result/error-state layout, keyboard/accessibility acceptance, M09 outage/fallback,
+API-only rollback/restoration, or independent cross-repository release approval. No Search or
+Answer was submitted and no service was interrupted. The exact deployed application/image was
+not re-inspected in this browser-only session; the earlier frozen deployment identities remain
+the authoritative release evidence. Latest repository main was `c72c4f0566718046445b3da74aec091a05e38cad`,
+whose Harness, CodeQL and Pages checks passed; that is not a fresh deployed-image attestation.
+Issue #27 remains open with its twelve-row closure gate unchanged.
