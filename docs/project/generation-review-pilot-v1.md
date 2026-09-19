@@ -210,5 +210,5 @@ python tools/generation_review_pilot.py validate ...
 python tools/generation_review_pilot.py project ...
 ```
 
-The 14 focused tests and fictional preflight establish only implementation behavior. They do not
+The focused tests and fictional preflight establish only implementation behavior. They do not
 prove scientific judgment quality.
