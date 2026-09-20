@@ -543,7 +543,8 @@ def test_rehearsal_contract_digest_closes_transitive_and_gate_surfaces():
     )
 
     campaign_changed = workflow_source.replace(
-        'state["total_turns"] >= 188', 'state["total_turns"] >= 189'
+        'state["total_turns"] >= LIMITS["combined_turns"]',
+        'state["total_turns"] >= LIMITS["combined_turns"] + 1',
     )
     assert (
         workflow._contract_digests_from_sources(campaign_changed, pilot_source, cli_source)[

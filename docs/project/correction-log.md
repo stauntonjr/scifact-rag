@@ -960,3 +960,10 @@ revision; a fast-forward of the pre-squash feature branch is not expected to suc
   `not_assessed`.
 - Prevention surface: the finite coordinator persists every attempt and prohibits any second
   development run. Further work requires an explicit owner-approved contract revision.
+
+## Issue 35 recovery: excerpt lookup and flat accounting
+
+- Failed approach: map document ID to a single excerpt; repeated IDs overwrite earlier supplied text. Signature: exact quote rejected as not exact for the named document. Earlier failed attempts remain immutable.
+- Corrected path: group distinct texts under each document ID, retain exact-occurrence and ambiguity checks, and revalidate unchanged raw outputs with separately recorded provenance. Tests cover early excerpt, identical duplicate, within-excerpt repetition and cross-excerpt ambiguity.
+- Failed approach: recursively reconstruct revised continuation descriptors, losing inherited counts or rebinding earlier hashes. Corrected path: verify every physical attempt against its immutable terminal and frozen request, select earliest valid records, and retain duplicates and failures in campaign accounting.
+- Validation environment correction: default macOS python3 lacks tomllib; use the configured uv environment, and prefix make with the repository .venv/bin path. The initial environment-only failure is retained separately from the subsequent executed gate.

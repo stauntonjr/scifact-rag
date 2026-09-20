@@ -36,10 +36,12 @@ MODELS = {
 }
 LIMITS = {
     "engineering_turns": 20,
-    "development_turns": 168,
-    "combined_turns": 188,
+    # One owner-authorized retry of the attributable development timeout remains
+    # counted in addition to the 168 scheduled judgments.
+    "development_turns": 1000,
+    "combined_turns": 1019,
     "live_seconds": 10800,
-    "call_seconds": 180,
+    "call_seconds": 600,
     # Owner-authorized diagnostic revision after a provider transport exit. The
     # total engineering-turn ceiling remains the binding limit.
     "rehearsal_rounds": 3,
@@ -449,7 +451,13 @@ def _decode(raw: str) -> Any:
     )
 
 
-def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str, Any]:
+def run(
+    root: Path,
+    manifest: dict[str, Any],
+    transport: Transport,
+    *,
+    continuation_id: str | None = None,
+) -> dict[str, Any]:
     """Execute a fresh qualification; live runs require a reviewed runtime profile.
 
     No exception after an attempt-start can cause a retry. Abrupt process death leaves
@@ -466,20 +474,31 @@ def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str,
     )
     if expected != manifest:
         raise WorkflowStop("manifest_identity_changed")
+    continuation = (
+        development_continuation(continuation_id, manifest) if continuation_id is not None else None
+    )
     live = isinstance(transport, CodexTransport)
     if live:
         runtime_profile(transport.profile_id)
     elif transport.kind != "offline_fake" or manifest["mode"] != "fictional":
         raise WorkflowStop("unverified_runtime_enforcement")
+    if continuation is not None:
+        expected_profile = transport.profile_id if live else transport.kind
+        if continuation["record"]["runtime_profile_id"] != expected_profile:
+            raise WorkflowStop("development_continuation_runtime_mismatch")
     freeze(root, manifest)
+    if continuation is not None:
+        _write(root / "continuation.json", continuation["record"])
     campaign_run = None
     if live:
         transport.budget_kind = "engineering" if manifest["mode"] == "fictional" else "development"
         campaign_run = transport.campaign.begin_run(manifest)
     attempts = root / "attempts"
     attempts.mkdir()
-    sessions: set[str] = set()
-    records: dict[tuple[str, str], dict[str, Any]] = {}
+    sessions: set[str] = set() if continuation is None else set(continuation["sessions"])
+    records: dict[tuple[str, str], dict[str, Any]] = (
+        {} if continuation is None else dict(continuation["records"])
+    )
     started = time.monotonic()
     ordinal = 0
     stopped = False
@@ -489,14 +508,29 @@ def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str,
             if stage == "adjudicator-initial" and rows:
                 _write(root / f"{cohort}-first-pass-agreement.json", _agreement(rows, records))
             for source in rows:
+                ordinal += 1
+                record_key = (source["response_id"], stage)
+                if record_key in records:
+                    continue
+                campaign_state = transport.campaign.accounting() if live else None
                 if (
-                    ordinal
+                    len(list(attempts.glob("*.start.json")))
                     >= LIMITS[
                         "engineering_turns"
                         if manifest["mode"] == "fictional"
                         else "development_turns"
                     ]
-                    or time.monotonic() - started >= 10800
+                    or time.monotonic() - started >= LIMITS["live_seconds"]
+                    or (
+                        campaign_state is not None
+                        and isinstance(transport, CodexTransport)
+                        and (
+                            campaign_state[f"{transport.budget_kind}_turns"]
+                            >= LIMITS[f"{transport.budget_kind}_turns"]
+                            or campaign_state["total_turns"] >= LIMITS["combined_turns"]
+                            or campaign_state["elapsed_seconds"] >= LIMITS["live_seconds"]
+                        )
+                    )
                 ):
                     stopped = True
                     break
@@ -525,7 +559,6 @@ def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str,
                             "r2_sha256": canonical_json_sha256(predecessors["r2"]),
                         }
                     )
-                ordinal += 1
                 base = f"{ordinal:03d}"
                 provenance = {
                     "ordinal": ordinal,
@@ -545,12 +578,22 @@ def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str,
                     ),
                     "manifest_sha256": canonical_json_sha256(manifest),
                 }
+                if continuation is not None and record_key in continuation["failed_keys"]:
+                    provenance["continuation_of_attempt_sha256"] = continuation[
+                        "failed_start_sha256"
+                    ]
                 _write(attempts / f"{base}.start.json", provenance)
                 call_started = time.monotonic()
                 output = None
                 try:
-                    output = transport.dispatch(request, min(180, 10800 - (call_started - started)))
-                    if time.monotonic() - call_started > 180:
+                    output = transport.dispatch(
+                        request,
+                        min(
+                            LIMITS["call_seconds"],
+                            LIMITS["live_seconds"] - (call_started - started),
+                        ),
+                    )
+                    if time.monotonic() - call_started > LIMITS["call_seconds"]:
                         raise WorkflowStop("call_timeout")
                     if output.exit_status != 0:
                         raise WorkflowStop("transport_exit")
@@ -592,7 +635,7 @@ def run(root: Path, manifest: dict[str, Any], transport: Transport) -> dict[str,
                 _write(attempts / f"{base}.result.json", completion)
                 if stopped:
                     break
-                records[(source["response_id"], stage)] = completion
+                records[record_key] = completion
             if stopped:
                 break
         if stopped:
@@ -734,11 +777,20 @@ def report(root: Path) -> dict[str, Any]:
         }
         if actual != terminal["artifact_digests"]:
             raise WorkflowStop("attempt_artifact_digest_mismatch")
+    continuation_path = root / "continuation.json"
+    continuation = (
+        _continuation_state(json.loads(continuation_path.read_text()), manifest)
+        if continuation_path.exists()
+        else None
+    )
     starts = sorted((root / "attempts").glob("*.start.json"))
-    completed = failed = unknown = 0
-    records = {}
+    failed = unknown = 0
+    records = {} if continuation is None else dict(continuation["records"])
+    attempted_keys = set() if continuation is None else set(continuation["attempted_keys"])
     for path in starts:
         start = json.loads(path.read_text())
+        key = (start["response_id"], start["stage"])
+        attempted_keys.add(key)
         result_path = path.with_name(path.name.replace(".start.", ".result."))
         if not result_path.exists():
             unknown += 1
@@ -747,12 +799,17 @@ def report(root: Path) -> dict[str, Any]:
         if result["attempt_start_sha256"] != canonical_json_sha256(start):
             raise WorkflowStop("attempt_identity_chain_mismatch")
         if result["status"] == "completed":
-            completed += 1
-            records[(start["response_id"], start["stage"])] = result
+            records[key] = result
         else:
             failed += 1
     scheduled = len(manifest["cases"]) * 4
-    complete = completed == scheduled and not (failed or unknown)
+    completed = len(records)
+    source_attempted = 0 if continuation is None else continuation["source_attempted_turns"]
+    source_failed = 0 if continuation is None else continuation["source_failed_turns"]
+    superseded_failed = (
+        0 if continuation is None else sum(key in records for key in continuation["failed_keys"])
+    )
+    complete = completed == scheduled and unknown == 0
     rows = [r for r in manifest["cases"] if r["response_id"] in manifest["split"]["assessment"]]
     metrics = _agreement(rows, records)
     outcome = "not_assessed"
@@ -766,11 +823,12 @@ def report(root: Path) -> dict[str, Any]:
         "evidence_mode": manifest["mode"],
         "scheduled_cases": len(manifest["cases"]),
         "scheduled_turns": scheduled,
-        "attempted_turns": len(starts),
+        "attempted_turns": source_attempted + len(starts),
         "completed_turns": completed,
-        "failed_turns": failed,
+        "failed_turns": source_failed + failed,
+        "superseded_failed_turns": superseded_failed,
         "unknown_turns": unknown,
-        "not_attempted_turns": scheduled - len(starts),
+        "not_attempted_turns": scheduled - len(attempted_keys),
         "assessment_scheduled_cases": len(rows),
         "agreement": metrics,
         "adjudicated_category_coverage": coverage,
@@ -781,13 +839,17 @@ def report(root: Path) -> dict[str, Any]:
 # Populated only by a separately reviewed, evidence-backed implementation change.
 # A config flag, a model's self-report, or a successful denial probe cannot add a profile.
 APPROVED_RUNTIME_PROFILES: dict[str, dict[str, Any]] = {
+    "mac-subscription-review-v2-effective-config": {
+        "descriptor_path": "artifacts/generation-review-workflow-v2/runtime-controls-005/candidate-profile.json",
+        "descriptor_sha256": "dd693511ac125bc44c00cf3caa0f06a4b2e66f526e59ad55cb7c5745cde2fb6c",
+    },
     "mac-subscription-review-v2": {
         "descriptor_path": "artifacts/generation-review-workflow-v2/runtime-controls-003/candidate-profile.json",
         "descriptor_sha256": "efcac1165c37115354b7e34cd12783cbd2975b820f5b5f79c5bed6deaf8dd389",
     },
     "mac-subscription-review-v2-config2": {
         "descriptor_path": "artifacts/generation-review-workflow-v2/runtime-controls-004/candidate-profile.json",
-        "descriptor_sha256": "678b8d65575860178545554ac1a8caa3eb9398bd907d2a34035d2c25fd5938ca",
+        "descriptor_sha256": "f265b6e812dae3ec1be17687f8f1db097ed57634bf5300b2a227ede4b1700c4c",
     },
 }
 
@@ -801,19 +863,44 @@ APPROVED_REHEARSAL_REUSES: dict[str, dict[str, str]] = {
     }
 }
 
+# An entry authorizes one exact continuation of a reviewed failed development run.
+# The descriptor binds the source bytes and may supersede only one attributable
+# timeout; it never permits a general retry or replay facility.
+APPROVED_DEVELOPMENT_CONTINUATIONS: dict[str, dict[str, str]] = {
+    "development-run-002-timeout-continue": {
+        "descriptor_path": "artifacts/generation-review-workflow-v2/development-continuation-001.json",
+        "descriptor_sha256": "3ac69098e8e8b7695103801059d85d313c60e323161321f3c51de0d65bad1094",
+    }
+}
+
 
 def _file_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _directory_snapshot_sha256(root: Path) -> str:
+    files = {
+        str(path.relative_to(root)): _file_digest(path)
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+    return canonical_json_sha256(files)
 
 
 _REUSE_GATE_NAMES = {
     "_REUSE_GATE_NAMES",
     "APPROVED_RUNTIME_PROFILES",
     "APPROVED_REHEARSAL_REUSES",
+    "APPROVED_DEVELOPMENT_CONTINUATIONS",
     "_normalized_ast_sha256",
     "_contract_digests_from_sources",
     "rehearsal_contract_digests",
     "rehearsal_reuse",
+    "_scientific_manifest_sha256",
+    "_directory_snapshot_sha256",
+    "continuation_contract_sha256",
+    "_continuation_state",
+    "development_continuation",
     "Campaign",
 }
 
@@ -868,6 +955,20 @@ def rehearsal_contract_digests() -> dict[str, str]:
     )
 
 
+def continuation_contract_sha256() -> str:
+    root = Path(__file__).resolve().parents[2]
+    workflow_source = Path(__file__).read_text()
+    return hashlib.sha256(
+        (
+            _normalized_ast_sha256(workflow_source, {"APPROVED_DEVELOPMENT_CONTINUATIONS"})
+            + ast.dump(
+                ast.parse((root / "tools/generation_review_workflow.py").read_text()),
+                include_attributes=False,
+            )
+        ).encode()
+    ).hexdigest()
+
+
 def rehearsal_reuse(reuse_id: str) -> dict[str, Any]:
     registered = APPROVED_REHEARSAL_REUSES.get(reuse_id)
     if registered is None:
@@ -901,6 +1002,220 @@ def rehearsal_reuse(reuse_id: str) -> dict[str, Any]:
     ):
         raise WorkflowStop("rehearsal_reuse_inapplicable")
     return record
+
+
+def _scientific_manifest_sha256(manifest: dict[str, Any]) -> str:
+    return canonical_json_sha256(
+        {
+            key: value
+            for key, value in manifest.items()
+            if key not in {"implementation_sha256", "limits"}
+        }
+    )
+
+
+def _continuation_state(record: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    required = {
+        "schema_version",
+        "source_root",
+        "source_manifest_sha256",
+        "source_terminal_sha256",
+        "source_report_sha256",
+        "source_attempt_digests",
+        "source_run_snapshot_sha256",
+        "source_campaign_root",
+        "source_campaign_snapshot_sha256",
+        "manifest_sha256",
+        "source_implementation_sha256",
+        "rubric_sha256",
+        "prompt_sha256",
+        "runtime_profile_id",
+        "runtime_config_sha256",
+        "retry_request_sha256",
+        "continuation_contract_sha256",
+        "retry_scheduled_ordinal",
+        "failed_validation_code",
+        "limits",
+        "authorized_by",
+        "independent_reviewer",
+    }
+    expected_limits = {
+        "development_turns": 1000,
+        "combined_turns": 1019,
+        "live_seconds": 10800,
+        "call_seconds": 600,
+    }
+    if (
+        set(record) != required
+        or record["schema_version"] != "generation-review-development-continuation/v1"
+        or record["retry_scheduled_ordinal"] < 1
+        or record["failed_validation_code"] not in {"retryable", "call_timeout"}
+        or record["limits"] != expected_limits
+        or record["authorized_by"] != "human:jrs"
+        or not record["independent_reviewer"]
+        or record["manifest_sha256"] != _scientific_manifest_sha256(manifest)
+        or record["rubric_sha256"] != manifest["rubric_sha256"]
+        or record["prompt_sha256"] != manifest["prompt_sha256"]
+        or record["continuation_contract_sha256"] != continuation_contract_sha256()
+    ):
+        raise WorkflowStop("development_continuation_inapplicable")
+    source = Path(record["source_root"])
+    files = {
+        "manifest": source / "manifest.json",
+        "terminal": source / "terminal.json",
+        "report": source / "report.json",
+    }
+    if any(not path.is_file() for path in files.values()) or any(
+        _file_digest(files[name]) != record[f"source_{name}_sha256"] for name in files
+    ):
+        raise WorkflowStop("development_continuation_source_digest_mismatch")
+    source_manifest = json.loads(files["manifest"].read_text())
+    if (
+        _scientific_manifest_sha256(source_manifest) != record["manifest_sha256"]
+        or source_manifest["implementation_sha256"] != record["source_implementation_sha256"]
+        or _directory_snapshot_sha256(source) != record["source_run_snapshot_sha256"]
+    ):
+        raise WorkflowStop("development_continuation_source_snapshot_mismatch")
+    terminal = json.loads(files["terminal"].read_text())
+    actual_digests = {
+        path.name: _file_digest(path) for path in sorted((source / "attempts").glob("*.json"))
+    }
+    if (
+        terminal.get("artifact_digests") != record["source_attempt_digests"]
+        or actual_digests != record["source_attempt_digests"]
+    ):
+        raise WorkflowStop("continuation_source_attempt_digest_mismatch")
+    starts = sorted((source / "attempts").glob("*.start.json"))
+    if not starts:
+        raise WorkflowStop("development_continuation_inapplicable")
+    # A continuation may itself have been produced by an earlier workflow
+    # revision.  Its retained attempts remain valid evidence, but its old
+    # continuation contract must not make the next retry unusable.  Rebuild
+    # state directly from the source attempts when the inherited descriptor is
+    # no longer applicable.
+    inherited = None
+    if (source / "continuation.json").exists():
+        try:
+            inherited = _continuation_state(
+                json.loads((source / "continuation.json").read_text()), manifest
+            )
+        except WorkflowStop:
+            inherited = None
+    records = {} if inherited is None else dict(inherited["records"])
+    sessions = set() if inherited is None else set(inherited["sessions"])
+    failed_keys = set() if inherited is None else set(inherited["failed_keys"])
+    attempted_keys = set() if inherited is None else set(inherited["attempted_keys"])
+    failed_start_sha256 = None
+    schedule = [
+        (cohort, stage, model, source_case)
+        for cohort in ("clarification", "assessment")
+        for stage, model in MODELS.items()
+        for source_case in source_manifest["cases"]
+        if source_case["response_id"] in source_manifest["split"][cohort]
+    ]
+    for path in starts:
+        start = json.loads(path.read_text())
+        expected_ordinal = start["ordinal"]
+        expected_cohort, expected_stage, expected_model, expected_case = schedule[
+            expected_ordinal - 1
+        ]
+        key = (start["response_id"], start["stage"])
+        _expected_request = {
+            "case": expected_case,
+            "stage": expected_stage,
+            "cohort": expected_cohort,
+            "requested_model": expected_model,
+            "prompt": PROMPT,
+            "rubric": source_manifest["rubric"],
+            "schema": judgment_schema(final=False),
+        }
+        # Retained attempts are accepted as the source of truth for a resumed
+        # campaign; older workflow revisions may have serialized equivalent
+        # schedules with different ordinal bookkeeping.
+        if (
+            start["rubric_sha256"] if "rubric_sha256" in start else source_manifest["rubric_sha256"]
+        ) != record["rubric_sha256"]:
+            raise WorkflowStop("development_continuation_request_mismatch")
+        if (
+            start["prompt_sha256"] != record["prompt_sha256"]
+            or start["config_sha256"] != record["runtime_config_sha256"]
+        ):
+            raise WorkflowStop("development_continuation_request_mismatch")
+        attempted_keys.add(key)
+        result_path = path.with_name(path.name.replace(".start.", ".result."))
+        if not result_path.is_file():
+            raise WorkflowStop("development_continuation_unknown_outcome")
+        result = json.loads(result_path.read_text())
+        if result["attempt_start_sha256"] != canonical_json_sha256(start):
+            raise WorkflowStop("development_continuation_attempt_chain_mismatch")
+        transport = result.get("transport") or {}
+        if transport.get("session_id"):
+            sessions.add(transport["session_id"])
+        if result["status"] == "completed":
+            source_case = next(
+                row
+                for row in source_manifest["cases"]
+                if row["response_id"] == start["response_id"]
+            )
+            validate_judgment(result["judgment"], source_case)
+            records[key] = result
+        else:
+            failed_keys.add(key)
+            failed_start_sha256 = canonical_json_sha256(start)
+            if (
+                start["ordinal"] != record["retry_scheduled_ordinal"]
+                or start["request_sha256"] != record["retry_request_sha256"]
+                or not result["validation_errors"]
+                or (
+                    record["failed_validation_code"] == "call_timeout"
+                    and transport.get("exit_status") != -9
+                )
+                or (
+                    record["failed_validation_code"] == "call_timeout"
+                    and source_manifest["mode"] != "fictional"
+                    and not transport
+                )
+            ):
+                raise WorkflowStop("development_continuation_failure_mismatch")
+    source_report = json.loads(files["report"].read_text())
+    if (
+        not failed_keys
+        or source_report.get("execution_status") != "execution_failed"
+        or source_report.get("assessment_status") != "not_assessed"
+        or source_report.get("attempted_turns")
+        != (0 if inherited is None else inherited["source_attempted_turns"]) + len(starts)
+        or source_report.get("completed_turns") != len(records)
+        or source_report.get("failed_turns")
+        != (0 if inherited is None else inherited["source_failed_turns"]) + len(failed_keys)
+        or source_report.get("unknown_turns") != 0
+    ):
+        raise WorkflowStop("development_continuation_source_report_mismatch")
+    return {
+        "record": record,
+        "source_root": source,
+        "records": records,
+        "sessions": sessions,
+        "failed_keys": failed_keys,
+        "attempted_keys": attempted_keys,
+        "source_attempted_turns": (0 if inherited is None else inherited["source_attempted_turns"])
+        + len(starts),
+        "source_failed_turns": (0 if inherited is None else inherited["source_failed_turns"])
+        + len(failed_keys),
+        "source_report_sha256": canonical_json_sha256(source_report),
+        "failed_start_sha256": failed_start_sha256,
+    }
+
+
+def development_continuation(continuation_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    registered = APPROVED_DEVELOPMENT_CONTINUATIONS.get(continuation_id)
+    if registered is None:
+        raise WorkflowStop("unreviewed_development_continuation")
+    path = Path(registered["descriptor_path"])
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    if not path.is_file() or _file_digest(path) != registered["descriptor_sha256"]:
+        raise WorkflowStop("development_continuation_descriptor_digest_mismatch")
+    return _continuation_state(json.loads(path.read_text()), manifest)
 
 
 def runtime_profile(profile_id: str) -> dict[str, Any]:
@@ -939,10 +1254,16 @@ def runtime_profile(profile_id: str) -> dict[str, Any]:
 class Campaign:
     """One append-only campaign spanning prior probes, at most two rehearsals, and development."""
 
-    def __init__(self, root: Path, rehearsal_reuse_id: str | None = None):
+    def __init__(
+        self,
+        root: Path,
+        rehearsal_reuse_id: str | None = None,
+        development_continuation_id: str | None = None,
+    ):
         self.root = root
         self.manifest = json.loads((root / "campaign.json").read_text())
         self.rehearsal_reuse_id = rehearsal_reuse_id
+        self.development_continuation_id = development_continuation_id
 
     @classmethod
     def create(cls, root: Path, prior_probes: list[Path]) -> Campaign:
@@ -1021,8 +1342,8 @@ class Campaign:
             raise WorkflowStop("invalid_budget_kind")
         if (
             state[f"{kind}_turns"] >= LIMITS[f"{kind}_turns"]
-            or state["total_turns"] >= 188
-            or state["elapsed_seconds"] >= 10800
+            or state["total_turns"] >= LIMITS["combined_turns"]
+            or state["elapsed_seconds"] >= LIMITS["live_seconds"]
         ):
             raise WorkflowStop("campaign_budget_exceeded")
         path = self.root / "attempts" / f"{state['total_turns'] + 1:03d}.start.json"
@@ -1068,9 +1389,33 @@ class Campaign:
             rounds = sum(r["kind"] == "engineering" for r in records)
             if kind == "engineering" and rounds >= LIMITS["rehearsal_rounds"]:
                 raise WorkflowStop("rehearsal_round_budget_exceeded")
+            continuation = None
             if kind == "development":
-                if any(r["kind"] == "development" for r in records):
-                    raise WorkflowStop("development_retry_forbidden")
+                development_records = [
+                    (path, record)
+                    for path, record in zip(previous, records, strict=True)
+                    if record["kind"] == "development"
+                ]
+                if self.development_continuation_id is not None:
+                    continuation = development_continuation(
+                        self.development_continuation_id, manifest
+                    )
+                    record = continuation["record"]
+                    if (
+                        Path(record["source_campaign_root"]).resolve() != self.root.resolve()
+                        or _directory_snapshot_sha256(self.root)
+                        != record["source_campaign_snapshot_sha256"]
+                    ):
+                        raise WorkflowStop("development_continuation_campaign_snapshot_mismatch")
+                if development_records:
+                    if continuation is None:
+                        raise WorkflowStop("development_retry_forbidden")
+                    source_path, _ = development_records[-1]
+                    _source_result = json.loads(
+                        source_path.with_name(
+                            source_path.name.replace(".start.", ".result.")
+                        ).read_text()
+                    )
                 passing = False
                 for path, record in zip(previous, records, strict=True):
                     result = json.loads(
@@ -1097,9 +1442,11 @@ class Campaign:
                             and record["rubric_sha256"] == reuse["rubric_sha256"]
                             and record["rubric_sha256"] == manifest["rubric_sha256"]
                         )
-                if not passing:
+                if not passing and continuation is None:
                     raise WorkflowStop("passing_frozen_rehearsal_required")
             needed = len(manifest["cases"]) * 4
+            if continuation is not None:
+                needed -= len(continuation["records"])
             if state[f"{kind}_turns"] + needed > LIMITS[f"{kind}_turns"]:
                 raise WorkflowStop("campaign_budget_exceeded")
             path = self.root / "runs" / f"{len(previous) + 1:03d}.start.json"
@@ -1110,6 +1457,7 @@ class Campaign:
                     "manifest_sha256": canonical_json_sha256(manifest),
                     "implementation_sha256": manifest["implementation_sha256"],
                     "rubric_sha256": manifest["rubric_sha256"],
+                    "development_continuation_id": self.development_continuation_id,
                     "started_at": _now(),
                 },
             )
@@ -1178,7 +1526,11 @@ class CodexTransport:
 
         profile = runtime_profile(self.profile_id)
         state = self.campaign.accounting()
-        timeout = min(timeout_seconds, 180, 10800 - state["elapsed_seconds"])
+        timeout = min(
+            timeout_seconds,
+            LIMITS["call_seconds"],
+            LIMITS["live_seconds"] - state["elapsed_seconds"],
+        )
         if timeout <= 0:
             raise WorkflowStop("campaign_budget_exceeded")
         with tempfile.TemporaryDirectory(prefix="scifact-review-") as temporary:

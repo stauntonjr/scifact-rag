@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--runtime-profile", required=True)
         if name == "run-development":
             command.add_argument("--rehearsal-reuse")
+            command.add_argument("--continuation")
     command = sub.add_parser("report")
     command.add_argument("--run", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -72,9 +73,17 @@ def main(argv: list[str] | None = None) -> int:
                     rehearsal_reuse_id=(
                         args.rehearsal_reuse if args.command == "run-development" else None
                     ),
+                    development_continuation_id=(
+                        args.continuation if args.command == "run-development" else None
+                    ),
                 ),
             )
-            result = run(args.output, manifest, transport)
+            result = run(
+                args.output,
+                manifest,
+                transport,
+                continuation_id=(args.continuation if args.command == "run-development" else None),
+            )
         print(json.dumps(result, sort_keys=True))
         return 2 if result.get("status") == "runtime_stopped" else 0
     except (WorkflowStop, OSError, ValueError, KeyError, TypeError) as exc:

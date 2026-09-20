@@ -399,9 +399,10 @@ def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[s
         return
     evidence = source.get("evidence")
     evidence_rows = evidence if isinstance(evidence, list) else []
-    evidence_by_id = {
-        row.get("document_id"): row.get("text") for row in evidence_rows if isinstance(row, Mapping)
-    }
+    evidence_by_id: dict[Any, set[str]] = {}
+    for row in evidence_rows:
+        if isinstance(row, Mapping) and isinstance(row.get("text"), str):
+            evidence_by_id.setdefault(row.get("document_id"), set()).add(row["text"])
     for index, evidence_quote in enumerate(evidence_quotes):
         location = f"rationale.evidence_quotes[{index}]"
         quote_item = _strict_object(evidence_quote, EVIDENCE_QUOTE_FIELDS, location, errors)
@@ -409,11 +410,11 @@ def _validate_rationale(value: object, source: Mapping[str, Any], errors: list[s
             continue
         document_id = quote_item.get("document_id")
         quote = quote_item.get("quote")
-        text = evidence_by_id.get(document_id)
-        if not isinstance(quote, str) or not quote or not isinstance(text, str):
+        texts = evidence_by_id.get(document_id, set())
+        if not isinstance(quote, str) or not quote or not texts:
             errors.append(f"{location}.quote is not exact for the named document")
             continue
-        occurrences = _occurrence_count(text, quote)
+        occurrences = sum(_occurrence_count(text, quote) for text in texts)
         if occurrences == 0:
             errors.append(f"{location}.quote is not exact for the named document")
         elif occurrences != 1:

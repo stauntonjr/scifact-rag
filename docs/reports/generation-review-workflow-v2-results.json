@@ -1,0 +1,256 @@
+{
+  "adjudicated_category_coverage": {
+    "answer_adequacy": {
+      "adequate": {
+        "cases": 15,
+        "families": 7
+      },
+      "inadequate": {
+        "cases": 9,
+        "families": 7
+      }
+    },
+    "causal_strengthening": {
+      "no": {
+        "cases": 25,
+        "families": 15
+      },
+      "yes": {
+        "cases": 2,
+        "families": 1
+      }
+    },
+    "comparison_omission": {
+      "no": {
+        "cases": 24,
+        "families": 15
+      },
+      "yes": {
+        "cases": 3,
+        "families": 2
+      }
+    },
+    "intervention_omission": {
+      "no": {
+        "cases": 24,
+        "families": 14
+      },
+      "yes": {
+        "cases": 2,
+        "families": 2
+      }
+    },
+    "material_overstatement": {
+      "none": {
+        "cases": 22,
+        "families": 11
+      },
+      "present": {
+        "cases": 9,
+        "families": 7
+      }
+    },
+    "negation_omission": {
+      "no": {
+        "cases": 28,
+        "families": 16
+      },
+      "yes": {
+        "cases": 0,
+        "families": 0
+      }
+    },
+    "outcome_omission": {
+      "no": {
+        "cases": 25,
+        "families": 15
+      },
+      "yes": {
+        "cases": 2,
+        "families": 2
+      }
+    },
+    "population_generalization": {
+      "no": {
+        "cases": 24,
+        "families": 14
+      },
+      "yes": {
+        "cases": 3,
+        "families": 2
+      }
+    },
+    "population_omission": {
+      "no": {
+        "cases": 25,
+        "families": 15
+      },
+      "yes": {
+        "cases": 2,
+        "families": 1
+      }
+    },
+    "qualifier_omission": {
+      "no": {
+        "cases": 24,
+        "families": 15
+      },
+      "yes": {
+        "cases": 4,
+        "families": 3
+      }
+    }
+  },
+  "agreement": {
+    "answer_adequacy": {
+      "exact_agreement": 0.8076923076923077,
+      "exact_agreements": 21,
+      "negative_agreement": 0.7142857142857143,
+      "positive_agreement": 0.8888888888888888,
+      "resolved_binary_agreement": 0.84,
+      "resolved_rows": 25,
+      "scheduled": 26,
+      "uncertain_or_missing": 0
+    },
+    "causal_strengthening": {
+      "exact_agreement": 1.0,
+      "exact_agreements": 31,
+      "negative_agreement": 1.0,
+      "positive_agreement": 1.0,
+      "resolved_binary_agreement": 1.0,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "comparison_omission": {
+      "exact_agreement": 0.8387096774193549,
+      "exact_agreements": 26,
+      "negative_agreement": 0.9454545454545454,
+      "positive_agreement": 0.0,
+      "resolved_binary_agreement": 0.896551724137931,
+      "resolved_rows": 29,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "grounded": {
+      "exact_agreement": 0.9354838709677419,
+      "exact_agreements": 29,
+      "negative_agreement": 0.875,
+      "positive_agreement": 0.9565217391304348,
+      "resolved_binary_agreement": 0.9354838709677419,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "insufficiency_handling": {
+      "exact_agreement": 0.967741935483871,
+      "exact_agreements": 30,
+      "negative_agreement": 0.6666666666666666,
+      "positive_agreement": 0.9090909090909091,
+      "resolved_binary_agreement": 0.8571428571428571,
+      "resolved_rows": 7,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "intervention_omission": {
+      "exact_agreement": 0.9354838709677419,
+      "exact_agreements": 29,
+      "negative_agreement": 1.0,
+      "positive_agreement": 1.0,
+      "resolved_binary_agreement": 1.0,
+      "resolved_rows": 26,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "material_overstatement": {
+      "exact_agreement": 0.967741935483871,
+      "exact_agreements": 30,
+      "negative_agreement": 0.9787234042553191,
+      "positive_agreement": 0.9333333333333333,
+      "resolved_binary_agreement": 0.967741935483871,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "negation_omission": {
+      "exact_agreement": 0.9032258064516129,
+      "exact_agreements": 28,
+      "negative_agreement": 0.9824561403508771,
+      "positive_agreement": 0.0,
+      "resolved_binary_agreement": 0.9655172413793104,
+      "resolved_rows": 29,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "outcome_omission": {
+      "exact_agreement": 0.8709677419354839,
+      "exact_agreements": 27,
+      "negative_agreement": 0.9285714285714286,
+      "positive_agreement": 0.3333333333333333,
+      "resolved_binary_agreement": 0.8709677419354839,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "population_generalization": {
+      "exact_agreement": 0.8709677419354839,
+      "exact_agreements": 27,
+      "negative_agreement": 0.9310344827586207,
+      "positive_agreement": 0.0,
+      "resolved_binary_agreement": 0.8709677419354839,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "population_omission": {
+      "exact_agreement": 0.9032258064516129,
+      "exact_agreements": 28,
+      "negative_agreement": 0.9491525423728814,
+      "positive_agreement": 0.0,
+      "resolved_binary_agreement": 0.9032258064516129,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "qualifier_omission": {
+      "exact_agreement": 0.9354838709677419,
+      "exact_agreements": 29,
+      "negative_agreement": 0.9642857142857143,
+      "positive_agreement": 0.6666666666666666,
+      "resolved_binary_agreement": 0.9354838709677419,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    },
+    "supplied_context_answerability": {
+      "exact_agreement": 0.967741935483871,
+      "exact_agreements": 30,
+      "negative_agreement": 0.9090909090909091,
+      "positive_agreement": 0.9803921568627451,
+      "resolved_binary_agreement": 0.967741935483871,
+      "resolved_rows": 31,
+      "scheduled": 31,
+      "uncertain_or_missing": 0
+    }
+  },
+  "assessment_status": "insufficient_category_coverage",
+  "attempted_turns": 202,
+  "campaign_accounting": {
+    "development_turns": 202,
+    "elapsed_seconds": 9224.469735544852,
+    "engineering_turns": 19,
+    "total_turns": 221,
+    "unknown_turns": 0
+  },
+  "completed_turns": 168,
+  "duplicate_completed_turns": 5,
+  "execution_status": "execution_complete",
+  "failed_turns": 29,
+  "manifest_sha256": "796b0b8f70a3b8b2e489de7964b7ddba7d69884e156a42f41e8a025809324587",
+  "missing_judgments": 0,
+  "scheduled_cases": 42,
+  "scheduled_turns": 168,
+  "schema_version": "generation-review-recovery-report/v1",
+  "stop_reason": null,
+  "unknown_turns": 0
+}

@@ -692,6 +692,7 @@
         ],
         "ci_checks": [
           "uv run pytest tests/test_generation_review_workflow.py",
+          "uv run pytest tests/test_generation_review_recovery.py",
           "uv run pytest tests/test_generation_review_pilot.py tests/test_interface_contracts.py",
           "make smoke"
         ],
@@ -709,7 +710,12 @@
           "docs/project/generation-review-workflow-v2.md",
           "docs/research/generation-review-runtime-v2.md",
           "docs/reports/generation-review-workflow-v2.md",
-          "docs/adr/0038-generation-review-workflow.md"
+          "docs/adr/0038-generation-review-workflow.md",
+          "src/scifact_rag/generation_review_recovery.py",
+          "tools/generation_review_recovery.py",
+          "tests/test_generation_review_recovery.py",
+          "docs/project/generation-review-recovery.md",
+          "docs/reports/generation-review-workflow-v2-results.json"
         ]
       }
     }

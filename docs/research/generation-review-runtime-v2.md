@@ -121,3 +121,9 @@ and model-free admission returned `runtime_admitted` with zero turns. A separate
 reviewed reuse record bound the exact passing fictional run and unchanged workflow/pilot contract
 while pinning the current campaign and CLI gate. The subsequent development timeout is an execution
 result, not evidence that these admission controls failed.
+
+### Effective-configuration admission correction
+
+Recovery002 stopped after17physical development calls because the app changed the ignored user configuration source. Profile `mac-subscription-review-v2-effective-config` (descriptor005, SHA-256 `dd693511ac125bc44c00cf3caa0f06a4b2e66f526e59ad55cb7c5745cde2fb6c`) preserves executable, explicit overrides, evidence files/roles, authentication home and all three system configuration absence checks. It removes only `$CODEX_HOME/config.toml` from blocking source checks, recording its observed digest as audit-only metadata.
+
+The pinned installed executable's `exec --help` explicitly states that `--ignore-user-config` does not load that file; the transport unconditionally supplies the flag. Independent review `/root/assess_recovery` verified these facts and approved the applicability correction without additional model calls. Changes to excluded app preferences cannot change reviewer configuration. Effective control or executable drift still stops execution.

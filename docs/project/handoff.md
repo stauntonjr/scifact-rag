@@ -1,23 +1,10 @@
 # Project handoff
 
-## Real development review attempted and stopped
+## Real development assessment completed
 
-[Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35) contains the accepted repair plan
-for the stopped Issue #28 pilot. The [v2 protocol](generation-review-workflow-v2.md) adds the finite
-coordinator and initial/final adjudication contracts. Software tests and runtime probes have
-separate evidentiary roles; the [v2 report](../reports/generation-review-workflow-v2.md) records the
-current boundary. After independent runtime requalification and retained-rehearsal applicability
-review, the real 42-case run started once. Two calls completed; call three timed out at the fixed
-180-second ceiling. The coordinator retained 3 attempted, 2 completed, 1 failed, 0 unknown and
-165 not attempted turns, then stopped without retry. Execution is `execution_failed` and assessment
-is `not_assessed`; Issue #35 stays open. Completing it requires an explicit owner-approved contract
-revision. No Candidate A or confirmation work is authorized by this attempt.
+[Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35) completed the real 42-case development assessment: all 168 judgments, all 42 final adjudications resolved, zero missing or unknown outcomes. The [report](../reports/generation-review-workflow-v2.md) records `execution_complete` / `insufficient_category_coverage`; eight positive error categories miss required coverage, and the review panel is not qualified for screening.
 
-The original Issue #28 worktree cleanup removed its ignored pilot artifacts. The retained source
-worksheet and deterministic builders recovered the inventory and selection with exact original
-SHA-256 matches; the scientific cohort did not change. The old preflight result remains historical.
-Recovered files live outside that removed worktree under the DGX repository's ignored
-`artifacts/generation-review-workflow-v2/recovered-source/` directory.
+The retained campaign contains 202 development calls plus 19 engineering calls and 9,224.47 live seconds. Original failures and duplicates are preserved. The [recovery protocol](generation-review-recovery.md) explains owner-authorized retries, source-excerpt validation repair, effective runtime configuration checks, audited quote normalization and the one missing-slot completion. Independent verification reproduced identity chains, counts, stage ordering, agreement and qualification. No new model run, Candidate A, confirmation acquisition or product change is authorized by this result.
 
 ## Development reviewer pilot stopped at preflight
 
