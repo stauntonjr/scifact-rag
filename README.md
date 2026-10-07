@@ -16,6 +16,26 @@ The [roadmap](docs/project/roadmap.md) records completed and stopped experiments
 evaluation now belongs to [agentic-project-template #59](https://github.com/stauntonjr/agentic-project-template/issues/59);
 further scientific research or production-service work requires a new scope decision.
 
+## At A Glance
+
+![SciFact-RAG architecture: public abstracts and source-preserving representations feed a six-channel candidate pool, ColBERT reranking, generation-context assembly, and a local Qwen generator followed by a parent-citation gate. Shared interfaces and separate evaluation boundaries remain visible.](docs/assets/scifact-architecture.svg)
+
+**Who and why:** researchers and developers need to inspect both the answer and
+the evidence supplied to the model. The system retains parent-document identity,
+matching passages, retrieval signals, and generation context so relevance and
+scientific fidelity can be examined separately.
+
+**How:** ingest public SciFact abstracts into PostgreSQL, retrieve and deduplicate
+candidates across six channels, rerank their bounded content views with ColBERT,
+assemble context, and request a locally generated answer. Search ends at ranked
+evidence; answering adds generation and a parent-document citation check.
+
+**Current boundary:** this is a measured single-DGX prototype. Whole-document
+generation context is the default; adaptive context and the fast BM25 hybrid are
+explicit alternatives. Citation validation checks document identity, while
+scientific support, contradiction, and overstatement require separate evaluation.
+Experimental inference and proposition/graph work are outside the default path.
+
 ## Measured result
 
 The selected retrieval architecture builds a broad six-channel candidate pool and ranks each
@@ -52,30 +72,38 @@ supported fast/no-ColBERT alternative.
 
 ## Architecture
 
-```text
-SciFact corpus
-      |
-      v
-PostgreSQL + pgvector + VectorChord-BM25
-      |
-      +--> BM25, title, token-window, coreference-sentence,
-      |    and coreference-interval candidate generators
-      |
-      v
-deduplicated candidate pool
-      |
-      v
-ColBERT MaxSim over bounded DP content views
-      |
-      v
-ranked parent documents + matching-passage provenance
-      |
-      v
-whole-document or adaptive generation context
-      |
-      v
-Qwen NVFP4 --> cited answer or `insufficient evidence`
-```
+1. **Prepare evidence:** preserve the original title, abstract, and document ID;
+   build title, token-window, and coreference-informed representations; embed
+   searchable views with MiniLM. PostgreSQL stores the parents, source-preserving
+   chunks, and indexes through pgvector and VectorChord-BM25.
+2. **Retrieve and rank:** BM25, title, token-window, proper-noun coreference,
+   nominal coreference, and packed coreference-interval channels contribute to
+   one deduplicated parent-document pool. The selected strategy scores every
+   pooled parent using its best ColBERT MaxSim score over bounded, dynamic-programming
+   (DP) content views. It retains channel signals and the matching passage;
+   title-score fusion and graph scoring are not part of this default.
+3. **Assemble context and answer:** the default supplies whole retrieved abstracts.
+   The opt-in adaptive policy retains a whole abstract when its stored DP view
+   exactly matches it; otherwise it selects up to two ranked views per parent,
+   restoring source order. Qwen receives the question and this evidence through
+   an OpenAI-compatible endpoint. The application accepts citations only to
+   retrieved parent IDs and returns `insufficient evidence` for empty retrieval,
+   an explicit model abstention, or missing/invalid citations. Service failures
+   remain errors. A valid citation does not establish that every claim is supported.
+
+**Validation is a separate lane.** Retrieval comparisons use SciFact relevance
+labels, per-query rankings, quality metrics, and latency. Generation evaluation
+examines support, contradiction, insufficiency, qualifiers, and material
+overstatement against supplied evidence. Frozen manifests, component revisions,
+and artifact digests keep results attributable. The inspected retrieval partition
+and short-abstract generation review retain the limitations described above;
+they do not establish fresh generalization or long-document performance.
+
+See the [selected retrieval decision](docs/adr/0029-retrieval-default-selection.md),
+[context-assembly decision](docs/adr/0028-generation-context-assembly.md), and
+[technical reference](docs/project/technical-reference.md) for strategy, storage,
+provenance, and evaluation details. The [roadmap](docs/project/roadmap.md) records
+experimental and stopped work separately from the selected request path.
 
 The pipeline is a modular monolith with one explicit composition root. LangGraph is intentionally
 absent: the current request path is deterministic and does not need a stateful agent workflow.

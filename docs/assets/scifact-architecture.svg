@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="940" viewBox="0 0 1200 940" role="img" aria-labelledby="title desc">
+<title id="title">SciFact-RAG: inspectable scientific evidence retrieval and answering</title>
+<desc id="desc">Public SciFact abstracts retain titles and parent-document IDs. MiniLM embeddings and source-preserving title, token-window, and coreference representations are stored in PostgreSQL with pgvector and VectorChord-BM25. A question enters the shared RagApplication through CLI, HTTP, MCP, or browser. Six channels generate a deduplicated parent-document candidate pool. The selected default reranks every candidate by its best ColBERT MaxSim score over bounded dynamic-programming content views. Search returns ranked evidence with matching passages. Answering assembles whole-document context by default, with adaptive context opt-in, calls local Qwen, and checks citations against retrieved parent IDs. It returns a cited answer or explicit insufficient evidence; service failures remain errors. Citation identity does not prove scientific support. Retrieval and generation evaluation are separate, with retained manifests, revisions, digests, and inspected-data limits. Experimental NLI scoring and stopped proposition or graph work remain outside the default request path.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 1 L 8 5 L 0 9 Z" fill="#475569"/></marker>
+<style>
+text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
+.heading { font-size: 25px; font-weight: 700; fill: #0f172a; }
+.body { font-size: 17px; fill: #334155; }
+.detail { font-size: 15px; fill: #475569; }
+.label { font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+.flow { fill: none; stroke: #475569; stroke-width: 2.5; marker-end: url(#arrow); }
+</style>
+</defs>
+<rect width="1200" height="940" rx="20" fill="#f8fafc"/>
+<text x="40" y="43" class="label" fill="#475569">SCIFACT-RAG / SELECTED REQUEST PATH</text>
+<text x="40" y="84" font-size="32" font-weight="700" fill="#0f172a">From scientific abstracts to inspectable, cited answers</text>
+<text x="40" y="115" class="body">One DGX-local application. Separate evidence retrieval and scientific-fidelity evaluation.</text>
+
+<rect x="40" y="143" width="1120" height="57" rx="10" fill="#e2e8f0"/>
+<text x="60" y="168" class="label" fill="#334155">SHARED APPLICATION BOUNDARY</text>
+<text x="60" y="189" class="detail">CLI · HTTP · MCP: search_scifact / answer_scifact · Browser via HTTP → the same RagApplication services</text>
+
+<rect x="40" y="223" width="340" height="381" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+<path d="M 54 223 H 366 Q 380 223 380 237 V 242 H 40 V 237 Q 40 223 54 223" fill="#0f766e"/>
+<text x="62" y="272" class="label" fill="#0f766e">01 / INGESTION</text>
+<text x="62" y="307" class="heading">Prepare evidence</text>
+<text x="62" y="345" font-size="17" font-weight="600" fill="#334155">Public SciFact corpus</text>
+<text x="62" y="366" class="detail">5,183 abstracts + original titles / IDs</text>
+<text x="62" y="392" font-size="17" font-weight="600" fill="#334155">Source-preserving representations</text>
+<text x="62" y="413" class="detail">Token windows + coreference views</text>
+<text x="62" y="439" font-size="17" font-weight="600" fill="#334155">MiniLM embeddings</text>
+<text x="62" y="460" class="detail">Dense vectors for searchable views</text>
+<text x="62" y="486" font-size="17" font-weight="600" fill="#334155">PostgreSQL evidence store</text>
+<text x="62" y="507" class="detail">pgvector + VectorChord-BM25</text>
+<line x1="62" y1="523" x2="358" y2="523" stroke="#e2e8f0"/>
+<text x="62" y="551" font-size="17" font-weight="700" fill="#0f766e">Persistent parents + content views</text>
+<text x="62" y="580" class="detail">Original text and document identity retained</text>
+<rect x="430" y="223" width="340" height="381" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+<path d="M 444 223 H 756 Q 770 223 770 237 V 242 H 430 V 237 Q 430 223 444 223" fill="#1d4ed8"/>
+<text x="452" y="272" class="label" fill="#1d4ed8">02 / SELECTED DEFAULT</text>
+<text x="452" y="307" class="heading">Retrieve + rank</text>
+<text x="452" y="345" font-size="17" font-weight="600" fill="#334155">Six candidate channels</text>
+<text x="452" y="366" class="detail">BM25 · title · token-window</text>
+<text x="452" y="392" font-size="17" font-weight="600" fill="#334155">Coreference-informed candidates</text>
+<text x="452" y="413" class="detail">Proper noun · nominal · packed interval</text>
+<text x="452" y="439" font-size="17" font-weight="600" fill="#334155">Deduplicated parent pool</text>
+<text x="452" y="460" class="detail">Retain channel scores + ranks</text>
+<text x="452" y="486" font-size="17" font-weight="600" fill="#334155">ColBERT content-max reranking</text>
+<text x="452" y="507" class="detail">Best MaxSim over bounded DP views</text>
+<line x1="452" y1="523" x2="748" y2="523" stroke="#e2e8f0"/>
+<text x="452" y="551" font-size="17" font-weight="700" fill="#1d4ed8">Ranked parents + matching passages</text>
+<text x="452" y="580" class="detail">Search returns evidence at this boundary</text>
+<rect x="820" y="223" width="340" height="381" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+<path d="M 834 223 H 1146 Q 1160 223 1160 237 V 242 H 820 V 237 Q 820 223 834 223" fill="#6d28d9"/>
+<text x="842" y="272" class="label" fill="#6d28d9">03 / GENERATION</text>
+<text x="842" y="307" class="heading">Context + answer</text>
+<text x="842" y="345" font-size="17" font-weight="600" fill="#334155">Whole-document context: default</text>
+<text x="842" y="366" class="detail">Adaptive: opt-in, ≤ 2 views per parent</text>
+<text x="842" y="392" font-size="17" font-weight="600" fill="#334155">Local Qwen generator</text>
+<text x="842" y="413" class="detail">Question + supplied evidence; no tools</text>
+<text x="842" y="439" font-size="17" font-weight="600" fill="#334155">Application citation gate</text>
+<text x="842" y="460" class="detail">Accept only retrieved parent IDs</text>
+<text x="842" y="486" font-size="17" font-weight="600" fill="#334155">Cited answer or explicit abstention</text>
+<text x="842" y="507" class="detail">No hits / invalid citations → insufficiency</text>
+<line x1="842" y1="523" x2="1138" y2="523" stroke="#e2e8f0"/>
+<text x="842" y="551" font-size="17" font-weight="700" fill="#6d28d9">Answer + actual generation context</text>
+<text x="842" y="580" class="detail">Service failures remain explicit errors</text>
+<path d="M 384 416 H 426" class="flow"/>
+<path d="M 774 416 H 816" class="flow"/>
+
+<text x="40" y="634" class="detail">Fast retrieval alternative: BM25 + token-window RRF · Citation identity is checked; scientific support is evaluated separately.</text>
+
+<rect x="40" y="660" width="545" height="147" rx="12" fill="#eff6ff" stroke="#93c5fd"/>
+<text x="60" y="688" class="label" fill="#1d4ed8">RETRIEVAL EVALUATION</text>
+<text x="60" y="720" class="body">SciFact relevance labels → per-query ranked results</text>
+<text x="60" y="749" class="body">nDCG · recall · MRR · latency · candidate diagnostics</text>
+<text x="60" y="784" class="detail">Inspected validation partition; comparative engineering evidence</text>
+
+<rect x="615" y="660" width="545" height="147" rx="12" fill="#f5f3ff" stroke="#c4b5fd"/>
+<text x="635" y="688" class="label" fill="#6d28d9">GENERATION EVALUATION</text>
+<text x="635" y="720" class="body">Answer + supplied evidence → automatic / human review</text>
+<text x="635" y="749" class="body">Support · contradiction · qualifiers · insufficiency</text>
+<text x="635" y="784" class="detail">Short-abstract results do not establish long-document quality</text>
+
+<text x="40" y="842" class="detail">Reproducibility: frozen manifests · component revisions · artifact digests · retained failures and limitations</text>
+<rect x="40" y="862" width="1120" height="48" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="6 4"/>
+<text x="60" y="891" class="detail">Outside default: NLI scores not promoted · Proposition / graph work stopped at qualification · No agent workflow</text>
+</svg>
