@@ -111,6 +111,92 @@ The CLI, loopback HTTP API, loopback MCP service, and small evidence-inspection 
 application services. The browser calls the existing HTTP contracts rather than implementing a
 second retrieval or generation path.
 
+### Strategy detail
+
+Retrieval selects and orders **parent documents**; generation context independently chooses the
+text Qwen sees. The branches below are selectable alternatives, not stages that all run for every
+query. Green marks the selected retrieval default; blue marks the fast fallback.
+
+```mermaid
+flowchart TB
+    Q["Scientific query"]
+
+    subgraph simple["Baselines and list fusion"]
+        direction LR
+        L["keyword / bm25<br/>Lexical document ranking"]
+        V["Dense MiniLM baselines<br/>token-window; coref-propn / nominal / max<br/>sentence-pack; coref-aware / interval-pack"]
+        F["Fuse independently retrieved lists with RRF<br/>title + token-window; BM25 + dense variants<br/>hybrid-rrf: keyword + proper-noun coref"]
+        FAST["bm25-token-window-rrf — FAST FALLBACK<br/>BM25 list + MiniLM abstract-window list<br/>reciprocal-rank fusion; no ColBERT"]
+    end
+    Q --> L
+    Q --> V
+    Q --> F
+    Q --> FAST
+
+    subgraph pooled["Candidate pooling and scoring"]
+        direction TB
+        P5["Five generators, each top 50<br/>BM25 + title + token-window<br/>+ proper-noun + nominal coref sentences"]
+        P6["Six-generator interval pool<br/>same five + coref-interval-pack"]
+        P4["Four-generator DP alternative<br/>BM25 + title + nominal coref sentences<br/>+ raw MiniLM-DP chunks: target 112, max 126 tokens"]
+        N["Native pooled-score alternatives<br/>Rescore every deduplicated parent in every channel<br/>RRF; optional MS MARCO rank; or robust mean"]
+        W["Whole-document reranking alternatives<br/>Raw title + abstract scored by ONE reranker<br/>ColBERT; MS MARCO; RankZephyr on interval pool"]
+        C["pooled-coref-interval-content-max-colbert — DEFAULT<br/>Score all stored raw DP content views with ColBERT<br/>Max 510 tokens per view; parent score = highest raw score<br/>No title-score fusion or candidate-score mixing"]
+        M["Title + DP-content ablations<br/>Separate title score and max raw DP-content score<br/>Equal mean of raw scores, or separately robust-normalized scores"]
+        P5 --> P6
+        P5 --> N
+        P6 -->|"RRF variant"| N
+        P5 --> W
+        P6 --> W
+        P6 --> C
+        P6 --> M
+        P4 -->|"Robust-normalized mean"| M
+    end
+    Q --> P5
+    Q --> P4
+
+    R["Ranked parent document IDs<br/>Preserve source text and matching-passage provenance"]
+    L --> R
+    V --> R
+    F --> R
+    FAST --> R
+    N --> R
+    W --> R
+    C --> R
+    M --> R
+
+    subgraph context["Generation context"]
+        direction LR
+        WHOLE["whole-document — DEFAULT<br/>Title + complete abstract for each retrieved parent"]
+        ADAPT["adaptive — OPT-IN<br/>Keep whole abstract if it is one exact DP view<br/>Otherwise ColBERT-rank stored 510-token views<br/>Select at most two per parent; restore source order<br/>top-dp-chunks is an alias, not a third policy"]
+    end
+    R --> WHOLE
+    R --> ADAPT
+    WHOLE --> A["Local Qwen<br/>Cited answer or insufficient evidence<br/>Citations validated against retrieved parent IDs"]
+    ADAPT --> A
+
+    classDef selected fill:#e8f5e9,stroke:#2e7d32,color:#163b1c,stroke-width:2px;
+    classDef fallback fill:#e3f2fd,stroke:#1565c0,color:#153552,stroke-width:2px;
+    class C selected;
+    class FAST fallback;
+```
+
+RRF is **reciprocal-rank fusion**; DP is **dynamic programming** for chunk boundaries.
+Coreference rewrites are separate candidate representations; DP views preserve raw source text
+and use coreference to place boundaries. Pooling deduplicates documents before scoring; the
+selected content-max path retains the winning chunk as provenance rather than concatenating all
+chunks into one reranker input.
+
+The native pooled family also includes a sixth `sentence-pack` or `coref-aware-pack` channel;
+its MS MARCO extra rank and robust-mean variants use the five-generator pool. Whole-document
+ColBERT is distinct from the selected DP content-max path. Title/content fusion and robust
+normalization are retained ablations, not the selected default. Context selection preserves parent
+rank and citations; retrieval token limits are not a guarantee about Qwen's prompt budget.
+
+See the [complete strategy reference](docs/project/technical-reference.md),
+[composition root](src/scifact_rag/composition.py),
+[retrieval-default decision](docs/adr/0029-retrieval-default-selection.md), and
+[context-policy decision](docs/adr/0028-generation-context-assembly.md) for exact names and boundaries.
+
 ## Live UI showcase
 
 [![SciFact RAG live UI: enter a scientific claim, inspect the generated answer, and open cited evidence](docs/assets/showcase/scifact-ui-answer-evidence.gif)](https://stauntonjr.github.io/scifact-rag/showcase/scifact-ui/)
