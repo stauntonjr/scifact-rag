@@ -1,5 +1,11 @@
 # Project handoff
 
+## Real development assessment completed
+
+[Issue #35](https://github.com/stauntonjr/scifact-rag/issues/35) completed the real 42-case development assessment: all 168 judgments, all 42 final adjudications resolved, zero missing or unknown outcomes. The [report](../reports/generation-review-workflow-v2.md) records `execution_complete` / `insufficient_category_coverage`; eight positive error categories miss required coverage, and the review panel is not qualified for screening.
+
+The retained campaign contains 202 development calls plus 19 engineering calls and 9,224.47 live seconds. Original failures and duplicates are preserved. The [recovery protocol](generation-review-recovery.md) explains owner-authorized retries, source-excerpt validation repair, effective runtime configuration checks, audited quote normalization and the one missing-slot completion. Independent verification reproduced identity chains, counts, stage ordering, agreement and qualification. No new model run, Candidate A, confirmation acquisition or product change is authorized by this result.
+
 ## Development reviewer pilot stopped at preflight
 
 [Issue #28](https://github.com/stauntonjr/scifact-rag/issues/28) implements the strict

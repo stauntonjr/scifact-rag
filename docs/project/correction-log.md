@@ -863,3 +863,107 @@ revision; a fast-forward of the pre-squash feature branch is not expected to suc
 - Related execution failure: helper tests passed while the accepted renderer still lacked scored
   ranks, complete cross-tabs, and payload checks. Gate completion against the Issue acceptance
   criteria and a real retained-artifact execution, not helper-test counts or statements of intent.
+
+
+## SCIFACT-RAG-018: worktree cleanup removed unique ignored review artifacts
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 recovery of the Issue #28 frozen reviewer input boundary.
+- Failed approach: remove the merged Issue #28 worktree without preserving its ignored pilot
+  inventory and selection; a clean tracked tree did not imply its ignored evidence was disposable.
+- Error signature: the documented pilot artifact paths no longer existed after successful worktree
+  removal. The source worksheet, map and raw results survived outside that worktree.
+- Mutation check: the original cleanup deleted ignored pilot outputs. Recovery did not alter the
+  surviving sources, choose a new cohort, rerun inference or restore lost model outputs.
+- Corrected path: run existing deterministic inventory/selection builders on surviving sources,
+  match the published original SHA-256 values, and write fresh recovered files outside the removed
+  worktree only after exact matches. Metadata group-order matching used no assessment outcome.
+- Verification: worksheet `f6a64a24a031ab4cf2cfc3764419ca37276c0d8174581e302d173e3bac72f0d2`,
+  inventory `ea58f7266dc0233cc5d74c79053ed7c560de6f5662937a2b68a4930fe490f9e6` and selection
+  `fead52c0a781497e278aec8296a24c6731f0a59a5f4c39d3cef12828cb53cfbc` match the v1 protocol.
+- Prevention surface: the v2 retention protocol explicitly identifies ignored evidence before
+  cleanup. Existing preservation requirements apply; no automated cleanup was introduced.
+- Rejected recovery route: automatic approval review blocked extraction of commands from a private
+  DGX transcript because of possible secrets. Recovery instead used the original ordinary source
+  files, repository builders and published hashes; the rejected transcript route was not retried.
+
+## SCIFACT-RAG-019: advertised tool self-report is not runtime enforcement evidence
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 runtime admission.
+- Failed approach: infer a callable or absent tool surface from a model's list of available tools.
+- Error signature: the second fabricated probe's real router rejected Code Mode even though the
+  model listed wrapper tool names. The first probe's list could not establish callable access.
+- Mutation check: both probes used fictional content; no source review or scientific model call ran.
+- Corrected path: distinguish advertised names, attempted calls, runtime rejection and complete
+  registered surface. Preserve null returned-model identity when events do not supply it.
+- Verification: one actual Code Mode denial is retained; complete tool-surface and per-turn model
+  evidence remain unavailable. Runtime admission therefore stays closed, rather than claiming a
+  verified tool-less environment.
+- Prevention surface: the runtime-admission gate and v2 evidence report reject self-attestation and
+  separate requested identity from observed identity.
+
+
+## SCIFACT-RAG-020: reviewer prompt omitted a strict cross-field annotation rule
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 first complete fictional rehearsal.
+- Failed approach: supply the scientific rubric and strict JSON field schema without explicitly
+  conveying the validator's affirmative-flag-to-annotation-category mapping.
+- Error signature: rehearsal call 6 marked causal strengthening, negation omission and qualifier
+  omission but annotated only causal strengthening; validation reported missing `negation_loss`
+  and `qualifier_loss` categories.
+- Mutation check: five calls completed, one failed validation and two were never dispatched. The
+  failed judgment and its session identity remain retained. No scientific review ran.
+- Corrected path: mechanically expose the existing category mapping in instructions, preserve
+  strict validation and scientific criteria, freeze a new implementation identity, and use only
+  the one remaining authorized complete fictional round with the same cases. Never autocorrect a
+  judgment or selectively retry the failed call.
+- Verification boundary: the independent verifier reproduced the rejection; the final rehearsal
+  outcome is recorded in the v2 report. Instruction clarity alone does not establish reliability.
+- Prevention surface: a focused contract regression checks the published mechanical mapping;
+  campaign accounting enforces the two-round ceiling and preserves the failed attempt.
+
+## SCIFACT-RAG-021: transport exit lacked diagnosable failure evidence
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 final fictional rehearsal.
+- Failed approach: classify a subprocess exit only as `transport_exit` after discarding stderr.
+- Error signature: one fresh subscription session exited with status 1 and no final output; the
+  retained record could not distinguish provider failure, configuration failure or launch drift.
+- Mutation check: the failed attempt remained immutable; no retry or scientific call followed it.
+- Corrected path: retain only a coarse stderr class (`rate_or_budget_limit`, `authentication`,
+  `configuration`, `model_selection`, `network_or_timeout`, or process exit), never provider text,
+  hidden reasoning or credentials. A bounded diagnostic under the identical pinned profile then
+  succeeded with `stderr_without_failure`, and the final rehearsal completed all eight calls.
+- Verification: the transport repair passed the focused suite and the final fictional run had
+  eight completed, zero failed and zero unknown attempts. The original failure remains in the
+  ledger and is reported as non-reproducible under the available evidence.
+- Prevention surface: future transport failures retain enough sanitized classification to support
+  root-cause analysis without widening the publication boundary.
+
+## SCIFACT-RAG-022: development timeout is not a retryable transport probe
+
+- Date: 2026-09-19.
+- Workflow: Issue #35 real 42-case development assessment.
+- Failed approach: the third scheduled development request did not return a final judgment within
+  the frozen 180-second subprocess ceiling.
+- Error signature: `call_timeout`, exit `-9`, `process_exit`, with an attributable fresh session
+  and no usage or provider-returned model identity.
+- Mutation check: two prior development judgments completed; the third failed; 165 turns were not
+  dispatched. The campaign has zero unknown outcomes. No scientific result or aggregate assessment
+  was computed.
+- Corrected path: none exists inside the accepted contract. Preserve the failed attempt and stop;
+  do not retry, replace the case, resume the run, enlarge the timeout, or start another campaign.
+- Verification: the public report and campaign chain record 3 attempted, 2 completed, 1 failed,
+  0 unknown and 165 not attempted turns; execution is `execution_failed`, assessment is
+  `not_assessed`.
+- Prevention surface: the finite coordinator persists every attempt and prohibits any second
+  development run. Further work requires an explicit owner-approved contract revision.
+
+## Issue 35 recovery: excerpt lookup and flat accounting
+
+- Failed approach: map document ID to a single excerpt; repeated IDs overwrite earlier supplied text. Signature: exact quote rejected as not exact for the named document. Earlier failed attempts remain immutable.
+- Corrected path: group distinct texts under each document ID, retain exact-occurrence and ambiguity checks, and revalidate unchanged raw outputs with separately recorded provenance. Tests cover early excerpt, identical duplicate, within-excerpt repetition and cross-excerpt ambiguity.
+- Failed approach: recursively reconstruct revised continuation descriptors, losing inherited counts or rebinding earlier hashes. Corrected path: verify every physical attempt against its immutable terminal and frozen request, select earliest valid records, and retain duplicates and failures in campaign accounting.
+- Validation environment correction: default macOS python3 lacks tomllib; use the configured uv environment, and prefix make with the repository .venv/bin path. The initial environment-only failure is retained separately from the subsequent executed gate.
